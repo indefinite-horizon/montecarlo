@@ -2,8 +2,12 @@
 
 const {
   chmodSync,
+  closeSync,
+  constants,
+  fstatSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -19,6 +23,37 @@ const providerEnvironmentNames = Object.freeze({
 const providerSecretStoreVersion = 1;
 const maximumSecretCharacters = 8_192;
 const maximumStoreBytes = 128 * 1_024;
+
+function assertRegularCredentialFile(fileStats) {
+  if (!fileStats.isFile() || fileStats.isSymbolicLink()) {
+    throw new Error("Provider credential store must be a regular file.");
+  }
+  if (fileStats.size > maximumStoreBytes) {
+    throw new Error("Provider credential store is too large.");
+  }
+}
+
+function readCredentialFile(filePath) {
+  if (process.platform === "win32") {
+    const fileStats = lstatSync(filePath);
+    assertRegularCredentialFile(fileStats);
+    return readFileSync(filePath, "utf8");
+  }
+
+  let descriptor;
+  try {
+    descriptor = openSync(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    assertRegularCredentialFile(fstatSync(descriptor));
+    return readFileSync(descriptor, "utf8");
+  } catch (error) {
+    if (error?.code === "ELOOP") {
+      throw new Error("Provider credential store must be a regular file.");
+    }
+    throw error;
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
 
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -46,14 +81,7 @@ function assertSecureStorageAvailable(safeStorage) {
 function readEncryptedEntries(filePath) {
   let encoded;
   try {
-    const fileStats = lstatSync(filePath);
-    if (!fileStats.isFile() || fileStats.isSymbolicLink()) {
-      throw new Error("Provider credential store must be a regular file.");
-    }
-    if (fileStats.size > maximumStoreBytes) {
-      throw new Error("Provider credential store is too large.");
-    }
-    encoded = readFileSync(filePath, "utf8");
+    encoded = readCredentialFile(filePath);
   } catch (error) {
     if (error?.code === "ENOENT") return {};
     throw error;

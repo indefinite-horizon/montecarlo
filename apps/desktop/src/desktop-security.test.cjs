@@ -1,12 +1,20 @@
 /** Tests Electron renderer URL validation and packaged-asset path confinement. */
 
 const assert = require("node:assert/strict");
-const { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } = require("node:fs");
+const {
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { after, before, describe, it } = require("node:test");
 const {
   desktopOrigin,
+  isAllowedExternalUrl,
   isAllowedRendererUrl,
   mimeTypeForPath,
   parseRuntimeReadyLine,
@@ -63,9 +71,18 @@ describe("desktop security helpers", () => {
     const rendererUrl = resolveDevelopmentRendererUrl("http://127.0.0.1:5173/chat");
     const origin = new URL(rendererUrl).origin;
     assert.equal(rendererUrl, "http://127.0.0.1:5173/chat");
+    assert.equal(resolveDevelopmentRendererUrl("http://[::1]:5173/chat"), "http://[::1]:5173/chat");
     assert.equal(resolveDevelopmentRendererUrl("https://example.com"), "http://localhost:5173/");
     assert.equal(isAllowedRendererUrl(`${origin}/projects`, true, origin), true);
     assert.equal(isAllowedRendererUrl("http://127.0.0.1:5174/projects", true, origin), false);
+  });
+
+  it("opens external links only for explicitly trusted HTTPS origins", () => {
+    assert.equal(isAllowedExternalUrl("https://auth.openai.com/device"), true);
+    assert.equal(isAllowedExternalUrl("https://platform.openai.com/docs"), true);
+    assert.equal(isAllowedExternalUrl("https://example.com/phishing"), false);
+    assert.equal(isAllowedExternalUrl("https://user@auth.openai.com/device"), false);
+    assert.equal(isAllowedExternalUrl("http://auth.openai.com/device"), false);
   });
 
   it("allows only the canonical packaged renderer host", () => {
@@ -76,11 +93,11 @@ describe("desktop security helpers", () => {
 
   it("serves known assets with MIME types and falls back to the SPA document", () => {
     assert.deepEqual(resolveRendererAsset(rendererRoot, `${desktopOrigin}/assets/app.js`), {
-      filePath: path.join(rendererRoot, "assets", "app.js"),
+      filePath: realpathSync(path.join(rendererRoot, "assets", "app.js")),
       mimeType: "text/javascript; charset=utf-8",
     });
     assert.deepEqual(resolveRendererAsset(rendererRoot, `${desktopOrigin}/projects/example`), {
-      filePath: path.join(rendererRoot, "index.html"),
+      filePath: realpathSync(path.join(rendererRoot, "index.html")),
       mimeType: "text/html; charset=utf-8",
     });
     assert.equal(mimeTypeForPath("font.woff2"), "font/woff2");

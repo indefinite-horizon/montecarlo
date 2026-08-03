@@ -47,7 +47,7 @@ const Message = memo(function Message({
     );
   }
 
-  if (message.role === "system") {
+  if (message.role === "system" || message.isError) {
     return (
       <div className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm text-foreground/80">
         {message.content}

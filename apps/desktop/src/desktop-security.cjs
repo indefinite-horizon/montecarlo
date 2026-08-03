@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const desktopOrigin = "app://monte-carlo";
 const defaultDevelopmentRendererUrl = "http://localhost:5173/";
+const allowedExternalOrigins = new Set(["https://auth.openai.com", "https://platform.openai.com"]);
 // Keep aligned with runtimeDefaults.port in apps/runtime/src/config.ts.
 const runtimeDefaultPort = 43_127;
 
@@ -59,12 +60,27 @@ function resolveDevelopmentRendererUrl(rawValue) {
   } catch {
     return defaultDevelopmentRendererUrl;
   }
-  const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  const isLoopback =
+    url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
   const isHttp = url.protocol === "http:" || url.protocol === "https:";
   if (!isLoopback || !isHttp || url.username !== "" || url.password !== "") {
     return defaultDevelopmentRendererUrl;
   }
   return url.href;
+}
+
+function isAllowedExternalUrl(target) {
+  try {
+    const url = new URL(target);
+    return (
+      url.protocol === "https:" &&
+      url.username === "" &&
+      url.password === "" &&
+      allowedExternalOrigins.has(url.origin)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isAllowedRendererUrl(target, isDevelopment, developmentOrigin) {
@@ -167,6 +183,7 @@ function resolveRendererAsset(rendererRoot, requestUrl) {
 module.exports = {
   defaultDevelopmentRendererUrl,
   desktopOrigin,
+  isAllowedExternalUrl,
   isAllowedRendererUrl,
   mimeTypeForPath,
   parseRuntimeReadyLine,

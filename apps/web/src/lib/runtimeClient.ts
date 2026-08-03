@@ -244,14 +244,18 @@ async function runtimeConfig(): Promise<{ baseUrl: string; token?: string }> {
   };
 }
 
-function parseEventBlock(block: string): RuntimeStreamEvent | undefined {
+export function parseEventBlock(block: string): RuntimeStreamEvent | undefined {
   const data = block
     .split("\n")
     .filter((line) => line.startsWith("data:"))
     .map((line) => line.slice(5).trimStart())
     .join("\n");
   if (!data || data === "[DONE]") return undefined;
-  return JSON.parse(data) as RuntimeStreamEvent;
+  try {
+    return JSON.parse(data) as RuntimeStreamEvent;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function streamRuntimeChat(input: {

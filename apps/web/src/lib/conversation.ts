@@ -11,6 +11,7 @@ export type ChatMessage = {
   provider?: ProviderId;
   model?: string;
   isStreaming?: boolean;
+  isError?: boolean;
 };
 
 export type BranchAnchor = {

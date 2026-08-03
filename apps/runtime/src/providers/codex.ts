@@ -117,10 +117,16 @@ function streamProcess(
   };
 }
 
-function transcriptPrompt(messages: ChatMessage[]): string {
+function escapeRoleContent(content: string): string {
+  return content.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}
+
+export function transcriptPrompt(messages: ChatMessage[]): string {
   return [
     "Continue this conversation. Reply to the final user message.",
-    ...messages.map((message) => `<${message.role}>\n${message.content}\n</${message.role}>`),
+    ...messages.map(
+      (message) => `<${message.role}>\n${escapeRoleContent(message.content)}\n</${message.role}>`,
+    ),
   ].join("\n\n");
 }
 

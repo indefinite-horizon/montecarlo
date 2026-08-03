@@ -8,6 +8,7 @@ const { readFile } = require("node:fs/promises");
 const path = require("node:path");
 const {
   desktopOrigin,
+  isAllowedExternalUrl,
   isAllowedRendererUrl,
   parseRuntimeReadyLine,
   readRuntimePort,
@@ -271,7 +272,7 @@ function createWindow() {
   });
 
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("https://")) void shell.openExternal(url);
+    if (isAllowedExternalUrl(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", (event, url) => {

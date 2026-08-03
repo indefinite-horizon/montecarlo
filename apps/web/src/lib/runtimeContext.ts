@@ -75,7 +75,7 @@ export function buildRuntimeContext(
     index -= 1
   ) {
     const message = messages[index];
-    if (!message) continue;
+    if (!message || message.isError) continue;
     const content = message.content.trim();
     if (!content || remaining <= 0) continue;
     const bounded = truncateMiddle(content, Math.min(limits.maxMessageCharacters, remaining));

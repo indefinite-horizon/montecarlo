@@ -1,6 +1,7 @@
 /** Backend-neutral blob manifests for filesystem and R2 object bodies. */
 
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { convexConfig } from "./config";
 import {
@@ -26,6 +27,23 @@ const blobManifestValidator = v.object({
   createdAt: v.number(),
   updatedAt: v.number(),
 });
+
+function toManifestResult(manifest: Doc<"blob_manifests">) {
+  return {
+    id: manifest._id,
+    publicId: manifest.publicId,
+    workspaceId: manifest.workspaceId,
+    backend: manifest.backend,
+    objectKey: manifest.objectKey,
+    envelopeVersion: manifest.envelopeVersion,
+    contentType: manifest.contentType,
+    byteLength: manifest.byteLength,
+    sha256: manifest.sha256,
+    status: manifest.status,
+    createdAt: manifest.createdAt,
+    updatedAt: manifest.updatedAt,
+  };
+}
 
 export const reserve = mutation({
   args: {
@@ -77,20 +95,7 @@ export const reserve = mutation({
       ) {
         throw new Error("Blob public ID already refers to different content.");
       }
-      return {
-        id: existingPublicId._id,
-        publicId: existingPublicId.publicId,
-        workspaceId: existingPublicId.workspaceId,
-        backend: existingPublicId.backend,
-        objectKey: existingPublicId.objectKey,
-        envelopeVersion: existingPublicId.envelopeVersion,
-        contentType: existingPublicId.contentType,
-        byteLength: existingPublicId.byteLength,
-        sha256: existingPublicId.sha256,
-        status: existingPublicId.status,
-        createdAt: existingPublicId.createdAt,
-        updatedAt: existingPublicId.updatedAt,
-      };
+      return toManifestResult(existingPublicId);
     }
 
     const existingContent = await ctx.db
@@ -108,20 +113,7 @@ export const reserve = mutation({
       ) {
         throw new Error("Blob digest already exists with conflicting metadata.");
       }
-      return {
-        id: existingContent._id,
-        publicId: existingContent.publicId,
-        workspaceId: existingContent.workspaceId,
-        backend: existingContent.backend,
-        objectKey: existingContent.objectKey,
-        envelopeVersion: existingContent.envelopeVersion,
-        contentType: existingContent.contentType,
-        byteLength: existingContent.byteLength,
-        sha256: existingContent.sha256,
-        status: existingContent.status,
-        createdAt: existingContent.createdAt,
-        updatedAt: existingContent.updatedAt,
-      };
+      return toManifestResult(existingContent);
     }
 
     const now = Date.now();
@@ -140,20 +132,9 @@ export const reserve = mutation({
       createdAt: now,
       updatedAt: now,
     });
-    return {
-      id: manifestId,
-      publicId,
-      workspaceId: args.workspaceId,
-      backend: args.backend,
-      objectKey,
-      envelopeVersion,
-      contentType,
-      byteLength,
-      sha256,
-      status: "reserved" as const,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const manifest = await ctx.db.get(manifestId);
+    if (!manifest) throw new Error("Reserved blob manifest could not be loaded.");
+    return toManifestResult(manifest);
   },
 });
 
@@ -173,20 +154,7 @@ export const markAvailable = mutation({
     if (manifest.status !== "available") {
       await ctx.db.patch(manifest._id, { status: "available", updatedAt });
     }
-    return {
-      id: manifest._id,
-      publicId: manifest.publicId,
-      workspaceId: manifest.workspaceId,
-      backend: manifest.backend,
-      objectKey: manifest.objectKey,
-      envelopeVersion: manifest.envelopeVersion,
-      contentType: manifest.contentType,
-      byteLength: manifest.byteLength,
-      sha256: manifest.sha256,
-      status: "available" as const,
-      createdAt: manifest.createdAt,
-      updatedAt,
-    };
+    return toManifestResult({ ...manifest, status: "available", updatedAt });
   },
 });
 
@@ -206,19 +174,6 @@ export const get = query({
       )
       .unique();
     if (!manifest || manifest.status === "deleted") return null;
-    return {
-      id: manifest._id,
-      publicId: manifest.publicId,
-      workspaceId: manifest.workspaceId,
-      backend: manifest.backend,
-      objectKey: manifest.objectKey,
-      envelopeVersion: manifest.envelopeVersion,
-      contentType: manifest.contentType,
-      byteLength: manifest.byteLength,
-      sha256: manifest.sha256,
-      status: manifest.status,
-      createdAt: manifest.createdAt,
-      updatedAt: manifest.updatedAt,
-    };
+    return toManifestResult(manifest);
   },
 });

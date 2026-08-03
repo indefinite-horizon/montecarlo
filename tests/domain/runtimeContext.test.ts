@@ -44,4 +44,11 @@ describe("runtime context", () => {
       "positive integers",
     );
   });
+
+  it("excludes failed assistant placeholders from provider context", () => {
+    const failed = { ...message(1, "runtime unavailable"), isError: true };
+    expect(buildRuntimeContext([message(0, "question"), failed])).toEqual([
+      { ...message(0, "question"), isStreaming: false },
+    ]);
+  });
 });

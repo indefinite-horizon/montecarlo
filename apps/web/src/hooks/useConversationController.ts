@@ -11,16 +11,11 @@ import {
 } from "@/lib/conversation";
 import type { MessageItem } from "@/lib/convexDomainApi";
 import { demoBranches, demoChats, demoProjects } from "@/lib/demoConversation";
+import { defaultProviderModels } from "@/lib/providerConfig";
 import { streamRuntimeChat } from "@/lib/runtimeClient";
 import { buildRuntimeContext } from "@/lib/runtimeContext";
 import { useConvexConversationData } from "./useConvexConversationData";
 
-const defaultProviderModels: Record<ProviderId, string> = {
-  codex: "gpt-5.6-sol",
-  anthropic: "claude-sonnet-4-6",
-  ollama: "qwen3:8b",
-  openrouter: "anthropic/claude-sonnet-4.6",
-};
 const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
 
 type SessionBranch = {
@@ -81,7 +76,9 @@ export function useConversationController(
     prompt: string;
   }>();
   const [provider, setProvider] = useState<ProviderId>("codex");
-  const [providerModels, setProviderModels] = useState(defaultProviderModels);
+  const [providerModels, setProviderModels] = useState<Record<ProviderId, string>>({
+    ...defaultProviderModels,
+  });
   const domain = useConvexConversationData(requestedBranchId);
   const abortRef = useRef<AbortController>();
   const startedBranchTurnsRef = useRef(new Set<string>());
@@ -349,8 +346,8 @@ export function useConversationController(
           assistantContent = "";
           updateMessage(branchId, assistantId, (message) => ({
             ...message,
-            role: "system",
             content: runtimeOfflineMessage,
+            isError: true,
           }));
         }
       } finally {

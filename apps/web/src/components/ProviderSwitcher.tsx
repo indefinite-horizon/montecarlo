@@ -12,6 +12,7 @@ import {
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProviderId, ProviderOption } from "@/lib/conversation";
+import { defaultProviderModels } from "@/lib/providerConfig";
 import { cn } from "@/lib/utils";
 
 const iconByProvider = {
@@ -40,28 +41,28 @@ export const ProviderSwitcher = memo(function ProviderSwitcher({
     {
       id: "codex",
       label: t("providers.codex.name"),
-      model: "gpt-5.6-sol",
+      model: defaultProviderModels.codex,
       detail: t("providers.codex.detail"),
       availability: "ready",
     },
     {
       id: "openrouter",
       label: t("providers.openrouter.name"),
-      model: "anthropic/claude-sonnet-4.6",
+      model: defaultProviderModels.openrouter,
       detail: t("providers.openrouter.detail"),
       availability: "setup",
     },
     {
       id: "ollama",
       label: t("providers.ollama.name"),
-      model: "qwen3:8b",
+      model: defaultProviderModels.ollama,
       detail: t("providers.ollama.detail"),
       availability: "ready",
     },
     {
       id: "anthropic",
       label: t("providers.anthropic.name"),
-      model: "claude-sonnet-4-6",
+      model: defaultProviderModels.anthropic,
       detail: t("providers.anthropic.detail"),
       availability: "setup",
     },
