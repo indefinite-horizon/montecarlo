@@ -2,62 +2,54 @@
 
 ## Background
 
-This repo is a template for a Convex + Vite + React application. It includes Better Auth, shadcn/ui, Effect, i18n, analytics outbox plumbing, Playwright, Vitest, GitHub Actions, and reusable agent rules/skills.
+Monte Carlo is a local-first branchable conversation workspace. It uses a React/Vite SPA, Electron, a local Node/Bun model runtime, Convex, Better Auth, AI SDK 7, Tailwind/shadcn primitives, Effect, i18n, Vitest, and Playwright.
 
-## Convention Enforcement
-
-1. Local helpers and docs explain the intended path.
-2. Custom lint in `scripts/lint-custom.ts` catches project-specific mistakes.
-3. CI runs lint, typecheck, tests, build, codegen freshness, i18n validation, and Playwright projects.
-4. Agent skills in `.agents/skills` preserve common review and recovery workflows.
+The application-owned chat DAG is always authoritative. Provider session IDs are optional accelerators and must never become required to reconstruct a conversation or move it between providers.
 
 ## Hard Rules
 
-- Do not commit secrets. Use `.env.local` locally and Vercel/Convex env vars in production.
-- Do not bypass `scripts/run_local.sh` when validating the full local stack.
-- Do not import analytics SDKs outside the approved adapter/outbox files.
-- Do not hand-edit generated Convex or route tree files except to resolve codegen conflicts.
-- Keep i18n keys in sync with `bun run validate:i18n`.
+- Never commit secrets. Local model and object-store secrets belong in `.env.runtime.local` or the desktop credential boundary, never in Convex, analytics, renderer persistence, logs, or action arguments.
+- Every public tenant Convex function must authorize active workspace membership. Do not accept a user/owner ID from clients.
+- Every tenant-owned document carries `workspaceId`; tenant compound indexes begin with it and reads use those indexes.
+- Keep stable public IDs and versioned envelopes at persistence boundaries. Never export Convex `_id` values or absolute local paths as portable identity.
+- Keep branch persistence provider-neutral. Native Codex/Claude forks may optimize a run but do not define the graph.
+- Do not enable Claude subscription authentication without written Anthropic approval. Direct Anthropic API-key access is supported.
+- Do not read, copy, return, or persist Codex's auth cache. Let the official local SDK/CLI own and refresh it.
+- Do not import provider SDKs into React or Convex query/mutation modules. Provider execution lives under `apps/runtime`.
+- Do not hand-edit generated Convex or TanStack Router files except to resolve a documented codegen conflict.
+- User-facing product copy uses locale keys. Run `bun run validate:i18n` after copy changes.
 
-## Dev Environment
+## Development
 
 ```sh
 cp .env.example .env.local
+cp .env.runtime.example .env.runtime.local
 bun install
-bash scripts/run_local.sh
+bun run dev
 ```
 
-Local dev sign-in:
+Use `bun run dev:desktop` for Electron. Use `.conductor/settings.toml` from Conductor workspaces; do not add a legacy `conductor.json`.
 
-- `test@test.local`
+## Verification
 
-Submitting the email in local development automatically opens the magic link.
-
-## Planning And Review
-
-Use `/babysit` after opening a PR. Use `/run-ci-local` to reproduce CI. Use `/verify-with-screenshot` when a UI change needs browser evidence.
-
-## Testing
-
-See [docs/TESTING.md](docs/TESTING.md). The short path is:
-
-After completing any implementation work, consult [docs/TESTING.md](docs/TESTING.md) to determine whether new or updated tests are needed.
+Consult [docs/TESTING.md](docs/TESTING.md) for test selection. The standard path is:
 
 ```sh
 bun run lint
 bun run typecheck
 bun run test
-bash scripts/prepare_e2e_env.sh .env.example .env.e2e
-bun run test:e2e:core:ci
+bun run build
+bun run validate:i18n
 ```
+
+Add focused coverage for branch graphs, context windows, authorization, portable imports, stream normalization, endpoint security, and provider cancellation when those areas change.
 
 ## Doc Map
 
-- `README.md`: setup and feature overview.
-- `docs/ONTOLOGY.md`: app-specific terminology and jargon.
-- `docs/NEW_PROD_DEPLOY.md`: Vercel + Convex deployment.
-- `docs/ANALYTICS.md`: event catalog and outbox model.
-- `docs/TESTING.md`: unit, integration, and Playwright strategy.
-- `docs/SECURITY.md`: security posture and checklist.
-- `docs/DESIGN.md`: starter design guidance.
-- `docs/LOCAL_SMOKE.md`: local and deployed smoke checks.
+- `README.md`: setup, feature status, and provider support.
+- `docs/ARCHITECTURE.md`: runtime and persistence invariants.
+- `docs/ONTOLOGY.md`: canonical product terminology.
+- `docs/DESIGN.md`: visual and interaction rules.
+- `docs/SECURITY.md`: trust boundaries and release checklist.
+- `docs/TESTING.md`: unit, integration, desktop, and browser strategy.
+- `docs/NEW_PROD_DEPLOY.md`: cloud and desktop release requirements.

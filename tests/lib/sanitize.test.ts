@@ -10,7 +10,7 @@ describe("sanitizeProperties", () => {
         user_id: "users_1",
         count: 2,
         enabled: true,
-        tags: ["core", "template"],
+        tags: ["core", "workspace"],
         empty: null,
         result: "success",
       }),
@@ -18,7 +18,7 @@ describe("sanitizeProperties", () => {
       user_id: "users_1",
       count: 2,
       enabled: true,
-      tags: ["core", "template"],
+      tags: ["core", "workspace"],
       empty: null,
       result: "success",
     });

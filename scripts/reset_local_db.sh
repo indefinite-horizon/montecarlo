@@ -12,20 +12,13 @@ HARD=false
 [[ "${1:-}" == "--hard" ]] && HARD=true
 
 if $HARD; then
-  # Parse the deployment name from .env.local
-  DEPLOYMENT=$(grep '^CONVEX_DEPLOYMENT=' .env.local | cut -d: -f2)
-  if [[ -z "$DEPLOYMENT" ]]; then
-    echo "Error: could not read CONVEX_DEPLOYMENT from .env.local" >&2
-    exit 1
-  fi
-  # NOTE: Convex-internal path convention — may change across Convex versions
-  DB_PATH="$HOME/.convex/anonymous-convex-backend-state/$DEPLOYMENT/convex_local_backend.sqlite3"
+  DB_PATH="$PWD/.convex/local/default/convex_local_backend.sqlite3"
   if [[ ! -f "$DB_PATH" ]]; then
     echo "Error: SQLite file not found at $DB_PATH" >&2
     exit 1
   fi
   echo "Deleting $DB_PATH ..."
-  rm "$DB_PATH"
+  rm -- "$DB_PATH"
   echo "Done. Restart 'bun dev' to reinitialize the DB, then run: bunx convex run --no-push init"
 else
   echo "Clearing all Convex data (live reset)..."

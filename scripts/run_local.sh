@@ -11,6 +11,7 @@ cd "$(dirname "$0")/.."
 source scripts/convex_cli_utils.sh
 
 ENV_FILE="${LOCAL_ENV_FILE:-.env.local}"
+RUNTIME_ENV_FILE="${LOCAL_RUNTIME_ENV_FILE:-.env.runtime.local}"
 AFTER_START_COMMAND="${LOCAL_AFTER_START_COMMAND:-}"
 CONVEX_CLI="${CONVEX_CLI:-bunx convex}"
 LOCAL_BACKEND_PORT="${LOCAL_BACKEND_PORT:-}"
@@ -19,6 +20,7 @@ SITE_PORT="${SITE_PORT:-}"
 LOCAL_FRONTEND_PORT="${LOCAL_FRONTEND_PORT:-}"
 CONDUCTOR_PORT="${CONDUCTOR_PORT:-}"
 LOCAL_FRONTEND_BIND_PORT="${LOCAL_FRONTEND_BIND_PORT:-}"
+LOCAL_RUNTIME_PORT="${LOCAL_RUNTIME_PORT:-}"
 LOCAL_SUPPRESS_PERIODIC_URL_LOG="${LOCAL_SUPPRESS_PERIODIC_URL_LOG:-}"
 ENV_FILE_SET=false
 URL_LOG_PID=""
@@ -40,6 +42,7 @@ stop_dev_stack() {
       kill_process_tree "$DEV_PID" KILL
     fi
   fi
+  rm -f .dev/local-stack.pid
 }
 
 stop_processes_on_port() {
@@ -106,6 +109,8 @@ Environment:
   CONDUCTOR_PORT              Frontend port supplied by Conductor.
   LOCAL_FRONTEND_BIND_PORT    Vite bind port. Defaults to selected frontend port.
   CONVEX_CLI                  Convex CLI command. Default: bunx convex.
+  LOCAL_RUNTIME_ENV_FILE      Runtime env file. Default: .env.runtime.local.
+  LOCAL_RUNTIME_PORT          Explicit loopback companion port.
 EOF
 }
 
@@ -141,6 +146,11 @@ done
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Error: $ENV_FILE not found."
+  exit 1
+fi
+
+if [ ! -f "$RUNTIME_ENV_FILE" ]; then
+  echo "Error: $RUNTIME_ENV_FILE not found. Copy .env.runtime.example first."
   exit 1
 fi
 
@@ -431,6 +441,7 @@ print_urls() {
   echo "  Web:         http://localhost:${site_port}"
   echo "  Convex:      http://127.0.0.1:${backend_port}"
   echo "  Convex site: http://127.0.0.1:${backend_site_port}"
+  echo "  Runtime:     http://127.0.0.1:${runtime_port}"
 }
 
 start_periodic_url_log() {
@@ -491,7 +502,22 @@ if [ "$frontend_bind_port" -eq "$backend_port" ] || [ "$frontend_bind_port" -eq 
   echo "Error: frontend bind port $frontend_bind_port is reserved for Convex." >&2
   exit 1
 fi
-stop_processes_on_port "$frontend_bind_port" "frontend bind"
+require_free_port "$frontend_bind_port" "frontend bind"
+
+if [ -n "$LOCAL_RUNTIME_PORT" ]; then
+  runtime_port="$LOCAL_RUNTIME_PORT"
+elif [ -n "$CONDUCTOR_PORT" ]; then
+  runtime_port="$((CONDUCTOR_PORT + 3))"
+else
+  runtime_port="$(find_free_port 4242 1 "runtime")"
+fi
+
+while [ "$runtime_port" -eq "$backend_port" ] ||
+  [ "$runtime_port" -eq "$backend_site_port" ] ||
+  [ "$runtime_port" -eq "$frontend_bind_port" ]; do
+  runtime_port="$(find_free_port "$((runtime_port + 1))" 1 "runtime")"
+done
+require_free_port "$runtime_port" "runtime"
 
 write_selected_ports_to_env
 
@@ -502,6 +528,11 @@ export CONVEX_AGENT_MODE=anonymous
 export LOCAL_FRONTEND_PORT="$frontend_port"
 export LOCAL_FRONTEND_BIND_PORT="$frontend_bind_port"
 export SITE_PORT="$site_port"
+export MONTE_CARLO_RUNTIME_DEV=1
+export MONTE_CARLO_RUNTIME_PORT="$runtime_port"
+export MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS="http://localhost:${site_port},http://127.0.0.1:${frontend_bind_port}"
+export VITE_RUNTIME_URL="http://127.0.0.1:${runtime_port}"
+export VITE_RUNTIME_TOKEN="$(env_file_value "MONTE_CARLO_RUNTIME_TOKEN" "$RUNTIME_ENV_FILE")"
 
 if env_file_has_usable_deployment_selector; then
   echo "Using existing Convex deployment selector from $ENV_FILE."
@@ -544,6 +575,8 @@ if [ -z "$DEV_GIT_REF" ]; then
   DEV_GIT_REF="$(git rev-parse --short HEAD 2>/dev/null || true)"
 fi
 WEB_DEV_COMMAND="bun --env-file=\"$ENV_FILE\" run dev:web -- --host 0.0.0.0 --port $frontend_bind_port --strictPort"
+RUNTIME_DEV_COMMAND="bun --env-file=\"$RUNTIME_ENV_FILE\" run --filter './apps/runtime' dev"
+APP_DEV_COMMAND="bunx concurrently --kill-others-on-fail -n web,runtime '$WEB_DEV_COMMAND' '$RUNTIME_DEV_COMMAND'"
 
 echo "Starting dev stack..."
 start_periodic_url_log
@@ -555,8 +588,10 @@ VITE_DEV_GIT_BRANCH="$DEV_GIT_REF" \
     --local-cloud-port "$backend_port" \
     --local-site-port "$backend_site_port" \
     --tail-logs pause-on-deploy \
-    --start "$WEB_DEV_COMMAND" &
+    --start "$APP_DEV_COMMAND" &
 DEV_PID=$!
+mkdir -p .dev
+printf '%s\n' "$DEV_PID" > .dev/local-stack.pid
 
 if [ -n "$AFTER_START_COMMAND" ]; then
   wait_for_url "http://127.0.0.1:${backend_site_port}/api/health/ready" "Convex site"

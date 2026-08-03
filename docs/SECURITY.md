@@ -1,7 +1,8 @@
 # Security
 
-This document captures template-level security expectations. Product-specific
-apps should extend it before collecting real users.
+Monte Carlo has four trust boundaries: the renderer, Convex control plane,
+loopback model runtime, and workspace object store. A chat may cross all four;
+provider credentials must cross none of them except the runtime that uses them.
 
 ## Baseline
 
@@ -12,6 +13,10 @@ apps should extend it before collecting real users.
 - Analytics properties reject obvious PII, credentials, URLs, prompts, and nested payloads.
 - Convex HTTP routes expose Better Auth and health endpoints by default.
 - CI runs audit, lint, typecheck, tests, build, codegen freshness, i18n validation, and Playwright projects.
+- Every tenant read and write resolves the Better Auth caller and active workspace membership.
+- The local companion accepts only loopback Host headers, exact configured origins, bounded bodies, and a bearer token outside explicit development mode.
+- Electron uses a sandboxed, context-isolated renderer, denies permissions and new windows, and exposes narrow typed IPC only.
+- The trusted client verifies the runtime upload receipt, hash, and byte length before requesting manifest availability. This is a local-mode integrity check, not server-side attestation for a future multi-tenant gateway.
 
 ## Sensitive Data
 
@@ -22,6 +27,42 @@ errors, screenshots, or client state:
 - `BETTER_AUTH_SECRET`, session tokens, cookies, and magic-link tokens
 - verification codes and other credential material
 - request headers, env vars, raw provider payloads, prompts, and message bodies
+
+The exception to “client state” is the shortest-lived input buffer needed while
+a user pastes a provider key. The web build never persists that value. Electron
+passes it over IPC to `safeStorage`, then clears the field and restarts the
+runtime with the decrypted secret. No IPC method returns secret plaintext.
+
+## Local Account-Free Mode
+
+Local workspaces can run without a cloud account. This is not a cloud auth
+bypass: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` is honored only when `SITE_URL`
+is a loopback origin. The local Convex deployment is expected to bind to the
+user's machine, and the runtime independently binds to loopback. Never set this
+flag on a shared or cloud deployment.
+
+## Provider Boundary
+
+- Codex authentication remains in the official CLI/SDK credential store. Monte
+  Carlo may invoke `codex login --device-auth`, but does not read the auth cache.
+- OpenRouter and Anthropic keys come from Electron's encrypted store or an
+  explicitly trusted local runtime environment.
+- A managed OpenRouter key is used only with the configured managed endpoint;
+  request-selected endpoints never receive it.
+- Ollama endpoints must resolve to loopback.
+- Claude.ai Free/Pro/Max authentication remains disabled unless Anthropic gives
+  written approval for the third-party integration.
+
+## Object Storage
+
+Portable keys are relative, versioned identifiers. Filesystem adapters reject
+absolute paths, traversal, and symlink escape. R2 buckets are private; access
+credentials live only in the runtime environment. Convex stores hash, size,
+media type, backend, lifecycle status, and a portable object key—not the body or
+a signed URL. The current companion is loopback-only. A future production
+gateway must issue short-lived per-user/per-workspace capabilities and attest
+the object before changing its manifest status; one shared bearer across
+tenants is prohibited.
 
 Convex action args are logged by Convex. Read secrets from environment variables
 inside the action that uses them.

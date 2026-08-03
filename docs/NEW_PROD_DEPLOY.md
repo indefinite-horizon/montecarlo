@@ -62,6 +62,8 @@ Minimum production values:
 - `RESEND_FROM_EMAIL`
 - `APP_RELEASE_CHANNEL=production`
 
+Never set `ALLOW_LOCAL_ANONYMOUS_WORKSPACES` on the shared deployment.
+
 Optional values:
 
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
@@ -115,6 +117,19 @@ Before sending production users to the deployment:
 - Confirm authenticated Convex reads work by reaching the home page.
 - If Google OAuth is enabled, complete one Google sign-in.
 - If analytics is enabled, verify backend outbox flushes and browser captures.
+
+## Cloud Runtime And R2
+
+The current release supports only an authenticated loopback companion. Do not
+put a runtime bearer or managed provider key in a `VITE_*` variable: browser
+bundles are public, and that would let any visitor spend the managed key.
+
+Before enabling the hosted SPA for cloud object bodies or managed OpenRouter
+usage, add a gateway that exchanges the Better Auth session for a short-lived,
+workspace- and provider-scoped capability. The gateway must authorize every
+R2 operation, attest the uploaded hash and length before marking a manifest
+available, rate-limit provider spend, and keep the bucket private. A shared
+static bearer is not a supported deployment design.
 
 ## 8. Roll Back
 

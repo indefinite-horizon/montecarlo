@@ -26,6 +26,10 @@ export const env = cleanEnv(process.env, {
     desc: "Explicit opt-in for destructive local dev tools. Must be 'true' to enable.",
     default: "",
   }),
+  ALLOW_LOCAL_ANONYMOUS_WORKSPACES: str({
+    desc: "Allow the account-free local workspace identity on a loopback deployment.",
+    default: "",
+  }),
   GIT_SHA: str({ desc: "Commit SHA stamped on structured logs.", default: "" }),
   APP_RELEASE_CHANNEL: str({ desc: "Deployment channel.", default: "" }),
 });
@@ -38,6 +42,9 @@ export const isDev =
 
 export const isLocalDev =
   env.SITE_URL.startsWith("http://localhost") || env.SITE_URL.startsWith("http://127.0.0.1");
+
+export const localAnonymousWorkspacesEnabled =
+  isLocalDev && env.ALLOW_LOCAL_ANONYMOUS_WORKSPACES === "true";
 
 export const devToolsEnabled = computeDevToolsEnabled(env.SITE_URL, env.ENABLE_DANGEROUS_DEV_TOOLS);
 

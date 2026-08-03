@@ -1,7 +1,19 @@
-/** Convex schema for the reusable template starter app. */
+/** Multi-tenant control-plane schema for Monte Carlo workspaces. */
 
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import {
+  blobBackendValidator,
+  blobStatusValidator,
+  branchAnchorTypeValidator,
+  branchSelectionValidator,
+  messageRoleValidator,
+  runRuntimeValidator,
+  runStatusValidator,
+  workspaceMembershipStatusValidator,
+  workspaceRoleValidator,
+  workspaceStorageModeValidator,
+} from "./lib/domainValidators";
 
 export default defineSchema({
   // App-owned identity table. Better Auth owns credentials, sessions, and
@@ -66,4 +78,136 @@ export default defineSchema({
   })
     .index("by_email", ["email"])
     .index("by_created_at", ["createdAt"]),
+
+  // Workspaces are tenant roots. Every table owned by a tenant below carries
+  // workspaceId explicitly; users and workspaces themselves are global roots.
+  workspaces: defineTable({
+    publicId: v.string(),
+    name: v.string(),
+    storageMode: workspaceStorageModeValidator,
+    schemaVersion: v.number(),
+    createdByUserId: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_public_id", ["publicId"]),
+
+  workspace_memberships: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    userId: v.id("users"),
+    role: workspaceRoleValidator,
+    status: workspaceMembershipStatusValidator,
+    invitedByUserId: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace_user", ["workspaceId", "userId"])
+    .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_user_status", ["userId", "status"]),
+
+  projects: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    createdByUserId: v.id("users"),
+    archivedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_workspace_updated_at", ["workspaceId", "updatedAt"]),
+
+  chats: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    projectId: v.optional(v.id("projects")),
+    title: v.string(),
+    rootBranchId: v.optional(v.id("chat_branches")),
+    createdByUserId: v.id("users"),
+    archivedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_workspace_updated_at", ["workspaceId", "updatedAt"])
+    .index("by_workspace_project_updated_at", ["workspaceId", "projectId", "updatedAt"]),
+
+  chat_branches: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    chatId: v.id("chats"),
+    parentBranchId: v.optional(v.id("chat_branches")),
+    anchorType: branchAnchorTypeValidator,
+    anchorSourceBranchId: v.optional(v.id("chat_branches")),
+    anchorSourceMessageId: v.optional(v.id("messages")),
+    anchorSelection: v.optional(branchSelectionValidator),
+    anchorPrompt: v.optional(v.string()),
+    contextMessageIds: v.array(v.id("messages")),
+    contextPreview: v.optional(v.string()),
+    depth: v.number(),
+    nextMessageOrdinal: v.number(),
+    createdByUserId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_workspace_chat_created_at", ["workspaceId", "chatId", "createdAt"]),
+
+  messages: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    chatId: v.id("chats"),
+    branchId: v.id("chat_branches"),
+    ordinal: v.number(),
+    role: messageRoleValidator,
+    contentRef: v.string(),
+    contentPreview: v.string(),
+    contentType: v.string(),
+    byteLength: v.number(),
+    sha256: v.string(),
+    replyToMessageId: v.optional(v.id("messages")),
+    runId: v.optional(v.id("agent_runs")),
+    createdByUserId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_workspace_branch_ordinal", ["workspaceId", "branchId", "ordinal"]),
+
+  agent_runs: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    chatId: v.id("chats"),
+    branchId: v.id("chat_branches"),
+    inputMessageId: v.optional(v.id("messages")),
+    outputMessageId: v.optional(v.id("messages")),
+    runtime: runRuntimeValidator,
+    provider: v.string(),
+    model: v.string(),
+    providerSessionId: v.optional(v.string()),
+    status: runStatusValidator,
+    errorCode: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    requestedByUserId: v.id("users"),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_workspace_public_id", ["workspaceId", "publicId"]),
+
+  blob_manifests: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    backend: blobBackendValidator,
+    objectKey: v.string(),
+    envelopeVersion: v.number(),
+    contentType: v.string(),
+    byteLength: v.number(),
+    sha256: v.string(),
+    status: blobStatusValidator,
+    createdByUserId: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_workspace_sha256", ["workspaceId", "sha256"]),
 });

@@ -9,7 +9,7 @@ export async function signIn(page: Page, email = defaultAuthEmail) {
   await page.goto("/login");
   await page.getByTestId("auth-email").fill(email);
   await page.getByTestId("auth-submit").click();
-  await page.getByTestId("home-page").waitFor();
+  await page.getByTestId("workspace-app").waitFor();
 }
 
 export async function signOut(page: Page) {

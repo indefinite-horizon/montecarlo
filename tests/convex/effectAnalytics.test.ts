@@ -1,4 +1,4 @@
-/** Unit tests for the template Effect-backed analytics helper. */
+/** Unit tests for the Effect-backed analytics helper. */
 
 import { describe, expect, it } from "vitest";
 import { formatAppError, isAppError } from "../../convex/effect/AppError";

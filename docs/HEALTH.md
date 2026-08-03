@@ -7,6 +7,8 @@ bun run lint
 bun run typecheck
 bun run test
 bun run build:web
+bun run build:runtime
 ```
 
-For the full stack, run `bash scripts/run_local.sh` and check the Convex readiness endpoint.
+For the full stack, run `bash scripts/run_local.sh` and check the Convex and local-runtime
+readiness endpoints.

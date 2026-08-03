@@ -1,0 +1,35 @@
+{
+  "name": "@monte-carlo/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && bun build src/cli.ts --target=node --format=cjs --outfile=dist/runtime.cjs",
+    "dev": "bun --watch src/index.ts",
+    "start": "node dist/runtime.cjs",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.0",
+    "@ai-sdk/openai-compatible": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.1090.0",
+    "@openai/codex-sdk": "^0.144.6",
+    "ai": "^7.0.0",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2",
+    "vitest": "^4.0.0"
+  }
+}

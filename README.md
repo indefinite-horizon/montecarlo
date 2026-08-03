@@ -1,153 +1,133 @@
-# Convex Project Template
+# Monte Carlo
 
-A reusable full-stack starter for Convex, Better Auth, Vite, shadcn/ui, Effect, i18n, Playwright, and agent workflow scaffolding.
+Monte Carlo is a local-first, multi-model conversation workspace built around a branchable chat graph. Highlight part of an answer and follow it into a focused thread, or branch the current conversation with a fresh prompt. Every branch keeps its provenance and can use a different model provider without changing the stored chat format.
+
+The repository starts from [`richardwu/convex-project-template`](https://github.com/richardwu/convex-project-template) at `37dcb99a44d38bbb5285fe71db1500fc4b0384f7` and reimplements the warm editorial design language of Socrates at `84f64c37a6f8777599b6c2de6580b12b1249058a`.
+
+## What is implemented
+
+- React/Vite SPA with project/chat creation, editable model and compatible-endpoint selection, message composition, selection-to-branch, prompt-only branching, and an interactive branch map.
+- Electron 43 shell with a sandboxed renderer, navigation guards, denied browser permissions, narrow IPC, and an authenticated loopback runtime on a child-attested ephemeral port.
+- Provider-neutral local runtime with streamed events for Codex, OpenRouter, Ollama, and direct Anthropic API access.
+- Codex uses the official local SDK and the user's existing Codex/ChatGPT login. Credentials remain owned by Codex and never enter the renderer, Convex, or object storage.
+- Multi-tenant Convex schema for workspaces, memberships, projects, chats, branches, message metadata, blob manifests, and model runs.
+- Versioned portable domain envelopes and context materialization for moving a workspace between local and cloud storage.
+- Local filesystem and cloud R2 are routed per workspace behind the same blob-manifest contract; provider credentials are deliberately outside that contract.
+
+Claude Pro/Max authentication is intentionally disabled. Anthropic's current [authentication and credential-use policy](https://code.claude.com/docs/en/legal-and-compliance) says third-party products may not offer Claude.ai login or route subscription credentials. Monte Carlo supports Anthropic Console API keys now and keeps a connector boundary for a future approved integration.
+
+## Architecture
+
+```text
+React SPA / Electron renderer
+        │
+        ├── Convex ── workspace membership, projects, chat DAG,
+        │             message/blob metadata and runs
+        │
+        └── authenticated loopback runtime (Electron or companion)
+                  ├── Codex SDK ── existing local ChatGPT-plan login
+                  ├── AI SDK 7 ─── OpenRouter
+                  ├── AI SDK 7 ─── Ollama's OpenAI-compatible endpoint
+                  └── AI SDK 7 ─── Anthropic Console API key
+
+Message bodies / tool artifacts
+        ├── local workspace: filesystem objects
+        └── cloud workspace: R2 objects
+```
+
+Convex is the portable control plane, not the model-execution environment. Subscription harnesses and Ollama always run on the user's machine. The browser SPA connects to the companion runtime; the Electron app starts it automatically.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for invariants and data flow.
 
 ## Quickstart
 
+Requirements: Bun 1.3.6, Node 22 or newer, and Chromium for browser tests.
+
 ```sh
 cp .env.example .env.local
+cp .env.runtime.example .env.runtime.local
 bun install
-bash scripts/run_local.sh
+bun run dev
 ```
 
-Open the printed Vite URL and sign in with:
+The web app defaults to `http://localhost:5173`. The local runner initializes an anonymous Convex development deployment and binds the model runtime only to a selected `127.0.0.1` port.
 
-- Email: `test@test.local`
-
-In local development, submitting the email automatically opens the magic link.
-
-You can also use the template through:
+Start the desktop shell after the web stack is healthy:
 
 ```sh
-npm create convex@latest -- -t richardwu/convex-project-template
+bun run dev:desktop
 ```
 
-Forking or cloning this repository directly is the primary path.
-
-## Agent Fork Setup
-
-When an agent forks or clones this template for a new app, it should complete
-the quickstart locally before handing work back:
+Useful checks:
 
 ```sh
-bash scripts/setup_worktree.sh
-bun install
-bunx playwright install chromium
-bash scripts/run_local.sh .env.local --command 'PLAYWRIGHT_SKIP_WEBSERVER=true PLAYWRIGHT_BASE_URL="http://localhost:${SITE_PORT}" bun --env-file=.env.local run test:e2e:core:raw'
+bun run lint
+bun run typecheck
+bun run test
+bun run build:web
+bun run build:runtime
 ```
 
-`scripts/setup_worktree.sh` prepares the shared local env file and copies it
-into the active checkout.
-The `scripts/run_local.sh` command starts the local anonymous Convex + Vite
-stack, waits for both services to be healthy, runs the core Playwright suite
-against the running app, and then stops the stack. If the user needs the app
-left running, start it again with:
+## Provider setup
 
-```sh
-bash scripts/run_local.sh
-```
+| Provider | Supported credential | Execution location | Notes |
+| --- | --- | --- | --- |
+| Codex | Existing `codex login` / ChatGPT-plan session | Local only | Requires the official Codex CLI on `PATH` (or `CODEX_PATH`). `codex login --device-auth` is available through the companion. The app never reads `~/.codex/auth.json`. |
+| Ollama | No credential by default | Local only | Defaults to `http://127.0.0.1:11434/v1`; arbitrary insecure remote endpoints are rejected. |
+| OpenRouter | User API key or administrator-provisioned runtime key | Local companion | User keys stay in the local credential boundary; settings or `OPENROUTER_BASE_URL` selects an HTTPS-compatible endpoint, and managed keys are never forwarded to request-selected endpoints. |
+| Claude API | Anthropic Console API key | Local companion | Standard API billing. |
+| Claude Pro/Max | Disabled | — | Requires written Anthropic approval for a third-party integration. |
 
-Report the URLs printed by `scripts/run_local.sh`, or read them from
-`.env.local` after the script updates it:
+Runtime-only secrets belong in `.env.runtime.local`, not `.env.local`. The latter is synchronized to the local Convex backend by the development scripts. Never put model-provider secrets in Convex function arguments or documents.
 
-- Web app: `SITE_URL`
-- Convex backend API: `CONVEX_URL` / `VITE_CONVEX_URL`
-- Convex HTTP actions and auth site: `CONVEX_SITE_URL` / `VITE_CONVEX_SITE_URL`
+## Workspace modes
 
-Before declaring setup complete, tell the user which external configuration
-still needs to be done manually:
+Local message objects live under Electron's `app.getPath("userData")/workspaces/<public-id>/`. During development, metadata for all local workspaces shares the isolated anonymous Convex backend selected by `scripts/run_local.sh`; tenancy remains enforced by `workspaceId`. The Convex CLI's anonymous local deployment is development-only. The packaged Electron artifact currently requires an external Convex endpoint; shipping a standalone offline metadata backend still requires a reviewed self-hosted Convex distribution and its current license notices.
 
-- GitHub Actions secrets: `CLAUDE_CODE_OAUTH_TOKEN` for the Claude Code, code
-  review, and security review workflows. To create it, run the `claude` CLI and
-  then run `/install-github-app`. The default CI and Playwright workflows do not
-  require app runtime secrets.
-- Vercel env and secrets: `CONVEX_DEPLOY_KEY`, `VITE_CONVEX_URL`,
-  `VITE_CONVEX_SITE_URL`, plus optional `VITE_POSTHOG_PROJECT_TOKEN`,
-  `VITE_POSTHOG_HOST`, and `VITE_AUTH_GOOGLE_ENABLED=true`.
-- Convex backend env: `BETTER_AUTH_SECRET`, plus optional `GOOGLE_CLIENT_ID`,
-  `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`,
-  `POSTHOG_PROJECT_TOKEN`, `POSTHOG_HOST`, and `ANALYTICS_DISABLED=true`.
-  `SITE_URL`, `CONVEX_URL`, and `CONVEX_SITE_URL` are generated by the local
-  and deployment tooling.
-- Provider dashboards: create the Convex deploy key for Vercel, configure the
-  Google OAuth redirect URI as `<CONVEX_SITE_URL>/callback/google`, copy the
-  Resend API key and verified sender for production magic links, copy the
-  PostHog project token and host if analytics is enabled, and provide
-  `OPENROUTER_API_KEY` only when running `bun run translate`.
+Cloud workspace metadata uses the shared multi-tenant Convex deployment and R2-compatible manifests. The companion can route R2 when trusted credentials are configured, but a public multi-tenant storage/provider gateway is not enabled yet; it requires short-lived Better Auth-bound capabilities rather than a browser-visible shared bearer. Every tenant-owned record carries `workspaceId`; public Convex functions verify active membership. Provider credentials never sync with the workspace.
 
-See [docs/NEW_PROD_DEPLOY.md](docs/NEW_PROD_DEPLOY.md) for the production
-deployment runbook.
+The transfer command is not wired into the UI yet. Its enforced domain format uses stable public IDs and a versioned manifest, with this import/export sequence:
 
-## Worktrees
+1. Export metadata and object references.
+2. Copy objects and verify SHA-256 and byte length.
+3. Import into a staging workspace.
+4. Run schema migrations and validate counts/references.
+5. Activate the imported workspace.
 
-Before creating worktrees, put your configured `.env.local` in the main checkout. Running `bash scripts/setup_worktree.sh` from a worktree will create this main-checkout `.env.local` automatically if it is missing. For example, if a worktree lives at `$HOME/conductor/workspaces/convex-project-template/worktree-one`, the shared env file lives at `$HOME/conductor/workspaces/convex-project-template/.env.local`.
+Convex `_id` values and absolute local paths are never part of the portable format.
 
-Run `bash scripts/setup_worktree.sh` from each worktree after creating it. If the main checkout does not already have `.env.local`, the script creates a static copy there from `.env.example`. In worktrees, it copies that main-checkout `.env.local` into the current worktree, strips `CONVEX_DEPLOYMENT` so the worktree gets its own anonymous Convex backend, installs dependencies, and sets up hooks. Update the main-checkout `.env.local` values to change the local env vars used by subsequent worktrees.
+## Branch semantics
 
-## Production
+A chat owns a graph of branches. A branch points to at most one parent branch and records an anchor containing the source message, optional selected range/text, and optional prompt. The application remains the source of truth even when a native provider supports session forks.
 
-Import the repo into Vercel. `vercel.json` calls `scripts/vercel_build.sh`, which deploys Convex and builds the web app. See [docs/NEW_PROD_DEPLOY.md](docs/NEW_PROD_DEPLOY.md).
+Context for a new branch is snapshotted at creation and materialized deterministically from:
 
-## Optional Features
+- a bounded recent window from the parent lineage;
+- the complete source turn when available;
+- the selected passage and provenance;
+- the branch prompt.
 
-Google OAuth is off by default. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `VITE_AUTH_GOOGLE_ENABLED=true` to show the Google button.
+This makes a branch reconstructible on Codex, OpenRouter, Ollama, or Claude API without persisting provider-native transcripts.
 
-Resend is used for production magic-link email. Set `RESEND_API_KEY` and
-`RESEND_FROM_EMAIL` on the Convex backend before sending production users
-through email sign-in.
+## Environment files
 
-PostHog is off unless `POSTHOG_PROJECT_TOKEN` and `VITE_POSTHOG_PROJECT_TOKEN` are set. Analytics events use the Convex outbox described in [docs/ANALYTICS.md](docs/ANALYTICS.md).
+- `.env.local`: Convex, Better Auth, browser build, and non-secret development settings.
+- `.env.runtime.local`: model-provider keys, loopback token, R2 credentials, and local runtime settings.
+- `.worktreeinclude`: asks Conductor to copy both gitignored files into new workspaces.
 
-Translation sync uses OpenRouter only when you invoke it:
+The checked-in examples document every supported variable. Production secrets should come from the desktop credential store or the runtime's deployment environment.
 
-```sh
-OPENROUTER_API_KEY=... bun run translate
-```
+Account-free mode is guarded twice: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` must be explicit and `SITE_URL` must resolve to a loopback origin. Cloud deployments must leave that flag unset and require Better Auth membership for every workspace operation.
 
-## Environment Variables
+## Reference docs
 
-Local development starts from `.env.example`; copy it to `.env.local` before running the stack.
+- [Architecture](docs/ARCHITECTURE.md)
+- [Ontology](docs/ONTOLOGY.md)
+- [Design](docs/DESIGN.md)
+- [Security](docs/SECURITY.md)
+- [Testing](docs/TESTING.md)
+- [Deployment](docs/NEW_PROD_DEPLOY.md)
 
-Core local/backend variables:
+## Repository workflow
 
-- `SITE_URL`: frontend origin used by Better Auth redirects and trusted origins.
-- `BETTER_AUTH_SECRET`: Better Auth session secret. Use a high-entropy value outside local development.
-
-Frontend build variables:
-
-- `VITE_AUTH_GOOGLE_ENABLED`: set to `true` to show Google sign-in.
-- `VITE_POSTHOG_PROJECT_TOKEN`, `VITE_POSTHOG_HOST`, and `VITE_ANALYTICS_DISABLED`: browser analytics controls.
-
-Optional provider variables:
-
-- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: enable Google OAuth on the backend.
-- `RESEND_API_KEY` and `RESEND_FROM_EMAIL`: send production magic-link email through Resend.
-- `POSTHOG_PROJECT_TOKEN`, `POSTHOG_HOST`, and `ANALYTICS_DISABLED`: backend analytics outbox controls.
-- `OPENROUTER_API_KEY`: used only when running `bun run translate`.
-
-## Batteries Included
-
-| Category | Battery | Why it exists |
-| --- | --- | --- |
-| Framework | Bun | Runs the workspace, installs dependencies, and drives scripts with a pinned package manager. |
-| Framework | Vite | Provides fast local web development and production builds for the React app. |
-| Framework | Convex | Provides the backend data model, functions, generated API, and local anonymous dev stack. |
-| Framework | Better Auth | Handles magic-link auth, sessions, account linking, and optional social login. |
-| Framework | TanStack Router | Gives the web app typed file-based routing and a generated route tree. |
-| Framework | Tailwind CSS v4 | Supplies the styling system used by the web app. |
-| Framework | shadcn/ui | Provides reusable UI primitives configured for the template's Vite/Tailwind setup. |
-| Framework | Effect | Wraps backend provider calls with typed Effect helpers. |
-| Framework | i18next | Loads and validates English/French locale resources. |
-| Framework | Vitest | Runs unit and integration tests for app and backend behavior. |
-| Framework | Playwright | Runs core, performance, external, and nightly browser checks. |
-| Framework | Biome | Formats and lints the repo alongside custom project-specific lint rules. |
-| Framework | Electron | Provides the optional desktop shell around the web app. |
-| Provider | Vercel | Hosts production web deploys and runs the build script that deploys Convex. |
-| Provider | PostHog | Receives analytics events from the frontend adapter and backend outbox flush. |
-| Provider | Google OAuth | Enables optional Google sign-in when OAuth credentials are configured. |
-| Provider | Resend | Sends production magic-link email when configured. |
-| Provider | OpenRouter | Powers optional translation sync when `OPENROUTER_API_KEY` is provided. |
-| Provider | GitHub Actions | Runs CI, nightly E2E, dependency, and agent review workflows. |
-| Provider | Claude Code | Supports optional automated review workflows. |
-
-On Windows, recreate symlinks manually or copy the target directories if your Git checkout does not preserve them.
+Conductor uses [.conductor/settings.toml](.conductor/settings.toml) for setup and run commands. New local worktrees receive isolated frontend/Convex/runtime ports. Agent rules under `.agents/rules/` enforce tenant authorization, indexed Convex reads, schema naming, uniqueness, secret isolation, i18n, and CI behavior.

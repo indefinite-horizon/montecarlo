@@ -5,97 +5,122 @@
 
 :root {
   --radius: 0.5rem;
-  --background: oklch(0.985 0.01 165);
-  --foreground: oklch(0.21 0.025 150);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.025 150);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.025 150);
-  --primary: oklch(0.47 0.105 157);
-  --primary-foreground: oklch(0.985 0.01 165);
-  --secondary: oklch(0.93 0.018 160);
-  --secondary-foreground: oklch(0.25 0.03 150);
-  --muted: oklch(0.94 0.012 160);
-  --muted-foreground: oklch(0.48 0.03 150);
-  --accent: oklch(0.92 0.025 158);
-  --accent-foreground: oklch(0.24 0.04 150);
-  --destructive: oklch(0.58 0.21 27);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.88 0.015 160);
-  --input: oklch(0.84 0.018 160);
-  --ring: oklch(0.58 0.12 157);
+  --background: 34 47% 97%;
+  --foreground: 23 24% 12%;
+  --card: 38 38% 99%;
+  --card-foreground: 23 24% 12%;
+  --popover: 38 38% 99%;
+  --popover-foreground: 23 24% 12%;
+  --primary: 16 58% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 33 34% 92%;
+  --secondary-foreground: 23 24% 15%;
+  --muted: 33 32% 93%;
+  --muted-foreground: 23 10% 40%;
+  --accent: 16 40% 93%;
+  --accent-foreground: 16 45% 20%;
+  --destructive: 0 74% 52%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 24 29% 84%;
+  --input: 24 24% 80%;
+  --ring: 16 58% 56%;
+  --branch-blue: 207 46% 52%;
+  --branch-gold: 39 57% 54%;
 }
 
 .dark {
-  --background: oklch(0.17 0.018 150);
-  --foreground: oklch(0.95 0.012 155);
-  --card: oklch(0.21 0.02 150);
-  --card-foreground: oklch(0.95 0.012 155);
-  --popover: oklch(0.21 0.02 150);
-  --popover-foreground: oklch(0.95 0.012 155);
-  --primary: oklch(0.72 0.12 157);
-  --primary-foreground: oklch(0.16 0.02 150);
-  --secondary: oklch(0.29 0.02 150);
-  --secondary-foreground: oklch(0.95 0.012 155);
-  --muted: oklch(0.27 0.018 150);
-  --muted-foreground: oklch(0.75 0.025 155);
-  --accent: oklch(0.32 0.035 155);
-  --accent-foreground: oklch(0.95 0.012 155);
-  --destructive: oklch(0.68 0.19 25);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.34 0.02 150);
-  --input: oklch(0.38 0.02 150);
-  --ring: oklch(0.72 0.12 157);
+  --background: 27 22% 8%;
+  --foreground: 33 30% 94%;
+  --card: 27 22% 10%;
+  --card-foreground: 33 30% 94%;
+  --popover: 27 22% 10%;
+  --popover-foreground: 33 30% 94%;
+  --primary: 16 58% 56%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 24 15% 20%;
+  --secondary-foreground: 33 30% 94%;
+  --muted: 24 14% 19%;
+  --muted-foreground: 30 14% 70%;
+  --accent: 16 18% 16%;
+  --accent-foreground: 33 30% 94%;
+  --destructive: 0 63% 48%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 23 14% 24%;
+  --input: 23 14% 24%;
+  --ring: 16 58% 56%;
+  --branch-blue: 207 42% 61%;
+  --branch-gold: 39 57% 60%;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --container-app: var(--breakpoint-2xl);
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
 }
 
+@utility font-display {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+}
+
+@utility bg-app-surface {
+  background: hsl(var(--background));
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
 html {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 body {
   min-width: 320px;
   margin: 0;
+  overflow: hidden;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Avenir Next", Avenir, Aptos, "Helvetica Neue", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
 }
 
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
 }
 
-/* Thin gray scrollbars across all surfaces. Overrides macOS "Always" setting
-   so the chunky always-visible scrollbar never appears. Radix ScrollArea
-   hides the native scrollbar entirely so it's unaffected. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.22);
 }
 
 *::-webkit-scrollbar {
@@ -108,16 +133,45 @@ input {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: var(--border);
   border: 2px solid transparent;
   border-radius: 9999px;
+  background-color: hsl(var(--border));
   background-clip: padding-box;
 }
 
-*::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
+.message-copy p + p {
+  margin-top: 0.9rem;
 }
 
-*::-webkit-scrollbar-corner {
-  background: transparent;
+.message-copy code {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.3rem;
+  background: hsl(var(--secondary) / 0.65);
+  padding: 0.08rem 0.32rem;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.88em;
+}
+
+.branch-map-grid {
+  background-image: radial-gradient(hsl(var(--border) / 0.65) 0.7px, transparent 0.7px);
+  background-size: 16px 16px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .streaming-caret::after {
+    content: "";
+    display: inline-block;
+    width: 0.45rem;
+    height: 1rem;
+    margin-left: 0.18rem;
+    vertical-align: -0.1rem;
+    background: hsl(var(--primary));
+    animation: caret-pulse 1s steps(2, jump-none) infinite;
+  }
+}
+
+@keyframes caret-pulse {
+  50% {
+    opacity: 0;
+  }
 }

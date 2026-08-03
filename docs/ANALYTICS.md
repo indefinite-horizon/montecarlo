@@ -1,6 +1,6 @@
 # Analytics
 
-The template emits analytics through a first-party harness. PostHog is the
+Monte Carlo emits analytics through a first-party harness. PostHog is the
 default provider, but product code should not import provider SDKs directly.
 
 ## Architecture
@@ -63,7 +63,7 @@ Local backend env is pushed with `bash scripts/setup_local_env.sh`.
 
 ## Event Catalog
 
-Starter backend events:
+Backend events:
 
 | Event | Source | Notes |
 | --- | --- | --- |
@@ -71,7 +71,7 @@ Starter backend events:
 | `user signed in` | Available builder | Use when wiring explicit sign-in tracking. |
 | `app error shown` | Available builder | Use for server-side app error surfaces. |
 
-Starter frontend events:
+Frontend events:
 
 | Event | Source | Notes |
 | --- | --- | --- |
