@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Pre-commit hook: runs Biome lint & format on staged files and custom lint rules.
+#
+# Install: bash scripts/setup_git_hooks.sh
+
+set -euo pipefail
+
+echo "Running biome check on staged files..."
+# Biome returns exit code 1 for both lint errors AND "no processable files",
+# so we only run it when there are staged files Biome can actually process.
+STAGED_BIOME_FILES=$(git diff --cached --name-only --diff-filter=ACMR -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.css' 2>/dev/null | grep -v '^convex/_generated/' || true)
+if [ -n "$STAGED_BIOME_FILES" ]; then
+  bunx biome check --write --staged || exit 1
+  # Re-stage any auto-fixed files so commit includes the fixed versions
+  echo "$STAGED_BIOME_FILES" | xargs git add
+fi
+
+echo "Running custom lints..."
+bun scripts/lint-custom.ts
+
+# Convex codegen freshness is checked in CI (convex-codegen job).

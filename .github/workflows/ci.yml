@@ -1,0 +1,116 @@
+# CI uses ubuntu-latest. If you move back to Blacksmith runners, update every job consistently.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bun scripts/audit-critical.ts
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bun run lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bun run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bun run test
+      - run: RUN_INTEGRATION_TESTS=1 bun run test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bun run build:web
+
+  convex-codegen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bash scripts/codegen_anon.sh .env.example
+      - run: git diff --exit-code convex/_generated
+
+  validate-i18n:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bun run validate:i18n
+
+  e2e-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bunx playwright install --with-deps chromium
+      - run: bash scripts/prepare_e2e_env.sh .env.example .env.e2e
+      - run: bun run test:e2e:core:ci
+
+  e2e-perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bunx playwright install --with-deps chromium
+      - run: bash scripts/prepare_e2e_env.sh .env.example .env.e2e
+      - run: PLAYWRIGHT_WORKERS=2 bun run test:e2e:perf:ci
+
+  e2e-external:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bunx playwright install --with-deps chromium
+      - run: bash scripts/prepare_e2e_env.sh .env.example .env.e2e
+      - run: PLAYWRIGHT_WORKERS=2 bun run test:e2e:external:ci

@@ -1,0 +1,46 @@
+{
+  "name": "@template/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.ts",
+    "build": "tsc --noEmit -p tsconfig.json && vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@convex-dev/better-auth": "0.12.0",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@template/app-constants": "workspace:*",
+    "@tanstack/react-router": "^1.167.3",
+    "better-auth": "1.6.11",
+    "class-variance-authority": "^0.7.1",
+    "convex": "^1.37.0",
+    "i18next": "^25.8.13",
+    "i18next-browser-languagedetector": "^8.2.1",
+    "lucide-react": "^0.542.0",
+    "posthog-js": "^1.368.0",
+    "react": "^18.3.1",
+    "react-compiler-runtime": "^1.0.0",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^16.5.4",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@rolldown/plugin-babel": "^0.2.0",
+    "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/router-plugin": "^1.166.12",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^6.0.0",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "react-scan": "^0.5.7",
+    "tailwindcss": "^4.2.1",
+    "tw-animate-css": "^1.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^8.0.0"
+  }
+}

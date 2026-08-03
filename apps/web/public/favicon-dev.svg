@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Convex Project Template Dev">
+  <rect width="64" height="64" rx="14" fill="#2c1907" />
+  <path d="M18 38 32 14l14 24H18Z" fill="#ff9f1c" />
+  <path d="M18 42h28v8H18z" fill="#fff3df" />
+</svg>

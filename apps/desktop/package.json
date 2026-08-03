@@ -1,0 +1,19 @@
+{
+  "name": "@template/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/main.cjs",
+  "dependencies": {
+    "@template/app-constants": "workspace:*"
+  },
+  "scripts": {
+    "dev": "bunx wait-on tcp:5173 && bunx electron ./src/main.cjs",
+    "start": "bunx electron ./src/main.cjs",
+    "build": "echo \"Desktop packaging is configured via electron-builder in later phase\"",
+    "typecheck": "echo \"no typecheck for cjs shell\""
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "wait-on": "^8.0.1"
+  }
+}

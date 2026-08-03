@@ -1,0 +1,68 @@
+{
+  "app": {
+    "name": "Modele de projet Convex"
+  },
+  "auth": {
+    "signInTitle": "Connexion",
+    "subtitle": "Saisissez votre email et nous enverrons un lien de connexion securise.",
+    "signIn": "Se connecter",
+    "sendMagicLink": "Envoyer le lien magique",
+    "sending": "Envoi...",
+    "redirecting": "Redirection...",
+    "devAutoLogin": "Ouverture du lien magique local...",
+    "checkEmail": "Verifiez {{email}} pour votre lien de connexion.",
+    "useDifferentEmail": "Utiliser un autre email",
+    "email": "Email",
+    "genericError": "L'authentification a echoue.",
+    "magicLinkError": "Impossible d'envoyer le lien magique.",
+    "googleError": "La connexion Google a echoue.",
+    "continueWithGoogle": "Continuer avec Google",
+    "googleDisabledTooltip": "Activez VITE_AUTH_GOOGLE_ENABLED, GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET pour utiliser la connexion Google.",
+    "or": "ou"
+  },
+  "home": {
+    "title": "Application de depart",
+    "greetingLabel": "Connecte",
+    "greeting": "Bienvenue, {{name}}",
+    "defaultUser": "a vous",
+    "body": "L'auth Convex, i18n, l'analytics, le seeding local et la coque applicative sont prets. Remplacez cet ecran par votre workflow produit.",
+    "signOut": "Se deconnecter",
+    "signOutError": "Impossible de se deconnecter.",
+    "darkTheme": "Theme sombre",
+    "lightTheme": "Theme clair"
+  },
+  "devTools": {
+    "title": "Outils dev",
+    "open": "Ouvrir les outils dev",
+    "description": "Commandes de base de donnees reservees au developpement.",
+    "wipeTitle": "Effacer la base",
+    "wipeDescription": "Supprimer les donnees app et les sessions locales.",
+    "wipe": "Effacer",
+    "wipeConfirm": "Effacer les donnees app locales et les sessions ? Cette action est irreversible.",
+    "wiping": "Effacement...",
+    "wipeSuccess": "Base effacee ({{count}} documents).",
+    "wipeError": "Impossible d'effacer la base.",
+    "reseedTitle": "Reinitialiser la base",
+    "reseedDescription": "Relancer le hook Convex init.",
+    "reseed": "Reseed",
+    "reseeding": "Reseed...",
+    "reseedSuccess": "Base reinitialisee.",
+    "reseedError": "Impossible de reinitialiser la base.",
+    "wipeAndReseedTitle": "Reset DB + reseed",
+    "wipeAndReseedDescription": "Supprimer les donnees locales puis lancer init.",
+    "wipeAndReseed": "Reset",
+    "wipeAndReseedConfirm": "Reset la base locale et relancer init ? Cette action est irreversible.",
+    "wipeAndReseeding": "Reset...",
+    "wipeAndReseedSuccess": "Base reinitialisee ({{count}} documents supprimes).",
+    "wipeAndReseedError": "Impossible de reset et reseed la base."
+  },
+  "errorScreen": {
+    "eyebrow": "Erreur d'application",
+    "headline": "Un probleme est survenu",
+    "subcopy": "L'application a rencontre un probleme inattendu. Vous pouvez revenir a l'accueil ou recharger la page.",
+    "returnHome": "Retour accueil",
+    "tryAgain": "Recharger",
+    "showDetails": "Afficher les details",
+    "hideDetails": "Masquer les details"
+  }
+}

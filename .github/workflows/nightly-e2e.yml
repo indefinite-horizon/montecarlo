@@ -1,0 +1,19 @@
+name: Nightly E2E
+
+on:
+  schedule:
+    - cron: "23 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.6
+      - run: bun install
+      - run: bunx playwright install --with-deps chromium
+      - run: bash scripts/prepare_e2e_env.sh .env.example .env.e2e
+      - run: PLAYWRIGHT_WORKERS=2 bun run test:e2e:nightly:ci

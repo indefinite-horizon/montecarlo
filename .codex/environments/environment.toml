@@ -1,0 +1,15 @@
+version = 1
+name = "Default"
+
+[setup]
+script = '''
+git fetch origin
+./scripts/setup_worktree.sh
+'''
+
+[[actions]]
+name = "Run"
+icon = "run"
+command = '''
+./scripts/run_local.sh
+'''

@@ -1,0 +1,16 @@
+name: Address Unresolved PR Reviews
+
+on:
+  schedule:
+    - cron: "17 14 * * 1"
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - run: echo "Use the address-unresolved-pr-reviews skill to triage open review threads."

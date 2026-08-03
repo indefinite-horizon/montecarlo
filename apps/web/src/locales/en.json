@@ -1,0 +1,68 @@
+{
+  "app": {
+    "name": "Convex Project Template"
+  },
+  "auth": {
+    "signInTitle": "Sign in",
+    "subtitle": "Enter your email and we will send a secure sign-in link.",
+    "signIn": "Sign in",
+    "sendMagicLink": "Send magic link",
+    "sending": "Sending...",
+    "redirecting": "Redirecting...",
+    "devAutoLogin": "Opening your local magic link...",
+    "checkEmail": "Check {{email}} for your sign-in link.",
+    "useDifferentEmail": "Use a different email",
+    "email": "Email",
+    "genericError": "Authentication failed.",
+    "magicLinkError": "Failed to send magic link.",
+    "googleError": "Google sign-in failed.",
+    "continueWithGoogle": "Continue with Google",
+    "googleDisabledTooltip": "Enable VITE_AUTH_GOOGLE_ENABLED, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET to use Google sign-in.",
+    "or": "or"
+  },
+  "home": {
+    "title": "Starter app",
+    "greetingLabel": "Signed in",
+    "greeting": "Welcome, {{name}}",
+    "defaultUser": "there",
+    "body": "Convex auth, i18n, analytics, local seeding, and the app shell are wired up. Replace this screen with your product workflow.",
+    "signOut": "Sign out",
+    "signOutError": "Could not sign out.",
+    "darkTheme": "Dark theme",
+    "lightTheme": "Light theme"
+  },
+  "devTools": {
+    "title": "Dev Tools",
+    "open": "Open dev tools",
+    "description": "Development-only database commands.",
+    "wipeTitle": "Wipe Database",
+    "wipeDescription": "Delete app data and local auth sessions.",
+    "wipe": "Wipe",
+    "wipeConfirm": "Wipe local app data and auth sessions? This cannot be undone.",
+    "wiping": "Wiping...",
+    "wipeSuccess": "Database wiped ({{count}} documents).",
+    "wipeError": "Failed to wipe database.",
+    "reseedTitle": "Reseed Database",
+    "reseedDescription": "Run the Convex init seed hook again.",
+    "reseed": "Reseed",
+    "reseeding": "Reseeding...",
+    "reseedSuccess": "Database reseeded.",
+    "reseedError": "Failed to reseed database.",
+    "wipeAndReseedTitle": "Reset DB + Reseed",
+    "wipeAndReseedDescription": "Delete local data, clear auth, then run init.",
+    "wipeAndReseed": "Reset",
+    "wipeAndReseedConfirm": "Reset the local database and rerun init? This cannot be undone.",
+    "wipeAndReseeding": "Resetting...",
+    "wipeAndReseedSuccess": "Database reset and reseeded ({{count}} documents deleted).",
+    "wipeAndReseedError": "Failed to reset and reseed database."
+  },
+  "errorScreen": {
+    "eyebrow": "Application error",
+    "headline": "Something went wrong",
+    "subcopy": "The app hit an unexpected problem. You can return home or reload the page.",
+    "returnHome": "Return home",
+    "tryAgain": "Reload",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details"
+  }
+}

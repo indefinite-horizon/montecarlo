@@ -1,0 +1,77 @@
+/** Defines Playwright projects and local web servers for E2E tests. */
+
+import { defineConfig, devices } from "@playwright/test";
+
+const webPort = process.env.PLAYWRIGHT_WEB_PORT ?? "5173";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${webPort}`;
+const convexSiteURL = process.env.CONVEX_SITE_URL ?? "http://127.0.0.1:3211";
+const convexSitePort = Number(new URL(convexSiteURL).port);
+const convexReadyPort =
+  process.env.PLAYWRIGHT_CONVEX_READY_PORT ??
+  String(Number.isFinite(convexSitePort) && convexSitePort > 0 ? convexSitePort + 1000 : 4211);
+const convexReadyURL = `http://127.0.0.1:${convexReadyPort}/ready`;
+const convexReadyFile = ".context/playwright-convex-ready";
+// envFile is only used in webServer commands below.
+const envFile = process.env.PLAYWRIGHT_ENV_FILE ?? ".env.local";
+const workerCount = Number(process.env.PLAYWRIGHT_WORKERS ?? "8");
+const expectTimeout = Number(process.env.PLAYWRIGHT_EXPECT_TIMEOUT ?? "5000");
+const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "true";
+const externalSpecs = ["**/*.external.spec.ts"];
+const nightlySpecs = ["**/*.nightly.external.spec.ts"];
+const perfSpecs = ["**/*.perf.spec.ts"];
+
+export default defineConfig({
+  testDir: "tests/e2e",
+  timeout: process.env.CI ? 60_000 : 30_000,
+  retries: process.env.CI ? 1 : 0,
+  workers: workerCount,
+  expect: {
+    timeout: expectTimeout,
+  },
+  outputDir: "test-results",
+  reporter: [["html", { outputFolder: "playwright-report" }]],
+  use: {
+    baseURL,
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+  },
+  projects: [
+    {
+      name: "chromium-core",
+      testIgnore: [...externalSpecs, ...perfSpecs],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium-external",
+      testMatch: externalSpecs,
+      testIgnore: nightlySpecs,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium-nightly",
+      testMatch: nightlySpecs,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium-perf",
+      testMatch: perfSpecs,
+      use: { ...devices["Desktop Chrome"] },
+    },
+  ],
+  webServer: skipWebServer
+    ? undefined
+    : [
+        {
+          command: `PLAYWRIGHT_CONVEX_READY_PORT=${convexReadyPort} bash scripts/dev_convex_playwright.sh ${envFile}`,
+          url: convexReadyURL,
+          reuseExistingServer: true,
+          timeout: 120_000,
+        },
+        {
+          command: `bash -c 'while [ ! -f ${convexReadyFile} ]; do sleep 1; done; bun --env-file=${envFile} run --filter "./apps/web" dev -- --port ${webPort} --strictPort'`,
+          url: baseURL,
+          reuseExistingServer: true,
+          timeout: 120_000,
+        },
+      ],
+});

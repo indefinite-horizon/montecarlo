@@ -1,0 +1,7 @@
+[install]
+exact = false
+frozenLockfile = true
+minimumReleaseAge = 1209600
+
+[test]
+root = "."
