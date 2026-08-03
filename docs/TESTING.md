@@ -23,6 +23,8 @@ bun run test
 RUN_INTEGRATION_TESTS=1 bun run test
 bun run validate:i18n
 bun run build:web
+bun run build:runtime
+bun run --filter './apps/desktop' build:dir
 ```
 
 Convex generated-code freshness:
@@ -53,7 +55,9 @@ bun run test:e2e:external:ci
 ## Local Stack Validation
 
 Use `bash scripts/run_local.sh` when validating the full local stack. It
-normalizes env, starts Convex, starts Vite, and prints the URL to open.
+normalizes env, starts Convex, Vite, and the authenticated model companion, and
+prints every selected URL. Conductor workspaces allocate an isolated companion
+port from the workspace's port range.
 
 Do not bypass this script for full-stack validation. If you only need a narrow
 unit/type/build check, use the smaller command directly.
@@ -77,3 +81,15 @@ Add or update an E2E test for:
 - workflows that span multiple components
 
 Do not add an E2E test if it cannot be made reliable in CI.
+
+## Domain And Runtime Coverage
+
+The root Vitest suite protects deterministic branch traversal, bounded context
+materialization, and portable-envelope graph/hash validation. The runtime owns
+its own focused suite for origin/Host/bearer checks, strict request validation,
+stream normalization, cancellation, filesystem confinement, and mocked provider
+adapters. Provider-network tests are external tests and must be opt-in.
+
+Desktop verification should include `node --check`, an unsigned directory
+build on the target platform, custom-protocol navigation, encrypted key save,
+runtime restart, and a renderer check confirming no key readback API exists.

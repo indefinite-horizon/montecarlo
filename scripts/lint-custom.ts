@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-/** Lightweight project-specific lint rules for the reusable template. */
+/** Lightweight project-specific lint rules for Monte Carlo. */
 
 import fs from "node:fs";
 import path from "node:path";

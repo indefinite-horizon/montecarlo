@@ -1,7 +1,7 @@
 # Best Practices
 
-This template is intentionally small, but it carries conventions that should
-scale into a real app.
+These conventions keep Monte Carlo portable across providers, workspace modes,
+and future schema versions.
 
 ## Convex
 
@@ -23,7 +23,7 @@ scale into a real app.
 
 - User-facing errors should be specific enough to act on without leaking secrets.
 - Backend domain errors should be typed or tagged when the caller can recover.
-- Use the template Effect helpers for action-oriented workflows that benefit from typed failures.
+- Use the shared Effect helpers for action-oriented workflows that benefit from typed failures.
 - Do not expose raw provider responses, stack traces, headers, or request bodies to the client.
 
 ## Forms And Validation

@@ -1,8 +1,9 @@
 # Design
 
-The starter UI is quiet and application-first: compact forms, restrained
-colors, direct controls, and no marketing shell before the real product
-workflow.
+Monte Carlo is quiet, warm, editorial, and application-first. It follows the
+Socrates pattern of cream surfaces, near-black type, terracotta actions,
+restrained borders, compact controls, and serif display copy. The branch graph
+adds blue/gold only when another hue improves path recognition.
 
 ## UI Stack
 
@@ -13,6 +14,9 @@ workflow.
 
 ## Layout
 
+- Desktop uses a project/chat sidebar, centered transcript, and branch map.
+- The transcript stays readable at roughly 48rem even on wide windows.
+- Mobile prioritizes the transcript; navigation and the branch map become sheets.
 - Use full-width page bands or simple constrained content, not floating section cards.
 - Keep forms narrow enough to scan.
 - Keep app pages dense but calm; avoid oversized hero treatment in product surfaces.
@@ -45,6 +49,15 @@ workflow.
 - Loading states should preserve layout size where possible.
 - Empty states should say what is missing and provide the next useful action.
 - Avoid decorative placeholder art unless it carries domain meaning.
+
+## Branching
+
+- A text selection gets one compact floating action near the selection.
+- The branch composer always shows the selected passage and what context will be inherited.
+- Prompt-only branching requires a prompt; selection branching makes it optional.
+- A non-empty branch prompt immediately starts the child branch's first model turn.
+- The parent never changes when a child branch is created.
+- Active paths are distinguishable by position, label, and border—not color alone.
 
 ## i18n
 

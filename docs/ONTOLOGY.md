@@ -1,18 +1,20 @@
 # Ontology
 
-Use these terms when prompting agents or describing product behavior in this
-template.
-
 | Term | Meaning |
 | --- | --- |
-| App user | The app-owned `users` row that gives product code a stable Convex `Id<"users">`. |
-| Auth user | The Better Auth identity record that owns sessions and provider accounts. |
-| Auth subject | The Better Auth user ID stored on app users as `authSubject`. |
-| Auth audit log | A row in `auth_audit_logs` recording security-relevant auth events such as session creation and account linking. |
-| Local anonymous stack | The local Convex + Vite environment started by `scripts/run_local.sh` with `CONVEX_AGENT_MODE=anonymous`. |
-| Dev auth email | The local development email `test@test.local`; the dev stack auto-opens its magic link after submit. |
-| Authenticated route group | The TanStack Router `_authenticated` route group that contains routes requiring a signed-in user. |
-| Analytics event | A typed, sanitized product event emitted by frontend or backend code. |
-| Analytics outbox | The durable `app_events_outbox` table that stores backend analytics events before provider delivery. |
-| Locale source | `apps/web/src/locales/en.json`, the source of truth for translated UI keys. |
-| Desktop shell | The Electron workspace that wraps the web app for local desktop usage. |
+| App user | Stable application identity linked to a Better Auth subject. |
+| Workspace | Tenant and portability boundary. It is either local or cloud and owns projects, chats, blobs, and memberships. |
+| Membership | A user's active or inactive role in one workspace. |
+| Project | Optional grouping for chats. A chat belongs to at most one project. |
+| Chat | A named conversation graph within one workspace. |
+| Branch | One line of inquiry in a chat. It has at most one parent and stores only messages created on that branch. |
+| Branch anchor | Provenance for a branch: parent/source IDs, optional selected text/range, and the prompt that opened it. |
+| Lineage | Ordered path from a chat's root branch to one active branch. |
+| Materialized context | Bounded provider input derived from lineage, source turn, selection, and branch prompt. |
+| Message envelope | Versioned object containing full message content and parts. Convex stores its metadata and preview. |
+| Blob manifest | Convex row mapping a portable object key to its backend, hash, size, and lifecycle. |
+| Run | One provider generation attempt, with normalized status, usage, and error metadata. |
+| Runtime session | Optional provider-native session/thread identity used only to accelerate later turns. |
+| Local companion | Authenticated loopback process that owns model SDKs, provider keys, and filesystem objects. |
+| Portable manifest | Versioned export index containing public IDs, entity files, object hashes, and schema/migration versions. |
+| Managed provider key | Administrator-provisioned secret in a trusted runtime environment, never stored in the workspace or public browser bundle. |

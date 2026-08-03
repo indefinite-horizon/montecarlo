@@ -1,8 +1,8 @@
 /** Bootstraps the web app, Convex auth provider, TanStack Router, and global toasts. */
 
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import { getAppName } from "@monte-carlo/app-constants";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { getAppName } from "@template/app-constants";
 import { ConvexReactClient } from "convex/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -24,8 +24,10 @@ if (reactScanEnabled) {
   void import("react-scan").then(({ scan }) => scan());
 }
 
+const packagedDesktop = window.location.protocol === "app:";
 const convexUrl =
-  import.meta.env.VITE_CONVEX_URL || (import.meta.env.DEV ? "http://127.0.0.1:3210" : "");
+  import.meta.env.VITE_CONVEX_URL ||
+  (import.meta.env.DEV || packagedDesktop ? "http://127.0.0.1:3210" : "");
 
 if (!convexUrl) {
   throw new Error("VITE_CONVEX_URL is required in production");
@@ -70,12 +72,7 @@ declare module "@tanstack/react-router" {
 }
 
 function InnerApp() {
-  const { data: session, isPending } = authClient.useSession();
-  if (isPending) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-background text-sm">Loading</div>
-    );
-  }
+  const { data: session } = authClient.useSession();
   return <RouterProvider router={router} context={{ session, convexClient }} />;
 }
 

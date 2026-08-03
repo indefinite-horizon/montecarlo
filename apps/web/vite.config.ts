@@ -66,7 +66,7 @@ export default defineConfig(({ command }) => {
     envPrefix: ["VITE_", "CONVEX_SITE_URL"],
     plugins: [
       {
-        name: "template:favicon-href",
+        name: "monte-carlo:favicon-href",
         transformIndexHtml(html) {
           return html.replace("%APP_FAVICON_HREF%", faviconHref);
         },
@@ -84,7 +84,10 @@ export default defineConfig(({ command }) => {
       dedupe: ["react", "react-dom", "react/jsx-runtime", "convex"],
       alias: {
         "@": path.resolve(__dirname, "src"),
-        "@template/app-constants": path.resolve(workspaceRoot, "components/app-constants/index.js"),
+        "@monte-carlo/app-constants": path.resolve(
+          workspaceRoot,
+          "components/app-constants/index.js",
+        ),
       },
       extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"],
     },

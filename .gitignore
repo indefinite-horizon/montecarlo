@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.runtime.example
 node_modules
 dist
 build
@@ -15,4 +16,6 @@ apps/desktop/dist
 .context
 .dev
 .claude/settings.local.json
+.conductor/settings.local.toml
+.vercel
 *.log

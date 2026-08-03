@@ -13,6 +13,14 @@ const APP_TABLES = [
   "app_events_outbox",
   "app_analytics_flush_state",
   "dev_magic_links",
+  "workspace_memberships",
+  "projects",
+  "messages",
+  "agent_runs",
+  "chat_branches",
+  "chats",
+  "blob_manifests",
+  "workspaces",
 ] as const satisfies readonly TableNames[];
 
 const BETTER_AUTH_MODELS = [

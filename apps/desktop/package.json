@@ -1,19 +1,22 @@
 {
-  "name": "@template/desktop",
+  "name": "@monte-carlo/desktop",
   "version": "0.1.0",
+  "description": "A local-first, branchable multi-model conversation workspace.",
+  "author": "Monte Carlo contributors",
+  "desktopName": "Monte Carlo",
   "private": true,
   "main": "src/main.cjs",
-  "dependencies": {
-    "@template/app-constants": "workspace:*"
-  },
   "scripts": {
     "dev": "bunx wait-on tcp:5173 && bunx electron ./src/main.cjs",
     "start": "bunx electron ./src/main.cjs",
-    "build": "echo \"Desktop packaging is configured via electron-builder in later phase\"",
-    "typecheck": "echo \"no typecheck for cjs shell\""
+    "build": "bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml",
+    "build:dir": "bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml --dir",
+    "test": "node --test src/*.test.cjs",
+    "typecheck": "node --check src/main.cjs && node --check src/preload.cjs && node --check src/desktop-security.cjs && node --check src/provider-secrets.cjs"
   },
   "devDependencies": {
-    "electron": "^34.0.0",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.0.12",
     "wait-on": "^8.0.1"
   }
 }

@@ -1,5 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Convex Project Template Preview">
-  <rect width="64" height="64" rx="14" fill="#0f1f3d" />
-  <path d="M18 38 32 14l14 24H18Z" fill="#5ea1ff" />
-  <path d="M18 42h28v8H18z" fill="#eaf2ff" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Monte Carlo Preview">
+  <rect width="64" height="64" rx="14" fill="#2a211d" />
+  <path d="M16 18v28M16 25h15M31 25v12M31 31h16" fill="none" stroke="#f4eee6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="16" cy="18" r="5" fill="#d59a42" />
+  <circle cx="16" cy="46" r="5" fill="#d59a42" />
+  <circle cx="31" cy="37" r="5" fill="#d59a42" />
+  <circle cx="47" cy="31" r="5" fill="#d59a42" />
 </svg>

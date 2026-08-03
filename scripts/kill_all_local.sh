@@ -1,31 +1,30 @@
 #!/usr/bin/env bash
-# Kills all local Convex and Vite dev server processes.
-# Usage: bash scripts/kill_all_local.sh
+# Stops only the local stack recorded for this checkout.
 
 set -euo pipefail
+cd "$(dirname "$0")/.."
 
-killed=0
-
-# Kill Convex dev servers (ports 3210-3219)
-for port in $(seq 3210 3219); do
-  pids=$(lsof -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)
-  for pid in $pids; do
-    echo "Killing Convex on port $port (pid $pid)"
-    kill "$pid" 2>/dev/null && ((killed++)) || true
-  done
-done
-
-# Kill Vite dev servers (ports 5173-5182, matching the 10-worktree range)
-for port in $(seq 5173 5182); do
-  pids=$(lsof -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null || true)
-  for pid in $pids; do
-    echo "Killing Vite on port $port (pid $pid)"
-    kill "$pid" 2>/dev/null && ((killed++)) || true
-  done
-done
-
-if [ "$killed" -eq 0 ]; then
-  echo "No running Convex or Vite dev servers found."
-else
-  echo "Killed $killed process(es)."
+PID_FILE=".dev/local-stack.pid"
+if [[ ! -f "$PID_FILE" ]]; then
+  echo "No local stack PID file exists for this workspace."
+  exit 0
 fi
+
+pid="$(tr -dc '0-9' < "$PID_FILE")"
+if [[ -z "$pid" ]]; then
+  echo "Invalid PID file: $PID_FILE" >&2
+  exit 1
+fi
+
+command="$(ps -ww -o command= -p "$pid" 2>/dev/null || true)"
+case "$command" in
+  *"convex"*"dev"*) ;;
+  *)
+    echo "PID $pid is not this workspace's Convex dev stack; refusing to stop it." >&2
+    exit 1
+    ;;
+esac
+
+kill "$pid"
+rm -- "$PID_FILE"
+echo "Stopped local stack for this workspace (pid $pid)."

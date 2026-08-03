@@ -1,6 +1,11 @@
 {
   "app": {
-    "name": "Convex Project Template"
+    "name": "Monte Carlo"
+  },
+  "common": {
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save"
   },
   "auth": {
     "signInTitle": "Sign in",
@@ -17,19 +22,147 @@
     "magicLinkError": "Failed to send magic link.",
     "googleError": "Google sign-in failed.",
     "continueWithGoogle": "Continue with Google",
-    "googleDisabledTooltip": "Enable VITE_AUTH_GOOGLE_ENABLED, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET to use Google sign-in.",
+    "googleDisabledTooltip": "Enable Google authentication in the web and backend environment to use Google sign-in.",
     "or": "or"
   },
   "home": {
-    "title": "Starter app",
-    "greetingLabel": "Signed in",
-    "greeting": "Welcome, {{name}}",
-    "defaultUser": "there",
-    "body": "Convex auth, i18n, analytics, local seeding, and the app shell are wired up. Replace this screen with your product workflow.",
-    "signOut": "Sign out",
-    "signOutError": "Could not sign out.",
     "darkTheme": "Dark theme",
     "lightTheme": "Light theme"
+  },
+  "sidebar": {
+    "collapse": "Collapse sidebar",
+    "open": "Open sidebar",
+    "newChat": "New chat",
+    "search": "Search chats",
+    "navigation": "Projects and chats",
+    "projects": "Projects",
+    "newProject": "New project",
+    "projectName": "Project name",
+    "createProject": "Create",
+    "unfiled": "Without a project"
+  },
+  "workspace": {
+    "defaultName": "Richard's workspace",
+    "localStatus": "Local workspace · on this device",
+    "cloudStatus": "Cloud workspace · synced",
+    "persistenceError": "The workspace could not save that change. Your current session is still available.",
+    "projectLabel": "Probability lab",
+    "setupEyebrow": "Workspace setup",
+    "setupTitle": "Where should this workspace live?",
+    "setupSubtitle": "Choose local-first privacy or cloud sync. You can move it later.",
+    "existingTitle": "Open an existing workspace",
+    "localTitle": "Local workspace",
+    "localDescription": "Convex and model harnesses run on this machine.",
+    "localBulletOne": "Filesystem object storage",
+    "localBulletTwo": "No account or cloud dependency",
+    "cloudTitle": "Cloud workspace",
+    "cloudDescription": "Use the multi-tenant Convex deployment across devices.",
+    "cloudBulletOne": "R2 object storage",
+    "cloudBulletTwo": "Secure sync between devices",
+    "nameLabel": "Workspace name",
+    "portabilityNote": "Both modes use the same versioned IDs, message envelopes, and blob manifest. Export, verify, and import moves data in either direction without provider-specific history.",
+    "noBilling": "Cloud billing is not enabled yet.",
+    "createLocal": "Create local workspace",
+    "createCloud": "Create cloud workspace"
+  },
+  "providers": {
+    "choose": "Choose a provider",
+    "modelId": "Model ID",
+    "manage": "Manage providers and credentials",
+    "codex": {
+      "name": "Codex",
+      "detail": "ChatGPT plan · local"
+    },
+    "openrouter": {
+      "name": "OpenRouter",
+      "detail": "Your key or managed"
+    },
+    "ollama": {
+      "name": "Ollama",
+      "detail": "Local endpoint"
+    },
+    "anthropic": {
+      "name": "Claude API",
+      "detail": "Console API key"
+    }
+  },
+  "settings": {
+    "open": "Open settings",
+    "providersTitle": "Models and providers",
+    "providersSubtitle": "Credentials stay with the runtime that uses them.",
+    "connected": "Connected",
+    "connect": "Connect",
+    "checking": "Checking",
+    "unavailable": "Unavailable",
+    "needsSetup": "Needs setup",
+    "local": "Local",
+    "needsKey": "Needs key",
+    "codexDescription": "Uses the official local Codex SDK and your existing ChatGPT plan login.",
+    "codexSecurity": "Credential owned by the Codex CLI",
+    "checkConnection": "Check",
+    "ollamaDescription": "Calls the OpenAI-compatible endpoint on your machine.",
+    "testEndpoint": "Test",
+    "endpointPlaceholder": "Provider endpoint",
+    "saveEndpoint": "Save endpoint",
+    "endpointSaved": "The endpoint will be used for new local runtime requests.",
+    "invalidEndpoint": "Use a valid, policy-compliant provider endpoint.",
+    "openrouterDescription": "Use a key stored locally, or a centrally managed key in cloud mode.",
+    "anthropicDescription": "Supported direct Claude access through an Anthropic Console API key.",
+    "keyLocalOnly": "Encrypted local credential",
+    "addKey": "Add key",
+    "keyPlaceholder": "Paste API key",
+    "keySaved": "The encrypted local credential was saved and the runtime restarted.",
+    "desktopKeyOnly": "Open the Electron app to save a key securely, or configure the runtime environment.",
+    "runtimeUnavailable": "The local runtime is unavailable. Start it and try again.",
+    "claudePlanTitle": "Claude Pro and Max connector is disabled",
+    "claudePlanBlocked": "Anthropic currently prohibits third-party products from offering Claude.ai login or routing subscription credentials. This connector stays off until Anthropic approves the integration.",
+    "credentialsBoundary": "Subscription credentials never enter Convex, R2, chat records, analytics, or renderer persistence. The authenticated loopback runtime invokes official local SDKs and returns normalized stream events only."
+  },
+  "chat": {
+    "initialTitle": "New conversation",
+    "you": "You",
+    "assistant": "Monte Carlo",
+    "retry": "Retry",
+    "share": "Share chat"
+  },
+  "branch": {
+    "fromMessage": "Branch",
+    "mapTitle": "Branch map",
+    "count_one": "{{count}} line of inquiry",
+    "count_other": "{{count}} lines of inquiry",
+    "closeMap": "Close branch map",
+    "rootLabel": "Root conversation",
+    "turnCount_one": "{{count}} turn",
+    "turnCount_other": "{{count}} turns",
+    "new": "New branch",
+    "tip": "Highlight any part of an answer to open a focused line of inquiry without losing your place.",
+    "followSelection": "Follow this thread",
+    "selectionTitle": "Branch from selection",
+    "promptTitle": "Branch this conversation",
+    "composerSubtitle": "The parent remains unchanged.",
+    "selectedPassage": "Selected passage",
+    "promptContext": "A compact, versioned context window from the current branch will seed the new thread.",
+    "promptRequired": "What should this branch explore?",
+    "promptOptional": "Add a direction (optional)",
+    "selectionPlaceholder": "Why is this true? Compare it with…",
+    "promptPlaceholder": "Take this conversation in a new direction…",
+    "contextTitle": "Context included",
+    "contextParent": "Recent turns from the parent lineage",
+    "contextSelection": "The selected passage and its source message",
+    "contextIndependent": "A fresh provider session that can move independently",
+    "create": "Create branch",
+    "following": "Following a branch from"
+  },
+  "composer": {
+    "placeholder": "Ask a follow-up or start a new direction…",
+    "attach": "Attach a file",
+    "hint": "Enter to send · Shift+Enter for a new line",
+    "stop": "Stop generation",
+    "send": "Send message",
+    "persistence": "Messages persist in Convex; large content stays in the workspace object store."
+  },
+  "runtime": {
+    "offline": "The local model runtime is offline. Start the desktop app or `bun run dev:runtime`, then try again."
   },
   "devTools": {
     "title": "Dev Tools",

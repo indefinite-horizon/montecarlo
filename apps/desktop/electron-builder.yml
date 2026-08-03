@@ -1,0 +1,35 @@
+appId: chat.montecarlo.desktop
+productName: Monte Carlo
+executableName: monte-carlo
+asar: true
+directories:
+  output: ../../dist/desktop
+files:
+  - src/main.cjs
+  - src/preload.cjs
+  - src/desktop-security.cjs
+  - src/provider-secrets.cjs
+  - package.json
+extraResources:
+  - from: ../web/dist
+    to: renderer
+    filter:
+      - "**/*"
+  - from: ../runtime/dist
+    to: runtime
+    filter:
+      - runtime.cjs
+mac:
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  target:
+    - dmg
+    - zip
+linux:
+  category: Utility
+  syncDesktopName: true
+  target:
+    - AppImage
+win:
+  target:
+    - nsis

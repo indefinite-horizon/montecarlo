@@ -2,7 +2,8 @@
 
 import { type AuthFunctions, createClient, type GenericCtx } from "@convex-dev/better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
-import { getAppName } from "@template/app-constants";
+import { isMutationCtx, isRunMutationCtx } from "@convex-dev/better-auth/utils";
+import { getAppName } from "@monte-carlo/app-constants";
 import { betterAuth } from "better-auth/minimal";
 import { magicLink } from "better-auth/plugins";
 import type { GenericActionCtx } from "convex/server";
@@ -12,10 +13,11 @@ import { query } from "./_generated/server";
 import authConfig from "./auth.config";
 import { convexConfig } from "./config";
 import { magicLinkEmail } from "./emails/magicLink";
-import { devAllowedOrigins, env, isDev, isLocalDev } from "./env";
+import { devAllowedOrigins, env, isDev, isLocalDev, localAnonymousWorkspacesEnabled } from "./env";
 import { enqueueAnalyticsEvent } from "./lib/analytics/enqueue";
 import { buildUserSignedUpEvent } from "./lib/analytics/events";
 import { assertSafeProductionBetterAuthSecret } from "./lib/authSecurity";
+import { LOCAL_ANONYMOUS_AUTH_SUBJECT } from "./lib/localIdentity";
 
 const authFunctions: AuthFunctions = {
   onCreate: internal.auth.onCreate,
@@ -33,18 +35,15 @@ type AuthAuditLogInput = {
 };
 
 async function writeAuthAuditLog(ctx: GenericCtx<DataModel>, input: AuthAuditLogInput) {
-  if ("db" in ctx) {
-    const db = ctx.db as {
-      insert?: (table: "auth_audit_logs", value: AuthAuditLogInput) => Promise<unknown>;
-    };
-    if (typeof db.insert === "function") {
-      await db.insert("auth_audit_logs", input);
-      return;
-    }
+  if (isMutationCtx(ctx)) {
+    await ctx.db.insert("auth_audit_logs", input);
+    return;
   }
-  if ("runMutation" in ctx) {
+  if (isRunMutationCtx(ctx)) {
     await ctx.runMutation(internal.functions.authAudit.write, input);
+    return;
   }
+  throw new Error("Auth audit writes require a mutation-capable context.");
 }
 
 export const authComponent = createClient<DataModel>(components.betterAuth, {
@@ -225,7 +224,20 @@ export const me = query({
   args: {},
   handler: async (ctx) => {
     const authUser = await authComponent.safeGetAuthUser(ctx);
-    if (!authUser) return null;
+    if (!authUser) {
+      if (!localAnonymousWorkspacesEnabled) return null;
+      const localUser = await ctx.db
+        .query("users")
+        .withIndex("by_auth_subject", (q) => q.eq("authSubject", LOCAL_ANONYMOUS_AUTH_SUBJECT))
+        .unique();
+      if (!localUser) return null;
+      return {
+        id: localUser._id,
+        email: localUser.email ?? null,
+        name: localUser.name ?? null,
+        image: localUser.image ?? null,
+      };
+    }
     const appUser = await ctx.db
       .query("users")
       .withIndex("by_auth_subject", (q) => q.eq("authSubject", authUser._id))

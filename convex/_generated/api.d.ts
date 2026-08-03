@@ -10,6 +10,9 @@
 
 import type * as actions_analyticsFlushNode from "../actions/analyticsFlushNode.js";
 import type * as auth from "../auth.js";
+import type * as blobManifests from "../blobManifests.js";
+import type * as branches from "../branches.js";
+import type * as chats from "../chats.js";
 import type * as config from "../config.js";
 import type * as crons from "../crons.js";
 import type * as effect_AppError from "../effect/AppError.js";
@@ -29,7 +32,15 @@ import type * as lib_analytics_enqueue from "../lib/analytics/enqueue.js";
 import type * as lib_analytics_events from "../lib/analytics/events.js";
 import type * as lib_authSecurity from "../lib/authSecurity.js";
 import type * as lib_devToolsGate from "../lib/devToolsGate.js";
+import type * as lib_domainValidation from "../lib/domainValidation.js";
+import type * as lib_domainValidators from "../lib/domainValidators.js";
+import type * as lib_localIdentity from "../lib/localIdentity.js";
 import type * as lib_logger from "../lib/logger.js";
+import type * as lib_workspaceAuth from "../lib/workspaceAuth.js";
+import type * as messages from "../messages.js";
+import type * as projects from "../projects.js";
+import type * as runs from "../runs.js";
+import type * as workspaces from "../workspaces.js";
 
 import type {
   ApiFromModules,
@@ -40,6 +51,9 @@ import type {
 declare const fullApi: ApiFromModules<{
   "actions/analyticsFlushNode": typeof actions_analyticsFlushNode;
   auth: typeof auth;
+  blobManifests: typeof blobManifests;
+  branches: typeof branches;
+  chats: typeof chats;
   config: typeof config;
   crons: typeof crons;
   "effect/AppError": typeof effect_AppError;
@@ -59,7 +73,15 @@ declare const fullApi: ApiFromModules<{
   "lib/analytics/events": typeof lib_analytics_events;
   "lib/authSecurity": typeof lib_authSecurity;
   "lib/devToolsGate": typeof lib_devToolsGate;
+  "lib/domainValidation": typeof lib_domainValidation;
+  "lib/domainValidators": typeof lib_domainValidators;
+  "lib/localIdentity": typeof lib_localIdentity;
   "lib/logger": typeof lib_logger;
+  "lib/workspaceAuth": typeof lib_workspaceAuth;
+  messages: typeof messages;
+  projects: typeof projects;
+  runs: typeof runs;
+  workspaces: typeof workspaces;
 }>;
 
 /**

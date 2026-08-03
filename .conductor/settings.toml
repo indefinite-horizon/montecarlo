@@ -1,6 +1,6 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
-file_include_globs = ".env.local"
+file_include_globs = ".env*.local"
 
 [[preview_urls]]
 name = "web"
@@ -10,6 +10,19 @@ url = "http://localhost:$CONDUCTOR_PORT"
 create_pr = "Follow /babysit skill after"
 
 [scripts]
-run = "./scripts/run_local.sh"
+setup = "bash scripts/setup_worktree.sh"
 run_mode = "concurrent"
-setup = "./scripts/setup_worktree.sh"
+
+[scripts.run.dev]
+available_in = [ "local" ]
+command = "bash scripts/run_local.sh"
+default = true
+icon = "play"
+
+[scripts.run.test]
+command = "bun run test"
+icon = "test-tube"
+
+[scripts.run.check]
+command = "bun run lint && bun run typecheck"
+icon = "circle-check"
