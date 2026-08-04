@@ -1,6 +1,6 @@
 /** Exercises loopback runtime routing, security, streaming, and blob behavior. */
 
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it } from "vitest";
 import type { RuntimeConfig } from "./config.js";
 import { RunnerRegistry } from "./registry.js";
@@ -15,7 +15,7 @@ import {
 import type {
   AuthEvent,
   ChatRequest,
-  CodexAuthRunner,
+  LocalAuthRunner,
   ProviderDescriptor,
   ProviderHealth,
   Runner,
@@ -23,6 +23,12 @@ import type {
 } from "./types.js";
 
 const bearerToken = "test-runtime-token-that-is-longer-than-32-characters";
+const { privateKey: blobAttestationPrivateKey } = generateKeyPairSync("ec", {
+  namedCurve: "P-256",
+});
+const encodedBlobAttestationPrivateKey = blobAttestationPrivateKey
+  .export({ format: "der", type: "pkcs8" })
+  .toString("base64");
 const runningServers: RuntimeServer[] = [];
 
 function runtimeConfig(): RuntimeConfig {
@@ -32,6 +38,7 @@ function runtimeConfig(): RuntimeConfig {
     development: false,
     bearerToken,
     allowedOrigins: new Set(["http://localhost:5173"]),
+    blobAttestationPrivateKey: encodedBlobAttestationPrivateKey,
     maxRequestBytes: 2 * 1_024 * 1_024,
     maxBlobBytes: 32 * 1_024 * 1_024,
   };
@@ -275,7 +282,7 @@ describe("RuntimeServer", () => {
       available: true,
       description: "Mock Codex connector",
     };
-    const authRunner: CodexAuthRunner = {
+    const authRunner: LocalAuthRunner = {
       descriptor,
       health: () => Promise.resolve({ status: "ready", detail: "ready" }),
       authStatus: (): Promise<ProviderHealth> =>
@@ -315,6 +322,7 @@ describe("RuntimeServer", () => {
         "Content-Type": "application/json",
         "X-Monte-Carlo-Envelope-Version": "1",
         "X-Monte-Carlo-SHA256": digest,
+        "X-Monte-Carlo-Manifest-Id": "manifest_1",
       },
       body,
     });
@@ -350,6 +358,7 @@ describe("RuntimeServer", () => {
       "X-Monte-Carlo-Envelope-Version": "1",
       "X-Monte-Carlo-SHA256": digest,
       "X-Monte-Carlo-Storage-Backend": "r2",
+      "X-Monte-Carlo-Manifest-Id": "manifest_2",
     };
 
     const put = await fetch(`${baseURL}/v1/blobs/${key}`, { method: "PUT", headers, body });

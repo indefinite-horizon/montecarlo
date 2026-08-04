@@ -10,7 +10,7 @@ import type {
   AuthEvent,
   ChatMessage,
   ChatRequest,
-  CodexAuthRunner,
+  LocalAuthRunner,
   ProviderHealth,
   RunnerEvent,
   TokenUsage,
@@ -180,7 +180,7 @@ function mapCodexEvent(
   }
 }
 
-export class CodexRunner implements CodexAuthRunner {
+export class CodexRunner implements LocalAuthRunner {
   readonly descriptor = {
     id: "codex",
     name: "Codex",

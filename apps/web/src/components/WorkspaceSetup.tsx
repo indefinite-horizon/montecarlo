@@ -1,6 +1,6 @@
 /** Lets users create portable local or cloud workspaces. */
 
-import { ArrowRight, Cloud, Database, FolderOpen, HardDrive, RefreshCw, X } from "lucide-react";
+import { ArrowRight, Cloud, Database, HardDrive, X } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -8,12 +8,14 @@ import { Button } from "./ui/button";
 
 export const WorkspaceSetup = memo(function WorkspaceSetup({
   activeWorkspaceId,
+  loading,
   onClose,
   onCreate,
   onSelect,
   workspaces,
 }: {
   activeWorkspaceId?: string;
+  loading: boolean;
   onClose: () => void;
   onCreate: (input: { name: string; storageMode: "local" | "cloud" }) => Promise<boolean>;
   onSelect: (workspaceId: string) => void;
@@ -47,15 +49,9 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
           <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-foreground text-background">
             <Database className="size-5 text-primary" />
           </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-              {t("workspace.setupEyebrow")}
-            </p>
-            <h2 id="workspace-setup-title" className="mt-1 font-display text-2xl font-bold">
-              {t("workspace.setupTitle")}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">{t("workspace.setupSubtitle")}</p>
-          </div>
+          <h2 id="workspace-setup-title" className="min-w-0 flex-1 font-display text-2xl font-bold">
+            {t("workspace.setupTitle")}
+          </h2>
           <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>
             <X />
           </Button>
@@ -115,16 +111,12 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
               active={mode === "local"}
               icon={HardDrive}
               title={t("workspace.localTitle")}
-              description={t("workspace.localDescription")}
-              bullets={[t("workspace.localBulletOne"), t("workspace.localBulletTwo")]}
               onClick={() => setMode("local")}
             />
             <ModeCard
               active={mode === "cloud"}
               icon={Cloud}
               title={t("workspace.cloudTitle")}
-              description={t("workspace.cloudDescription")}
-              bullets={[t("workspace.cloudBulletOne"), t("workspace.cloudBulletTwo")]}
               onClick={() => setMode("cloud")}
             />
           </div>
@@ -139,31 +131,15 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
               onChange={(event) => setName(event.target.value)}
               className="mt-2 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/15"
             />
-            {mode === "local" ? (
-              <div className="mt-3 flex items-center gap-2 rounded-md bg-secondary/55 px-3 py-2 text-[11px] text-muted-foreground">
-                <FolderOpen className="size-3.5 shrink-0 text-primary" />
-                <code className="truncate">
-                  ~/Library/Application Support/Monte Carlo/workspaces/…
-                </code>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-4 flex gap-3 rounded-lg border border-primary/20 bg-accent/55 p-4">
-            <RefreshCw className="mt-0.5 size-4 shrink-0 text-primary" />
-            <p className="text-[11px] leading-5 text-muted-foreground">
-              {t("workspace.portabilityNote")}
-            </p>
           </div>
         </div>
 
-        <footer className="flex items-center justify-between border-t border-border bg-secondary/25 px-6 py-4">
-          <span className="text-[10px] text-muted-foreground">{t("workspace.noBilling")}</span>
+        <footer className="flex items-center justify-end border-t border-border bg-secondary/25 px-6 py-4">
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>
               {t("common.cancel")}
             </Button>
-            <Button onClick={() => void submit()} disabled={!name.trim() || submitting}>
+            <Button onClick={() => void submit()} disabled={!name.trim() || submitting || loading}>
               {mode === "local" ? t("workspace.createLocal") : t("workspace.createCloud")}
               <ArrowRight />
             </Button>
@@ -178,15 +154,11 @@ const ModeCard = memo(function ModeCard({
   active,
   icon: Icon,
   title,
-  description,
-  bullets,
   onClick,
 }: {
   active: boolean;
   icon: typeof HardDrive;
   title: string;
-  description: string;
-  bullets: string[];
   onClick: () => void;
 }) {
   return (
@@ -202,15 +174,6 @@ const ModeCard = memo(function ModeCard({
         <Icon className="size-4 text-primary" />
       </span>
       <span className="mt-3 block text-sm font-semibold">{title}</span>
-      <span className="mt-1 block text-[11px] leading-5 text-muted-foreground">{description}</span>
-      <span className="mt-3 block space-y-1 text-[10px] text-foreground/75">
-        {bullets.map((bullet) => (
-          <span key={bullet} className="flex gap-1.5">
-            <span className="mt-1.5 size-1 shrink-0 rounded-full bg-primary" />
-            {bullet}
-          </span>
-        ))}
-      </span>
     </button>
   );
 });

@@ -4,7 +4,7 @@ import type { ChatMessage, ProviderId } from "./conversation";
 
 type DesktopBridge = {
   getRuntimeConfig: () => Promise<{ baseUrl: string; token: string }>;
-  saveProviderSecret?: (provider: "openrouter" | "anthropic", value: string) => void;
+  saveProviderSecret?: (provider: "openrouter", value: string) => void;
 };
 
 declare global {
@@ -118,13 +118,14 @@ export async function encodeMessageEnvelope(content: string): Promise<EncodedMes
 }
 
 export async function putRuntimeBlob(input: {
+  manifestId: string;
   objectKey: string;
   backend: "filesystem" | "r2";
   data: Uint8Array<ArrayBuffer>;
   byteLength: number;
   sha256: string;
   signal?: AbortSignal;
-}): Promise<void> {
+}): Promise<string> {
   const response = await runtimeFetch(`/v1/blobs/${encodeURIComponent(input.objectKey)}`, {
     method: "PUT",
     headers: {
@@ -132,13 +133,14 @@ export async function putRuntimeBlob(input: {
       "x-monte-carlo-storage-backend": input.backend,
       "x-monte-carlo-envelope-version": String(MESSAGE_ENVELOPE_VERSION),
       "x-monte-carlo-sha256": input.sha256,
+      "x-monte-carlo-manifest-id": input.manifestId,
     },
     body: input.data,
     signal: input.signal,
   });
   if (!response.ok) throw new Error(`Runtime returned ${response.status}`);
 
-  const body = (await response.json()) as { manifest?: RuntimeBlobManifest };
+  const body = (await response.json()) as { manifest?: RuntimeBlobManifest; attestation?: string };
   const manifest = body.manifest;
   if (
     manifest?.version !== 1 ||
@@ -151,6 +153,10 @@ export async function putRuntimeBlob(input: {
   ) {
     throw new Error("Runtime blob manifest did not match the reserved content.");
   }
+  if (!/^[A-Za-z0-9_-]{86}$/u.test(body.attestation ?? "")) {
+    throw new Error("Runtime did not attest the stored blob.");
+  }
+  return body.attestation as string;
 }
 
 export async function getRuntimeMessageContent(input: {
@@ -198,10 +204,7 @@ export async function getRuntimeProviders(): Promise<ProviderStatus[]> {
   return body.providers;
 }
 
-export async function saveProviderSecret(
-  provider: "openrouter" | "anthropic",
-  value: string,
-): Promise<void> {
+export async function saveProviderSecret(provider: "openrouter", value: string): Promise<void> {
   if (!window.monteCarloDesktop?.saveProviderSecret) {
     throw new Error("Provider keys can only be saved securely in the desktop app.");
   }
@@ -213,6 +216,20 @@ export async function startCodexDeviceLogin(
   onEvent: (event: RuntimeStreamEvent) => void,
 ): Promise<void> {
   const response = await runtimeFetch("/v1/auth/codex/device-login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ method: "device" }),
+    signal,
+  });
+  if (!response.ok || !response.body) throw new Error(`Runtime returned ${response.status}`);
+  await consumeEventStream(response.body, onEvent);
+}
+
+export async function startClaudeLogin(
+  signal: AbortSignal,
+  onEvent: (event: RuntimeStreamEvent) => void,
+): Promise<void> {
+  const response = await runtimeFetch("/v1/auth/anthropic/device-login", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ method: "device" }),

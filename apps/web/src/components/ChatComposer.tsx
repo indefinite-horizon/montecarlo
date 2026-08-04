@@ -1,6 +1,6 @@
 /** Sends prompts to the selected provider and opens prompt-only branches. */
 
-import { ArrowUp, GitBranch, Paperclip, Square } from "lucide-react";
+import { ArrowUp, GitBranch, Square } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
@@ -47,16 +47,11 @@ export const ChatComposer = memo(function ChatComposer({
             placeholder={t("composer.placeholder")}
           />
           <div className="flex items-center gap-1.5">
-            <Button size="icon" variant="ghost" aria-label={t("composer.attach")}>
-              <Paperclip />
-            </Button>
             <Button size="sm" variant="ghost" onClick={onBranch} disabled={disabled}>
               <GitBranch />
               <span className="hidden sm:inline">{t("branch.new")}</span>
             </Button>
-            <span className="ml-auto hidden text-[10px] text-muted-foreground sm:inline">
-              {t("composer.hint")}
-            </span>
+            <span className="ml-auto" />
             {isStreaming ? (
               <Button
                 size="icon"
@@ -78,9 +73,6 @@ export const ChatComposer = memo(function ChatComposer({
             )}
           </div>
         </div>
-        <p className="mt-2 text-center text-[9px] text-muted-foreground">
-          {t("composer.persistence")}
-        </p>
       </div>
     </div>
   );

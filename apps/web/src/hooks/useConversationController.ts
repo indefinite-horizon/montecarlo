@@ -1,4 +1,4 @@
-/** Combines durable Convex conversations with optimistic and demo/local session state. */
+/** Combines durable Convex conversations with bounded optimistic rendering. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -66,8 +66,10 @@ function updateBranchMessage(
 export function useConversationController(
   runtimeOfflineMessage: string,
   persistenceErrorMessage: string,
+  hydrateAllBranches = false,
 ) {
   const [fallbackBranches, setFallbackBranches] = useState<ChatBranch[]>(demoBranches);
+  const [demoActiveChatId, setDemoActiveChatId] = useState(demoChats[0]?.id ?? "");
   const [requestedBranchId, setRequestedBranchId] = useState("branch-root");
   const [sessionBranches, setSessionBranches] = useState<SessionBranch[]>([]);
   const [sessionMessages, setSessionMessages] = useState<Record<string, ChatMessage[]>>({});
@@ -79,18 +81,40 @@ export function useConversationController(
   const [providerModels, setProviderModels] = useState<Record<ProviderId, string>>({
     ...defaultProviderModels,
   });
-  const domain = useConvexConversationData(requestedBranchId);
+  const domain = useConvexConversationData(requestedBranchId, hydrateAllBranches);
   const abortRef = useRef<AbortController>();
   const startedBranchTurnsRef = useRef(new Set<string>());
+  const messagePersistenceRef = useRef(new Map<string, Promise<MessageItem | null>>());
+  const persistedMessageIdsRef = useRef(new Map<string, string>());
   const durable = !demoMode && domain.hasConversation;
   const loading = !demoMode && domain.loading;
-  const activeChatId = durable ? String(domain.activeChat?.id) : "chat-convergence";
+  const activeChatId = durable
+    ? String(domain.activeChat?.id)
+    : demoMode
+      ? demoActiveChatId
+      : String(domain.activeChat?.id ?? "");
   const activeSessionBranches = useMemo(
     () => sessionBranches.filter((entry) => entry.chatId === activeChatId),
     [activeChatId, sessionBranches],
   );
   const branches = useMemo(() => {
-    if (!durable) return fallbackBranches;
+    if (!durable) {
+      if (!demoMode) return [];
+      if (activeChatId === demoChats[0]?.id) return fallbackBranches;
+      const activeDemoChat = demoChats.find((chat) => chat.id === activeChatId);
+      return activeDemoChat
+        ? [
+            {
+              id: `branch-root-${activeDemoChat.id}`,
+              contextMessageIds: [],
+              title: activeDemoChat.title,
+              depth: 0,
+              createdAt: activeDemoChat.updatedAt,
+              messages: [],
+            },
+          ]
+        : [];
+    }
     const durableIds = new Set(domain.branches.map((branch) => branch.id));
     const combined = [
       ...domain.branches,
@@ -112,7 +136,14 @@ export function useConversationController(
         messages: [...persisted, ...session.filter((message) => sessionById.has(message.id))],
       };
     });
-  }, [activeSessionBranches, domain.branches, durable, fallbackBranches, sessionMessages]);
+  }, [
+    activeChatId,
+    activeSessionBranches,
+    domain.branches,
+    durable,
+    fallbackBranches,
+    sessionMessages,
+  ]);
   const activeBranchId =
     branches.find((branch) => branch.id === requestedBranchId)?.id ??
     domain.activeBranchId ??
@@ -126,7 +157,9 @@ export function useConversationController(
   const appendMessages = useCallback(
     (branchId: string, additions: ChatMessage[]) => {
       if (!durable) {
-        setFallbackBranches((current) => appendToBranch(current, branchId, additions));
+        if (demoMode) {
+          setFallbackBranches((current) => appendToBranch(current, branchId, additions));
+        }
         return;
       }
       setSessionMessages((current) => ({
@@ -140,7 +173,11 @@ export function useConversationController(
   const updateMessage = useCallback(
     (branchId: string, messageId: string, update: (message: ChatMessage) => ChatMessage) => {
       if (!durable) {
-        setFallbackBranches((current) => updateBranchMessage(current, branchId, messageId, update));
+        if (demoMode) {
+          setFallbackBranches((current) =>
+            updateBranchMessage(current, branchId, messageId, update),
+          );
+        }
         return;
       }
       setSessionMessages((current) => ({
@@ -183,49 +220,68 @@ export function useConversationController(
   );
 
   const createBranch = useCallback(
-    async (anchor: BranchAnchor) => {
-      if (loading) return false;
+    async (anchor: BranchAnchor, parentBranchId = activeBranchId) => {
       if (!anchor.prompt.trim() && !anchor.selectedText?.trim()) return false;
-      const parent = branches.find((branch) => branch.id === activeBranchId);
+      const parent = branches.find((branch) => branch.id === parentBranchId);
       if (!parent) return false;
 
       if (durable) {
-        const selectionCanPersist =
-          !anchor.selectedText ||
-          (anchor.sourceMessageId !== undefined &&
-            domain.durableMessageIds.has(anchor.sourceMessageId));
-        if (selectionCanPersist) {
-          try {
-            const created = await domain.createBranch(anchor, parent.id);
-            if (created) {
-              addSessionBranch(
-                anchor,
-                parent,
-                String(created.id),
-                true,
-                created.depth,
-                created.contextMessageIds.map(String),
-              );
-              if (anchor.prompt.trim()) {
-                setPendingBranchTurn({
-                  branchId: String(created.id),
-                  prompt: anchor.prompt.trim(),
-                });
+        let sourceMessageId = anchor.sourceMessageId;
+        const originalSourceMessageId = sourceMessageId;
+        if (
+          anchor.selectedText &&
+          sourceMessageId &&
+          !domain.durableMessageIds.has(sourceMessageId)
+        ) {
+          const pendingPersistence = messagePersistenceRef.current.get(sourceMessageId);
+          if (pendingPersistence) {
+            try {
+              const persistedMessage = await pendingPersistence;
+              if (persistedMessage) {
+                persistedMessageIdsRef.current.set(sourceMessageId, String(persistedMessage.id));
               }
-              return true;
+            } catch {
+              // The persistence error is surfaced by the message send path.
             }
-          } catch {
-            toast.error(persistenceErrorMessage);
           }
+          sourceMessageId = persistedMessageIdsRef.current.get(sourceMessageId) ?? sourceMessageId;
         }
-        const id = crypto.randomUUID();
-        addSessionBranch(anchor, parent, id, false);
-        if (anchor.prompt.trim()) {
-          setPendingBranchTurn({ branchId: id, prompt: anchor.prompt.trim() });
+        const persistedAnchor = { ...anchor, sourceMessageId };
+        const sourceMessageIsPersisted =
+          sourceMessageId !== undefined &&
+          (domain.durableMessageIds.has(sourceMessageId) ||
+            (originalSourceMessageId !== undefined &&
+              persistedMessageIdsRef.current.get(originalSourceMessageId) === sourceMessageId));
+        const selectionCanPersist = !persistedAnchor.selectedText || sourceMessageIsPersisted;
+        if (!selectionCanPersist) {
+          toast.error(persistenceErrorMessage);
+          return false;
         }
-        return true;
+        try {
+          const created = await domain.createBranch(persistedAnchor, parent.id);
+          if (!created) return false;
+          addSessionBranch(
+            persistedAnchor,
+            parent,
+            String(created.id),
+            true,
+            created.depth,
+            created.contextMessageIds.map(String),
+          );
+          if (persistedAnchor.prompt.trim()) {
+            setPendingBranchTurn({
+              branchId: String(created.id),
+              prompt: persistedAnchor.prompt.trim(),
+            });
+          }
+          return true;
+        } catch {
+          toast.error(persistenceErrorMessage);
+          return false;
+        }
       }
 
+      if (!demoMode) return false;
       const id = crypto.randomUUID();
       const createdAt = Date.now();
       const next: ChatBranch = {
@@ -251,7 +307,6 @@ export function useConversationController(
       branches,
       domain,
       durable,
-      loading,
       messages,
       persistenceErrorMessage,
     ],
@@ -259,7 +314,7 @@ export function useConversationController(
 
   const sendMessage = useCallback(
     async (prompt: string) => {
-      if (loading) return;
+      if (loading || (!durable && !demoMode)) return;
       const text = prompt.trim();
       if (!text) return;
       const branchId = activeBranchId;
@@ -293,13 +348,17 @@ export function useConversationController(
       let run = null;
       if (durable && (domain.durableBranchIds.has(branchId) || persistedSessionBranch)) {
         try {
-          const inputMessage = await domain.persistMessage({
+          const inputPersistence = domain.persistMessage({
             branchId,
             clientId: userMessage.id,
             role: "user",
             content: userMessage.content,
           });
+          messagePersistenceRef.current.set(userMessage.id, inputPersistence);
+          const inputMessage = await inputPersistence;
+          messagePersistenceRef.current.delete(userMessage.id);
           if (inputMessage) {
+            persistedMessageIdsRef.current.set(userMessage.id, String(inputMessage.id));
             updateMessage(branchId, userMessage.id, (message) => ({
               ...message,
               id: String(inputMessage.id),
@@ -312,7 +371,25 @@ export function useConversationController(
             });
           }
         } catch {
+          messagePersistenceRef.current.delete(userMessage.id);
           toast.error(persistenceErrorMessage);
+          setSessionMessages((current) => ({
+            ...current,
+            [branchId]: (current[branchId] ?? []).filter(
+              (message) => message.id !== userMessage.id && message.id !== assistantId,
+            ),
+          }));
+          return;
+        }
+        if (!run) {
+          toast.error(persistenceErrorMessage);
+          setSessionMessages((current) => ({
+            ...current,
+            [branchId]: (current[branchId] ?? []).filter(
+              (message) => message.id !== userMessage.id && message.id !== assistantId,
+            ),
+          }));
+          return;
         }
       }
 
@@ -321,6 +398,7 @@ export function useConversationController(
       abortRef.current = controller;
       let outcome: "succeeded" | "failed" | "canceled" = "succeeded";
       let assistantContent = "";
+      let persistedAssistantId: string | undefined;
       try {
         await streamRuntimeChat({
           provider,
@@ -344,34 +422,45 @@ export function useConversationController(
         } else {
           outcome = "failed";
           assistantContent = "";
-          updateMessage(branchId, assistantId, (message) => ({
-            ...message,
-            content: runtimeOfflineMessage,
-            isError: true,
+          toast.error(runtimeOfflineMessage);
+          setSessionMessages((current) => ({
+            ...current,
+            [branchId]: (current[branchId] ?? []).filter((message) => message.id !== assistantId),
           }));
         }
       } finally {
-        updateMessage(branchId, assistantId, (message) => ({ ...message, isStreaming: false }));
         if (run) {
           let outputMessageId: MessageItem["id"] | undefined;
           if (assistantContent.trim()) {
             try {
-              const outputMessage = await domain.persistMessage({
+              const outputPersistence = domain.persistMessage({
                 branchId,
                 clientId: assistantId,
                 role: "assistant",
                 content: assistantContent,
                 runId: run.id,
               });
+              messagePersistenceRef.current.set(assistantId, outputPersistence);
+              const outputMessage = await outputPersistence;
+              messagePersistenceRef.current.delete(assistantId);
               if (outputMessage) {
                 outputMessageId = outputMessage.id;
+                persistedAssistantId = String(outputMessage.id);
+                persistedMessageIdsRef.current.set(assistantId, String(outputMessage.id));
                 updateMessage(branchId, assistantId, (message) => ({
                   ...message,
                   id: String(outputMessage.id),
                 }));
               }
             } catch {
+              messagePersistenceRef.current.delete(assistantId);
               toast.error(persistenceErrorMessage);
+              setSessionMessages((current) => ({
+                ...current,
+                [branchId]: (current[branchId] ?? []).filter(
+                  (message) => message.id !== assistantId,
+                ),
+              }));
             }
           }
           try {
@@ -380,6 +469,10 @@ export function useConversationController(
             toast.error(persistenceErrorMessage);
           }
         }
+        updateMessage(branchId, persistedAssistantId ?? assistantId, (message) => ({
+          ...message,
+          isStreaming: false,
+        }));
       }
     },
     [
@@ -424,7 +517,7 @@ export function useConversationController(
 
   const createProject = useCallback(
     async (name: string) => {
-      if (loading || !domain.hasWorkspace) return false;
+      if (!domain.hasWorkspace) return false;
       try {
         return Boolean(await domain.createProject(name));
       } catch {
@@ -432,12 +525,11 @@ export function useConversationController(
         return false;
       }
     },
-    [domain, loading, persistenceErrorMessage],
+    [domain, persistenceErrorMessage],
   );
 
   const createChat = useCallback(
     async (title: string, projectId?: string) => {
-      if (loading) return false;
       if (!domain.hasWorkspace) return false;
       try {
         const created = await domain.createChat(title, projectId);
@@ -449,26 +541,40 @@ export function useConversationController(
         return false;
       }
     },
-    [domain, loading, persistenceErrorMessage],
+    [domain, persistenceErrorMessage],
   );
 
   return {
     activeBranchId,
     activeChatId,
-    activeChatTitle: durable ? domain.activeChat?.title : demoChats[0]?.title,
-    activeProjectName: durable ? domain.activeProject?.name : demoProjects[0]?.name,
+    activeChatTitle:
+      durable || !demoMode
+        ? domain.activeChat?.title
+        : demoChats.find((chat) => chat.id === activeChatId)?.title,
+    activeProjectName:
+      durable || !demoMode
+        ? domain.activeProject?.name
+        : demoProjects.find(
+            (project) =>
+              project.id === demoChats.find((chat) => chat.id === activeChatId)?.projectId,
+          )?.name,
     branches,
-    chats: durable || domain.hasWorkspace ? domain.chats : demoChats,
+    chats: demoMode ? demoChats : domain.chats,
     createBranch,
     createChat,
     createProject,
     createWorkspace,
     loading,
     messages,
-    projects: durable || domain.hasWorkspace ? domain.projects : demoProjects,
+    projects: demoMode ? demoProjects : domain.projects,
     provider,
     model: providerModels[provider],
     selectChat: (chatId: string) => {
+      if (demoMode) {
+        setDemoActiveChatId(chatId);
+        setRequestedBranchId("");
+        return;
+      }
       domain.selectChat(chatId);
       setRequestedBranchId("");
     },

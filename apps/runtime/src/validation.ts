@@ -47,7 +47,7 @@ const chatRequestSchema = z
     if (
       (input.provider === "codex" ||
         input.provider === "ollama" ||
-        input.provider === "claude-subscription") &&
+        input.provider === "anthropic") &&
       input.connection?.apiKey !== undefined
     ) {
       context.addIssue({
@@ -56,9 +56,7 @@ const chatRequestSchema = z
       });
     }
     if (
-      (input.provider === "codex" ||
-        input.provider === "anthropic" ||
-        input.provider === "claude-subscription") &&
+      (input.provider === "codex" || input.provider === "anthropic") &&
       input.connection?.baseURL !== undefined
     ) {
       context.addIssue({

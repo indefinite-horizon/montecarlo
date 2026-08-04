@@ -47,8 +47,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# VITE_* variables are client-build inputs, not Convex backend env vars.
-awk '!/^(export[[:space:]]+)?VITE_[A-Za-z0-9_]*=/' "$ENV_FILE" > "$CONVEX_ENV_FILE"
+# Upload only the explicitly documented Convex-owned values. The shared example
+# also contains runtime credentials that must never enter the Convex environment.
+bash "$SCRIPT_DIR/filter_convex_env.sh" "$ENV_FILE" > "$CONVEX_ENV_FILE"
 
 env_file_value() {
   local key="$1" value
@@ -76,8 +77,8 @@ env_file_value() {
 
 run_convex_env_set() {
   local deployment_args=()
-  if grep -Eq '^(CONVEX_DEPLOY_KEY|CONVEX_DEPLOYMENT|CONVEX_SELF_HOSTED_URL|CONVEX_SELF_HOSTED_ADMIN_KEY)=' "$CONVEX_ENV_FILE"; then
-    deployment_args=(--env-file "$CONVEX_ENV_FILE")
+  if grep -Eq '^(CONVEX_DEPLOY_KEY|CONVEX_DEPLOYMENT|CONVEX_SELF_HOSTED_URL|CONVEX_SELF_HOSTED_ADMIN_KEY)=' "$ENV_FILE"; then
+    deployment_args=(--env-file "$ENV_FILE")
   fi
 
   run_convex_env_set_command() {

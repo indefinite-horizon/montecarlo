@@ -60,9 +60,10 @@ export const create = mutation({
       if (
         !inputMessage ||
         inputMessage.workspaceId !== args.workspaceId ||
-        inputMessage.chatId !== args.chatId
+        inputMessage.chatId !== args.chatId ||
+        inputMessage.branchId !== args.branchId
       ) {
-        throw new Error("Input message not found in this chat.");
+        throw new Error("Input message not found in this branch.");
       }
     }
 

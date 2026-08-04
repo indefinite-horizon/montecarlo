@@ -239,7 +239,11 @@ type DomainApi = {
       BlobManifestItem
     >;
     markAvailable: PublicMutation<
-      { workspaceId: Id<"workspaces">; manifestId: Id<"blob_manifests"> },
+      {
+        workspaceId: Id<"workspaces">;
+        manifestId: Id<"blob_manifests">;
+        attestation: string;
+      },
       BlobManifestItem
     >;
   };

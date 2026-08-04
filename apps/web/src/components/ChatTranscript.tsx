@@ -1,12 +1,12 @@
 /** Renders the active branch lineage and turns text selections into branch anchors. */
 
-import { GitBranch, RotateCcw, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatMessage, SelectionAnchor } from "@/lib/conversation";
+import { selectionAnchorFromMessage } from "@/lib/messageSelection";
 import { cn } from "@/lib/utils";
 import { MonteCarloBrand } from "./MonteCarloBrand";
-import { Button } from "./ui/button";
 
 export const ChatTranscript = memo(function ChatTranscript({
   messages,
@@ -55,33 +55,6 @@ const Message = memo(function Message({
     );
   }
 
-  const selectFromMessage = (container: HTMLElement) => {
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.anchorNode || !selection.focusNode)
-      return;
-    if (!container.contains(selection.anchorNode) || !container.contains(selection.focusNode))
-      return;
-    const range = selection.getRangeAt(0);
-    const rawSelection = range.toString();
-    const leadingWhitespace = rawSelection.length - rawSelection.trimStart().length;
-    const text = rawSelection.trim();
-    if (text.length < 3) return;
-    const rect = range.getBoundingClientRect();
-    const prefix = range.cloneRange();
-    prefix.selectNodeContents(container);
-    prefix.setEnd(range.startContainer, range.startOffset);
-    const start = prefix.toString().length + leadingWhitespace;
-    const selectedText = text.slice(0, 2_000);
-    if (message.content.slice(start, start + selectedText.length) !== selectedText) return;
-    onSelectText({
-      messageId: message.id,
-      text: selectedText,
-      start,
-      end: start + selectedText.length,
-      rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-    });
-  };
-
   return (
     <article className="group mb-10 grid grid-cols-[32px_minmax(0,1fr)] gap-3">
       <MonteCarloBrand compact />
@@ -100,22 +73,13 @@ const Message = memo(function Message({
             "message-copy whitespace-pre-wrap select-text text-[15px] leading-[1.72] text-foreground/92",
             message.isStreaming && "streaming-caret",
           )}
-          onMouseUp={(event) => selectFromMessage(event.currentTarget)}
+          onMouseUp={(event) => {
+            const anchor = selectionAnchorFromMessage(event.currentTarget, message);
+            if (anchor) onSelectText(anchor);
+          }}
         >
           {message.content}
         </div>
-        {message.content ? (
-          <div className="mt-3 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-            <Button size="xs" variant="ghost">
-              <GitBranch />
-              {t("branch.fromMessage")}
-            </Button>
-            <Button size="xs" variant="ghost">
-              <RotateCcw />
-              {t("chat.retry")}
-            </Button>
-          </div>
-        ) : null}
       </div>
     </article>
   );

@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { convexConfig } from "./config";
+import { env } from "./env";
 import {
   createPublicId,
   requireNonNegativeInteger,
@@ -132,9 +133,20 @@ export const reserve = mutation({
       createdAt: now,
       updatedAt: now,
     });
-    const manifest = await ctx.db.get(manifestId);
-    if (!manifest) throw new Error("Reserved blob manifest could not be loaded.");
-    return toManifestResult(manifest);
+    return {
+      id: manifestId,
+      publicId,
+      workspaceId: args.workspaceId,
+      backend: args.backend,
+      objectKey,
+      envelopeVersion,
+      contentType,
+      byteLength,
+      sha256,
+      status: "reserved" as const,
+      createdAt: now,
+      updatedAt: now,
+    };
   },
 });
 
@@ -142,6 +154,7 @@ export const markAvailable = mutation({
   args: {
     workspaceId: v.id("workspaces"),
     manifestId: v.id("blob_manifests"),
+    attestation: v.string(),
   },
   returns: blobManifestValidator,
   handler: async (ctx, args) => {
@@ -150,6 +163,45 @@ export const markAvailable = mutation({
     if (!manifest || manifest.workspaceId !== args.workspaceId || manifest.status === "deleted") {
       throw new Error("Blob manifest not found in this workspace.");
     }
+    const encodedPublicKey = env.MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY;
+    if (!encodedPublicKey || !/^[A-Za-z0-9_-]{86}$/.test(args.attestation)) {
+      throw new Error("Blob attestation is unavailable.");
+    }
+    const payload = [
+      String(manifest._id),
+      manifest.backend,
+      manifest.objectKey,
+      manifest.sha256,
+      manifest.byteLength,
+      manifest.envelopeVersion,
+      manifest.contentType,
+    ].join("\n");
+    let verified = false;
+    try {
+      const publicKey = Uint8Array.from(atob(encodedPublicKey), (character) =>
+        character.charCodeAt(0),
+      );
+      const normalizedSignature = args.attestation.replaceAll("-", "+").replaceAll("_", "/");
+      const signature = Uint8Array.from(atob(`${normalizedSignature}==`), (character) =>
+        character.charCodeAt(0),
+      );
+      const key = await crypto.subtle.importKey(
+        "spki",
+        publicKey,
+        { name: "ECDSA", namedCurve: "P-256" },
+        false,
+        ["verify"],
+      );
+      verified = await crypto.subtle.verify(
+        { name: "ECDSA", hash: "SHA-256" },
+        key,
+        signature,
+        new TextEncoder().encode(payload),
+      );
+    } catch {
+      throw new Error("Blob attestation is unavailable.");
+    }
+    if (!verified) throw new Error("Blob attestation is invalid.");
     const updatedAt = manifest.status === "available" ? manifest.updatedAt : Date.now();
     if (manifest.status !== "available") {
       await ctx.db.patch(manifest._id, { status: "available", updatedAt });

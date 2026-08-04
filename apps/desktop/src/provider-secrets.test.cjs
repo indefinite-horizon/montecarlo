@@ -37,30 +37,31 @@ describe("provider secret store", () => {
     rmSync(userDataPath, { recursive: true, force: true });
   });
 
-  it("persists only encrypted OpenRouter and Anthropic values", () => {
+  it("persists only encrypted OpenRouter values", () => {
     const store = createProviderSecretStore({ safeStorage: fakeSafeStorage(), userDataPath });
     store.save({ provider: "openrouter", secret: "test-value-one" });
-    store.save({ provider: "anthropic", secret: "test-value-two" });
 
     const fileContents = readFileSync(path.join(userDataPath, "provider-secrets.v1.json"), "utf8");
     assert.equal(fileContents.includes("test-value-one"), false);
-    assert.equal(fileContents.includes("test-value-two"), false);
     assert.deepEqual(store.loadEnvironment(), {
-      ANTHROPIC_API_KEY: "test-value-two",
-      OPENROUTER_API_KEY: "test-value-one",
+      MONTE_CARLO_USER_OPENROUTER_API_KEY: "test-value-one",
     });
   });
 
   it("clears a saved value and rejects every provider outside the allowlist", () => {
     const store = createProviderSecretStore({ safeStorage: fakeSafeStorage(), userDataPath });
     store.save({ provider: "openrouter", secret: "" });
-    assert.equal(store.loadEnvironment().OPENROUTER_API_KEY, undefined);
+    assert.equal(store.loadEnvironment().MONTE_CARLO_USER_OPENROUTER_API_KEY, undefined);
     assert.throws(
       () => parseProviderSecretUpdate({ provider: "ollama", secret: "not-applicable" }),
       /Unsupported provider/,
     );
     assert.throws(
       () => parseProviderSecretUpdate({ provider: "codex", secret: "not-applicable" }),
+      /Unsupported provider/,
+    );
+    assert.throws(
+      () => parseProviderSecretUpdate({ provider: "anthropic", secret: "not-applicable" }),
       /Unsupported provider/,
     );
   });
@@ -73,7 +74,10 @@ describe("provider secret store", () => {
       },
       userDataPath,
     });
-    assert.throws(() => store.save({ provider: "anthropic", secret: "test-value" }), /unavailable/);
+    assert.throws(
+      () => store.save({ provider: "openrouter", secret: "test-value" }),
+      /unavailable/,
+    );
   });
 
   it("rejects Electron's Linux plaintext storage fallback", () => {
@@ -104,7 +108,7 @@ describe("provider secret store", () => {
     });
     assert.deepEqual(store.loadEnvironment(), {});
     assert.throws(
-      () => store.save({ provider: "anthropic", secret: "test-value" }),
+      () => store.save({ provider: "openrouter", secret: "test-value" }),
       /regular file/,
     );
   });

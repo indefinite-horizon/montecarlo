@@ -1,6 +1,6 @@
 /** Declares the narrow Electron preload API available to the sandboxed renderer. */
 
-export type DesktopProviderSecretId = "anthropic" | "openrouter";
+export type DesktopProviderSecretId = "openrouter";
 
 export interface MonteCarloDesktopBridge {
   platform: string;

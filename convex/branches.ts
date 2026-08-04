@@ -103,6 +103,24 @@ export const create = mutation({
       ) {
         throw new Error("Source message not found in this chat.");
       }
+      const lineageBranchIds = new Set<string>();
+      let lineageBranch: Doc<"chat_branches"> | null = parent;
+      while (lineageBranch) {
+        lineageBranchIds.add(String(lineageBranch._id));
+        lineageBranch = lineageBranch.parentBranchId
+          ? await ctx.db.get(lineageBranch.parentBranchId)
+          : null;
+      }
+      if (!lineageBranchIds.has(String(sourceMessage.branchId))) {
+        throw new Error("Source message is not part of the parent branch lineage.");
+      }
+      if (
+        selection &&
+        (selection.end > sourceMessage.contentPreview.length ||
+          sourceMessage.contentPreview.slice(selection.start, selection.end) !== selection.quote)
+      ) {
+        throw new Error("Selection does not match the stored source content.");
+      }
     }
     if (!sourceMessage) {
       sourceMessage = recentParentMessages[0] ?? null;

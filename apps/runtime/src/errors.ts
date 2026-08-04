@@ -13,7 +13,12 @@ export class HttpError extends Error {
 }
 
 export function toPublicError(error: unknown, secrets: readonly string[] = []): string {
-  const source = error instanceof Error ? error.message : "The provider request failed.";
+  const source =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "The provider request failed.";
   let message = stripControlCharacters(source);
 
   for (const secret of secrets) {

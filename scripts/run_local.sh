@@ -150,7 +150,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 if [ ! -f "$RUNTIME_ENV_FILE" ]; then
-  echo "Error: $RUNTIME_ENV_FILE not found. Copy .env.runtime.example first."
+  echo "Error: $RUNTIME_ENV_FILE not found. Copy .env.example to it first."
   exit 1
 fi
 
@@ -197,19 +197,19 @@ require_free_port() {
 }
 
 upsert_env_var() {
-  local key="$1" value="$2" tmp
+  local key="$1" value="$2" target_file="${3:-$ENV_FILE}" tmp
   tmp=$(mktemp)
   awk -v key="$key" '
     $0 ~ "^[[:space:]]*(export[[:space:]]+)?" key "[[:space:]]*=" { next }
     { print }
-  ' "$ENV_FILE" > "$tmp"
+  ' "$target_file" > "$tmp"
   if [ -s "$tmp" ] && [ "$(tail -c 1 "$tmp")" != "" ]; then
     printf '\n' >> "$tmp"
   fi
   {
     cat "$tmp"
     printf '%s=%s\n' "$key" "$value"
-  } > "$ENV_FILE"
+  } > "$target_file"
   rm -f "$tmp"
 }
 
@@ -364,6 +364,18 @@ fs.writeFileSync(configFile, JSON.stringify(config));
 }
 
 write_selected_ports_to_env() {
+  local attestation_public_key attestation_private_key
+  attestation_public_key="$(env_file_value "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY")"
+  attestation_private_key="$(env_file_value "MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$RUNTIME_ENV_FILE")"
+  if [ -z "$attestation_public_key" ] || [ -z "$attestation_private_key" ]; then
+    mapfile -t attestation_keys < <(
+      bun -e 'const { publicKey, privateKey } = require("node:crypto").generateKeyPairSync("ec", { namedCurve: "P-256" }); console.log(publicKey.export({ format: "der", type: "spki" }).toString("base64")); console.log(privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"));'
+    )
+    attestation_public_key="${attestation_keys[0]}"
+    attestation_private_key="${attestation_keys[1]}"
+  fi
+  upsert_env_var "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY" "$attestation_public_key"
+  upsert_env_var "MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$attestation_private_key" "$RUNTIME_ENV_FILE"
   upsert_env_var "CONVEX_AGENT_MODE" "anonymous"
   upsert_env_var "CONVEX_URL" "http://127.0.0.1:${backend_port}"
   upsert_env_var "VITE_CONVEX_URL" "http://127.0.0.1:${backend_port}"
@@ -376,8 +388,9 @@ sync_convex_env_from_file() {
   local convex_env_file convex_url status
   convex_env_file=$(mktemp)
 
-  # VITE_* variables are client-build inputs, not Convex backend env vars.
-  awk '!/^(export[[:space:]]+)?VITE_[A-Za-z0-9_]*=/' "$ENV_FILE" > "$convex_env_file"
+  # Upload only the explicitly documented Convex-owned values. The shared
+  # example also contains runtime credentials that must never enter Convex.
+  bash scripts/filter_convex_env.sh "$ENV_FILE" > "$convex_env_file"
 
   echo "Syncing Convex env vars from $ENV_FILE..."
   set +e

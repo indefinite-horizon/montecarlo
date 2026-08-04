@@ -73,6 +73,13 @@ declare module "@tanstack/react-router" {
 
 function InnerApp() {
   const { data: session } = authClient.useSession();
+
+  // lint-allow: no-direct-use-effect — auth changes must rerun route guards.
+  React.useEffect(() => {
+    if (session === undefined) return;
+    void router.invalidate();
+  }, [session]);
+
   return <RouterProvider router={router} context={{ session, convexClient }} />;
 }
 

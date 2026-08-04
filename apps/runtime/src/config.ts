@@ -21,6 +21,7 @@ export interface RuntimeConfig {
   port: number;
   development: boolean;
   bearerToken?: string;
+  blobAttestationPrivateKey?: string;
   allowedOrigins: ReadonlySet<string>;
   allowedWorkspaceIds?: ReadonlySet<string>;
   maxRequestBytes: number;
@@ -70,6 +71,8 @@ function normalizeConfiguredOrigin(value: string): string {
 export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const development = env.NODE_ENV === "development" || env.MONTE_CARLO_RUNTIME_DEV === "1";
   const bearerToken = env.MONTE_CARLO_RUNTIME_TOKEN?.trim() || undefined;
+  const blobAttestationPrivateKey =
+    env.MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY?.trim() || undefined;
   if (!development && (bearerToken === undefined || bearerToken.length < 32)) {
     throw new Error(
       "MONTE_CARLO_RUNTIME_TOKEN must contain at least 32 characters outside development.",
@@ -98,6 +101,7 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     port: readPort(env.MONTE_CARLO_RUNTIME_PORT),
     development,
     bearerToken,
+    blobAttestationPrivateKey,
     allowedOrigins: new Set((configuredOrigins ?? defaults).map(normalizeConfiguredOrigin)),
     allowedWorkspaceIds:
       configuredWorkspaceIds === undefined ? undefined : new Set(configuredWorkspaceIds),

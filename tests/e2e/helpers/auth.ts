@@ -5,7 +5,7 @@ import { sharedConfig } from "../../../lib/config";
 
 export const defaultAuthEmail = sharedConfig.dev.defaultAuthUser.email;
 
-export async function signIn(page: Page, email = defaultAuthEmail) {
+export async function signIn(page: Page, email: string = defaultAuthEmail) {
   await page.goto("/login");
   await page.getByTestId("auth-email").fill(email);
   await page.getByTestId("auth-submit").click();

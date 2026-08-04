@@ -74,6 +74,7 @@ export const ProviderSwitcher = memo(function ProviderSwitcher({
     <div className="relative">
       <button
         type="button"
+        data-testid="provider-trigger"
         className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-sm transition-colors hover:bg-accent"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
@@ -84,7 +85,10 @@ export const ProviderSwitcher = memo(function ProviderSwitcher({
         <ChevronDown className="size-3" />
       </button>
       {open ? (
-        <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-lg border border-border bg-popover p-1.5 shadow-xl">
+        <div
+          className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-lg border border-border bg-popover p-1.5 shadow-xl"
+          data-testid="provider-menu"
+        >
           <p className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             {t("providers.choose")}
           </p>

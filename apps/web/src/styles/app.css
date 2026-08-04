@@ -1,3 +1,4 @@
+@import "@xyflow/react/dist/style.css" layer(base);
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -73,6 +74,8 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-branch-blue: hsl(var(--branch-blue));
+  --color-branch-gold: hsl(var(--branch-gold));
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -157,6 +160,50 @@ button,
   background-size: 16px 16px;
 }
 
+.react-flow__controls {
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  background: hsl(var(--card) / 0.94);
+  box-shadow: 0 10px 30px hsl(var(--foreground) / 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.react-flow__controls-button {
+  border-color: hsl(var(--border));
+  background: transparent;
+  fill: hsl(var(--foreground));
+}
+
+.react-flow__controls-button:hover {
+  background: hsl(var(--secondary));
+}
+
+.react-flow__minimap {
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.8rem;
+  background: hsl(var(--card) / 0.94);
+  box-shadow: 0 12px 34px hsl(var(--foreground) / 0.1);
+  backdrop-filter: blur(12px);
+}
+
+.react-flow__attribution {
+  border-radius: 0.25rem 0 0;
+  background: hsl(var(--card) / 0.75);
+  color: hsl(var(--muted-foreground));
+}
+
+.canvas-skeleton-line {
+  background-image: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--border) / 0.85) 48%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 210% 100%;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .streaming-caret::after {
     content: "";
@@ -168,10 +215,24 @@ button,
     background: hsl(var(--primary));
     animation: caret-pulse 1s steps(2, jump-none) infinite;
   }
+
+  .canvas-skeleton-line {
+    animation: canvas-shimmer 1.45s ease-in-out infinite;
+  }
 }
 
 @keyframes caret-pulse {
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes canvas-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
   }
 }

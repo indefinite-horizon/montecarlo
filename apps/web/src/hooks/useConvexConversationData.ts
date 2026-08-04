@@ -25,6 +25,7 @@ import {
 } from "@/lib/runtimeClient";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { sharedConfig } from "../../../../lib/config";
 
 const PROJECT_COLORS = ["terracotta", "blue", "gold", "green"] as const;
 const MAX_HYDRATED_MESSAGES = 256;
@@ -82,7 +83,7 @@ function messageFromEnvelope(
   };
 }
 
-export function useConvexConversationData(requestedBranchId: string) {
+export function useConvexConversationData(requestedBranchId: string, hydrateAllBranches = false) {
   const me = useQuery(api.auth.me);
   const authenticated = me !== undefined && me !== null;
   const workspacePage = useQuery(
@@ -91,9 +92,9 @@ export function useConvexConversationData(requestedBranchId: string) {
   );
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>();
   const [selectedChatId, setSelectedChatId] = useState<string>();
-  const workspace =
-    workspacePage?.items.find((item) => String(item.id) === selectedWorkspaceId) ??
-    workspacePage?.items[0];
+  const workspace = selectedWorkspaceId
+    ? workspacePage?.items.find((item) => String(item.id) === selectedWorkspaceId)
+    : workspacePage?.items[0];
   const projectPage = useQuery(
     domainApi.projects.list,
     workspace ? { workspaceId: workspace.id, limit: 100 } : "skip",
@@ -102,8 +103,9 @@ export function useConvexConversationData(requestedBranchId: string) {
     domainApi.chats.list,
     workspace ? { workspaceId: workspace.id, limit: 100 } : "skip",
   );
-  const chat =
-    chatPage?.items.find((item) => String(item.id) === selectedChatId) ?? chatPage?.items[0];
+  const chat = selectedChatId
+    ? chatPage?.items.find((item) => String(item.id) === selectedChatId)
+    : chatPage?.items[0];
   const tree = useQuery(
     domainApi.chats.getTree,
     workspace && chat ? { workspaceId: workspace.id, chatId: chat.id, limit: 500 } : "skip",
@@ -116,10 +118,14 @@ export function useConvexConversationData(requestedBranchId: string) {
         : ([] as Id<"chat_branches">[]),
     [requestedBranchId, tree],
   );
+  const requestedMessageBranchIds = useMemo(
+    () => (hydrateAllBranches && tree ? tree.branches.map((branch) => branch.id) : activeLineage),
+    [activeLineage, hydrateAllBranches, tree],
+  );
   const messageRequests = useMemo(
     () =>
       Object.fromEntries(
-        activeLineage.map((branchId) => [
+        requestedMessageBranchIds.map((branchId) => [
           String(branchId),
           {
             query: domainApi.messages.list,
@@ -127,10 +133,10 @@ export function useConvexConversationData(requestedBranchId: string) {
           },
         ]),
       ),
-    [activeLineage, workspace?.id],
+    [requestedMessageBranchIds, workspace?.id],
   );
   const messageResults = useQueries(messageRequests);
-  const messagePagesLoading = activeLineage.some(
+  const messagePagesLoading = requestedMessageBranchIds.some(
     (branchId) => messageResults[String(branchId)] === undefined,
   );
   const messageSummaries = useMemo(
@@ -146,12 +152,15 @@ export function useConvexConversationData(requestedBranchId: string) {
   useEffect(() => {
     const controller = new AbortController();
     const seen = new Set<string>();
-    const targets = messageSummaries.slice(-MAX_HYDRATED_MESSAGES).filter((message) => {
-      const key = hydrationKey(message);
-      if (seen.has(key) || hydratedContentRef.current[key] !== undefined) return false;
-      seen.add(key);
-      return true;
-    });
+    const targets = [...messageSummaries]
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .slice(-MAX_HYDRATED_MESSAGES)
+      .filter((message) => {
+        const key = hydrationKey(message);
+        if (seen.has(key) || hydratedContentRef.current[key] !== undefined) return false;
+        seen.add(key);
+        return true;
+      });
     let cursor = 0;
 
     const hydrateNext = async () => {
@@ -327,7 +336,9 @@ export function useConvexConversationData(requestedBranchId: string) {
       replyToMessageId?: Id<"messages">;
     }): Promise<MessageItem | null> => {
       if (!workspace || !chat) return null;
-      const preview = input.content.trim().slice(0, 1_000);
+      const preview = input.content
+        .trim()
+        .slice(0, sharedConfig.domain.limits.contentPreviewLength);
       if (!preview) return null;
       const envelope = await encodeMessageEnvelope(input.content);
       const reserved = await reserveBlobMutation({
@@ -339,7 +350,8 @@ export function useConvexConversationData(requestedBranchId: string) {
         sha256: envelope.sha256,
       });
       if (reserved.status !== "available") {
-        await putRuntimeBlob({
+        const attestation = await putRuntimeBlob({
+          manifestId: String(reserved.id),
           objectKey: reserved.objectKey,
           backend: reserved.backend,
           data: envelope.data,
@@ -349,6 +361,7 @@ export function useConvexConversationData(requestedBranchId: string) {
         const available = await markBlobAvailableMutation({
           workspaceId: workspace.id,
           manifestId: reserved.id,
+          attestation,
         });
         if (available.status !== "available") {
           throw new Error("Message content did not become available.");

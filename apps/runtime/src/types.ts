@@ -1,12 +1,6 @@
 /** Defines normalized provider, request, health, and streaming event contracts. */
 
-export const providerIds = [
-  "codex",
-  "openrouter",
-  "ollama",
-  "anthropic",
-  "claude-subscription",
-] as const;
+export const providerIds = ["codex", "openrouter", "ollama", "anthropic"] as const;
 
 export type ProviderId = (typeof providerIds)[number];
 export type MessageRole = "system" | "user" | "assistant";
@@ -81,12 +75,12 @@ export type AuthEvent =
   | { type: "output"; delta: string; stream: "stdout" | "stderr" }
   | { type: "finish"; success: true };
 
-export interface CodexAuthRunner extends Runner {
+export interface LocalAuthRunner extends Runner {
   authStatus(signal?: AbortSignal): Promise<ProviderHealth>;
   deviceLogin(signal: AbortSignal): AsyncIterable<AuthEvent>;
 }
 
-export function hasCodexAuth(runner: Runner): runner is CodexAuthRunner {
-  const candidate = runner as Partial<CodexAuthRunner>;
+export function hasLocalAuth(runner: Runner): runner is LocalAuthRunner {
+  const candidate = runner as Partial<LocalAuthRunner>;
   return typeof candidate.authStatus === "function" && typeof candidate.deviceLogin === "function";
 }
