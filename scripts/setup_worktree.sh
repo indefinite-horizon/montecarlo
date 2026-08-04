@@ -12,8 +12,8 @@ if [ "$MAIN_REPO" = "$WORKTREE_DIR" ]; then
     echo "Created .env.local from .env.example"
   fi
   if [ ! -f "$WORKTREE_DIR/.env.runtime.local" ]; then
-    cp "$WORKTREE_DIR/.env.runtime.example" "$WORKTREE_DIR/.env.runtime.local"
-    echo "Created .env.runtime.local from .env.runtime.example"
+    cp "$WORKTREE_DIR/.env.example" "$WORKTREE_DIR/.env.runtime.local"
+    echo "Created .env.runtime.local from .env.example"
   fi
   bun install --frozen-lockfile
   bash "$WORKTREE_DIR/scripts/setup_git_hooks.sh"
@@ -24,7 +24,7 @@ fi
 ENV_FILE="$MAIN_REPO/.env.local"
 EXAMPLE_ENV_FILE="$MAIN_REPO/.env.example"
 RUNTIME_ENV_FILE="$MAIN_REPO/.env.runtime.local"
-RUNTIME_EXAMPLE_ENV_FILE="$MAIN_REPO/.env.runtime.example"
+RUNTIME_EXAMPLE_ENV_FILE="$MAIN_REPO/.env.example"
 
 if [ ! -f "$ENV_FILE" ]; then
   if [ ! -f "$EXAMPLE_ENV_FILE" ]; then

@@ -9,6 +9,19 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 ## Hard Rules
 
 - Never commit secrets. Local model and object-store secrets belong in `.env.runtime.local` or the desktop credential boundary, never in Convex, analytics, renderer persistence, logs, or action arguments.
+- Keep `.env.example` focused on values an operator must supply or intentionally choose. Group
+  credentials by ownership in this order: cross-boundary Convex-and-runtime credentials,
+  Convex-only secrets, runtime-only secrets, and deployment-only secrets. List each assignment
+  once, keep non-secret configuration in separate owner-specific sections, and mark
+  browser-visible values as public. Do not duplicate tuning knobs or values that already have sane
+  runtime defaults; keep those defaults in config.
+- Treat `SECRETS.md` as the canonical secret and environment-ownership inventory. Whenever an
+  environment variable, credential, token, or runtime ownership boundary is added, renamed,
+  removed, or changed, review and update `SECRETS.md` and `.env.example` in the same change.
+  Secret-bearing and operator-supplied values must use the same ownership model in both files;
+  non-secret tuning knobs with runtime defaults remain documented through their config modules
+  rather than duplicated as active `.env.example` assignments. Never place real values, token
+  fragments, hashes, credential lengths, or screenshots in either file.
 - Every public tenant Convex function must authorize active workspace membership. Do not accept a user/owner ID from clients.
 - Every tenant-owned document carries `workspaceId`; tenant compound indexes begin with it and reads use those indexes.
 - Keep stable public IDs and versioned envelopes at persistence boundaries. Never export Convex `_id` values or absolute local paths as portable identity.
@@ -25,7 +38,7 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 
 ```sh
 cp .env.example .env.local
-cp .env.runtime.example .env.runtime.local
+cp .env.example .env.runtime.local
 bun install
 bun run dev
 ```
@@ -59,6 +72,7 @@ Add focused coverage for branch graphs, context windows, authorization, portable
 ## Doc Map
 
 - `README.md`: setup, feature status, and provider support.
+- `SECRETS.md`: canonical secret-bearing environment and deployment ownership inventory.
 - `docs/ARCHITECTURE.md`: runtime and persistence invariants.
 - `docs/ONTOLOGY.md`: canonical product terminology.
 - `docs/DESIGN.md`: visual and interaction rules.

@@ -44,7 +44,7 @@ Requirements: Bun 1.3.6, Node 22 or newer, and Chromium for browser tests.
 
 ```sh
 cp .env.example .env.local
-cp .env.runtime.example .env.runtime.local
+cp .env.example .env.runtime.local
 bun install
 bun run dev
 ```
@@ -105,7 +105,7 @@ This makes a branch reconstructible on Codex, Claude, OpenRouter, or Ollama with
 - `.env.runtime.local`: model-provider keys, loopback token, R2 credentials, and local runtime settings.
 - `.worktreeinclude`: asks Conductor to copy both gitignored files into new workspaces.
 
-The checked-in examples document every supported variable. Production secrets should come from the desktop credential store or the runtime's deployment environment.
+The single checked-in example groups operator-supplied values by owner. Copy it to both local files, then set Convex/web values only in `.env.local` and runtime values only in `.env.runtime.local`. [`SECRETS.md`](SECRETS.md) is the canonical ownership inventory. Production secrets should come from the desktop credential store or the runtime's deployment environment.
 
 Account-free mode is guarded twice: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` must be explicit and `SITE_URL` must resolve to a loopback origin. Cloud deployments must leave that flag unset and require Better Auth membership for every workspace operation.
 
@@ -115,6 +115,7 @@ Account-free mode is guarded twice: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` must
 - [Ontology](docs/ONTOLOGY.md)
 - [Design](docs/DESIGN.md)
 - [Security](docs/SECURITY.md)
+- [Secrets and environment ownership](SECRETS.md)
 - [Testing](docs/TESTING.md)
 - [Deployment](docs/NEW_PROD_DEPLOY.md)
 

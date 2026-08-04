@@ -150,7 +150,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 if [ ! -f "$RUNTIME_ENV_FILE" ]; then
-  echo "Error: $RUNTIME_ENV_FILE not found. Copy .env.runtime.example first."
+  echo "Error: $RUNTIME_ENV_FILE not found. Copy .env.example to it first."
   exit 1
 fi
 
@@ -388,8 +388,9 @@ sync_convex_env_from_file() {
   local convex_env_file convex_url status
   convex_env_file=$(mktemp)
 
-  # VITE_* variables are client-build inputs, not Convex backend env vars.
-  awk '!/^(export[[:space:]]+)?VITE_[A-Za-z0-9_]*=/' "$ENV_FILE" > "$convex_env_file"
+  # Upload only the explicitly documented Convex-owned values. The shared
+  # example also contains runtime credentials that must never enter Convex.
+  bash scripts/filter_convex_env.sh "$ENV_FILE" > "$convex_env_file"
 
   echo "Syncing Convex env vars from $ENV_FILE..."
   set +e
