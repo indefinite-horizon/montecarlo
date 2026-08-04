@@ -84,7 +84,11 @@ export const ProviderSwitcher = memo(function ProviderSwitcher({
         <ChevronDown className="size-3" />
       </button>
       {open ? (
-        <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-lg border border-border bg-popover p-1.5 shadow-xl">
+        <div
+          className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-lg border border-border bg-popover p-1.5 shadow-xl"
+          role="menu"
+          aria-label={t("providers.choose")}
+        >
           <p className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             {t("providers.choose")}
           </p>
@@ -94,6 +98,7 @@ export const ProviderSwitcher = memo(function ProviderSwitcher({
               <button
                 key={option.id}
                 type="button"
+                role="menuitem"
                 className={cn(
                   "flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left hover:bg-accent",
                   option.id === value && "bg-accent/70",

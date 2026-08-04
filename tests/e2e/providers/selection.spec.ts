@@ -19,7 +19,10 @@ async function openProviderMenu(page: Page) {
 
 async function selectProvider(page: Page, name: string, model: string) {
   await openProviderMenu(page);
-  await page.getByRole("button", { name: new RegExp(`^${name}`, "u") }).click();
+  await page
+    .getByRole("menu", { name: "Choose a provider" })
+    .getByRole("menuitem", { name: new RegExp(`^${name}`, "u") })
+    .click();
   await openProviderMenu(page);
   await page.getByLabel("Model ID").fill(model);
   await page.getByRole("heading", { name: "New conversation" }).click();
@@ -111,7 +114,7 @@ test("web settings never persist an OpenRouter key in renderer storage", async (
   const openrouter = providerCard(page, "OpenRouter");
   await openrouter.getByRole("button", { name: "Add key" }).click();
   await openrouter.getByLabel("Paste API key").fill("e2e-secret-must-not-persist");
-  await openrouter.getByRole("button", { name: "Save" }).click();
+  await openrouter.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Electron app");
   const storedValues = await page.evaluate(() => Object.values(localStorage));
   expect(storedValues.join("\n")).not.toContain("e2e-secret-must-not-persist");

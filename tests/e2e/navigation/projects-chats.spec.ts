@@ -84,7 +84,7 @@ test("switching chats restores independent conversations", async ({ page }) => {
 
 test("chat search is case-insensitive and clearing it restores all groups", async ({ page }) => {
   await page.getByRole("button", { name: "Search chats" }).click();
-  const search = page.getByLabel("Search chats");
+  const search = page.getByRole("textbox", { name: "Search chats" });
   await search.fill("bAyEsIaN");
   await expect(page.getByRole("button", { name: "Bayesian priors" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Why simulations converge" })).toHaveCount(0);

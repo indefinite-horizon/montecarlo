@@ -56,7 +56,7 @@ test("branches from selected assistant text without requiring a prompt", async (
   await expect(dialog.getByRole("button", { name: "Create branch" })).toBeEnabled();
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(page.getByText("Following a branch from", { exact: true })).toBeVisible();
-  await expect(page.getByText("selectable passage", { exact: false })).toBeVisible();
+  await expect(page.getByText("“selectable passage”", { exact: true })).toBeVisible();
   expect(runtime.chatRequests).toHaveLength(1);
 });
 
@@ -87,13 +87,7 @@ test("stale selected text is cleared when the transcript scrolls", async ({ page
     "Selection that must become stale",
   );
   await selectAssistantText(page, "must become stale");
-  await page
-    .getByRole("document")
-    .last()
-    .evaluate((element) => {
-      const scroller = element.parentElement?.parentElement;
-      scroller?.dispatchEvent(new Event("scroll", { bubbles: true }));
-    });
+  await page.getByTestId("transcript-scroller").dispatchEvent("scroll");
   await expect(page.getByRole("button", { name: "Follow this thread" })).toHaveCount(0);
 });
 

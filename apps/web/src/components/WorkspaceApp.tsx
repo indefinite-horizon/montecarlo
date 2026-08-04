@@ -209,6 +209,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         ) : (
           <>
             <div
+              data-testid="transcript-scroller"
               className="min-h-0 flex-1 overflow-y-auto"
               onScroll={() => setSelection(undefined)}
             >
