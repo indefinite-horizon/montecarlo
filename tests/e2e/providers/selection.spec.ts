@@ -25,7 +25,7 @@ async function selectProvider(page: Page, name: string, model: string) {
     .click();
   await openProviderMenu(page);
   await page.getByLabel("Model ID").fill(model);
-  await page.getByRole("heading", { name: "New conversation" }).click();
+  await page.getByTestId("provider-trigger").click();
 }
 
 function providerCard(page: Page, name: string) {

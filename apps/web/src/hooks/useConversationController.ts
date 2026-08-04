@@ -221,7 +221,6 @@ export function useConversationController(
 
   const createBranch = useCallback(
     async (anchor: BranchAnchor, parentBranchId = activeBranchId) => {
-      if (loading) return false;
       if (!anchor.prompt.trim() && !anchor.selectedText?.trim()) return false;
       const parent = branches.find((branch) => branch.id === parentBranchId);
       if (!parent) return false;
@@ -308,7 +307,6 @@ export function useConversationController(
       branches,
       domain,
       durable,
-      loading,
       messages,
       persistenceErrorMessage,
     ],
@@ -514,7 +512,7 @@ export function useConversationController(
 
   const createProject = useCallback(
     async (name: string) => {
-      if (loading || !domain.hasWorkspace) return false;
+      if (!domain.hasWorkspace) return false;
       try {
         return Boolean(await domain.createProject(name));
       } catch {
@@ -522,12 +520,11 @@ export function useConversationController(
         return false;
       }
     },
-    [domain, loading, persistenceErrorMessage],
+    [domain, persistenceErrorMessage],
   );
 
   const createChat = useCallback(
     async (title: string, projectId?: string) => {
-      if (loading) return false;
       if (!domain.hasWorkspace) return false;
       try {
         const created = await domain.createChat(title, projectId);
@@ -539,7 +536,7 @@ export function useConversationController(
         return false;
       }
     },
-    [domain, loading, persistenceErrorMessage],
+    [domain, persistenceErrorMessage],
   );
 
   return {
