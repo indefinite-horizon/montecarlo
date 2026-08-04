@@ -45,13 +45,13 @@ flag on a shared or cloud deployment.
 
 - Codex authentication remains in the official CLI/SDK credential store. Monte
   Carlo may invoke `codex login --device-auth`, but does not read the auth cache.
-- OpenRouter and Anthropic keys come from Electron's encrypted store or an
-  explicitly trusted local runtime environment.
+- OpenRouter keys come from Electron's encrypted store or an explicitly trusted
+  local runtime environment.
 - A managed OpenRouter key is used only with the configured managed endpoint;
   request-selected endpoints never receive it.
 - Ollama endpoints must resolve to loopback.
-- Claude.ai Free/Pro/Max authentication remains disabled unless Anthropic gives
-  written approval for the third-party integration.
+- Claude Pro/Max authentication remains in the official Claude CLI credential
+  store. Monte Carlo may invoke the CLI login flow, but does not read its cache.
 
 ## Object Storage
 

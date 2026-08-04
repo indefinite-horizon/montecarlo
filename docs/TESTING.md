@@ -39,6 +39,7 @@ git diff --exit-code convex/_generated
 Playwright tests live in `tests/e2e/` and are split by filename:
 
 - `*.spec.ts`: blocking deterministic core suite.
+- `desktop/*.spec.ts`: opt-in Electron shell suite.
 - `*.perf.spec.ts`: lightweight performance checks.
 - `*.external.spec.ts`: opt-in real-network or provider checks.
 - `*.nightly.external.spec.ts`: scheduled opt-in checks.
@@ -48,9 +49,16 @@ Commands:
 ```sh
 bash scripts/prepare_e2e_env.sh .env.example .env.e2e
 bun run test:e2e:core:ci
+bun run test:e2e:desktop
 bun run test:e2e:perf:ci
 bun run test:e2e:external:ci
 ```
+
+The core project starts both the ordinary local build and an auth-required
+build. Its loopback runtime fixture signs and retains message envelopes in
+memory, so provider streaming and durable blob round trips do not use external
+model networks. External provider cases run only when
+`RUN_EXTERNAL_PROVIDER_TESTS=true` and their provider-specific flag is set.
 
 ## Local Stack Validation
 
@@ -70,6 +78,15 @@ unit/type/build check, use the smaller command directly.
 - Keep each test focused on one meaningful flow.
 - Use unique emails or IDs for tests that create users.
 - Add screenshots when manually verifying UI changes.
+
+## Major PR And Feature Planning
+
+For every major PR or feature plan, identify the core user flows that the
+change introduces or materially alters and decide whether they need persistent
+E2E coverage. Before adding tests, review the existing E2E suite and design the
+combined coverage to be mutually exclusive and collectively exhaustive (MECE):
+avoid redundant scenarios while covering every important distinct flow. Modify
+or consolidate existing tests when needed to keep the overall suite MECE.
 
 ## When To Add Persistent E2E
 

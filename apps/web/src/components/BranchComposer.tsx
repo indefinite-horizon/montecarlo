@@ -84,12 +84,9 @@ export const BranchComposer = memo(function BranchComposer({
           <span className="grid size-8 place-items-center rounded-md bg-accent text-primary">
             <GitBranch className="size-4" />
           </span>
-          <div className="min-w-0 flex-1">
-            <h2 id="branch-composer-title" className="font-display text-lg font-bold">
-              {selection ? t("branch.selectionTitle") : t("branch.promptTitle")}
-            </h2>
-            <p className="text-[11px] text-muted-foreground">{t("branch.composerSubtitle")}</p>
-          </div>
+          <h2 id="branch-composer-title" className="min-w-0 flex-1 font-display text-lg font-bold">
+            {selection ? t("branch.selectionTitle") : t("branch.promptTitle")}
+          </h2>
           <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>
             <X />
           </Button>
@@ -106,11 +103,7 @@ export const BranchComposer = memo(function BranchComposer({
                 “{selection.text}”
               </blockquote>
             </div>
-          ) : (
-            <div className="mb-5 rounded-lg border border-border bg-secondary/45 p-4 text-xs leading-5 text-muted-foreground">
-              {t("branch.promptContext")}
-            </div>
-          )}
+          ) : null}
 
           <label htmlFor="branch-prompt" className="text-xs font-semibold">
             {promptRequired ? t("branch.promptRequired") : t("branch.promptOptional")}
@@ -125,26 +118,6 @@ export const BranchComposer = memo(function BranchComposer({
               selection ? t("branch.selectionPlaceholder") : t("branch.promptPlaceholder")
             }
           />
-
-          <div className="mt-5 rounded-lg border border-border p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {t("branch.contextTitle")}
-            </p>
-            <ul className="mt-2 space-y-2 text-xs leading-5 text-foreground/80">
-              <li className="flex gap-2">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                {t("branch.contextParent")}
-              </li>
-              <li className="flex gap-2">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                {t("branch.contextSelection")}
-              </li>
-              <li className="flex gap-2">
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                {t("branch.contextIndependent")}
-              </li>
-            </ul>
-          </div>
         </div>
 
         <footer className="flex items-center justify-end gap-2 border-t border-border p-4">

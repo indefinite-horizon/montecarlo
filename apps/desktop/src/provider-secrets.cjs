@@ -17,8 +17,7 @@ const path = require("node:path");
 const { randomBytes } = require("node:crypto");
 
 const providerEnvironmentNames = Object.freeze({
-  anthropic: "ANTHROPIC_API_KEY",
-  openrouter: "OPENROUTER_API_KEY",
+  openrouter: "MONTE_CARLO_USER_OPENROUTER_API_KEY",
 });
 const providerSecretStoreVersion = 1;
 const maximumSecretCharacters = 8_192;

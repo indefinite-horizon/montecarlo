@@ -2,7 +2,7 @@
 
 ## Background
 
-Monte Carlo is a local-first branchable conversation workspace. It uses a React/Vite SPA, Electron, a local Node/Bun model runtime, Convex, Better Auth, AI SDK 7, Tailwind/shadcn primitives, Effect, i18n, Vitest, and Playwright.
+Monte Carlo is a branchable conversation workspace. It uses a React/Vite SPA, Electron, a local Node/Bun model runtime, Convex, Better Auth, AI SDK 7, Tailwind/shadcn primitives, Effect, i18n, Vitest, and Playwright.
 
 The application-owned chat DAG is always authoritative. Provider session IDs are optional accelerators and must never become required to reconstruct a conversation or move it between providers.
 
@@ -13,11 +13,13 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 - Every tenant-owned document carries `workspaceId`; tenant compound indexes begin with it and reads use those indexes.
 - Keep stable public IDs and versioned envelopes at persistence boundaries. Never export Convex `_id` values or absolute local paths as portable identity.
 - Keep branch persistence provider-neutral. Native Codex/Claude forks may optimize a run but do not define the graph.
-- Do not enable Claude subscription authentication without written Anthropic approval. Direct Anthropic API-key access is supported.
+- Claude subscription authentication has written Anthropic approval. Use the official
+  local Claude CLI login and never read or persist its credential cache.
 - Do not read, copy, return, or persist Codex's auth cache. Let the official local SDK/CLI own and refresh it.
 - Do not import provider SDKs into React or Convex query/mutation modules. Provider execution lives under `apps/runtime`.
 - Do not hand-edit generated Convex or TanStack Router files except to resolve a documented codegen conflict.
 - User-facing product copy uses locale keys. Run `bun run validate:i18n` after copy changes.
+- UI descriptions: do not add subtitles, helper text, or descriptive copy beneath headings, labels, cards, or settings by default. Prefer one concise, self-explanatory heading or label. Only add supporting copy when the user explicitly asks for it or when it is necessary to prevent misunderstanding or error, and never use it to restate the heading.
 
 ## Development
 
@@ -33,6 +35,16 @@ Use `bun run dev:desktop` for Electron. Use `.conductor/settings.toml` from Cond
 ## Verification
 
 Consult [docs/TESTING.md](docs/TESTING.md) for test selection. The standard path is:
+
+For every major PR or feature implementation on the current working branch,
+consult [docs/TESTING.md](docs/TESTING.md) during planning and again after
+implementation. Review the existing E2E suite, identify core user flows that
+need coverage, and add, update, consolidate, or remove tests as needed to keep
+the suite MECE.
+
+After completing any other implementation work, consult
+[docs/TESTING.md](docs/TESTING.md) to determine whether new or updated tests are
+needed.
 
 ```sh
 bun run lint

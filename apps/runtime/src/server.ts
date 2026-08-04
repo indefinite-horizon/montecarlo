@@ -1,6 +1,6 @@
 /** Serves authenticated loopback chat, auth, cancellation, and blob APIs. */
 
-import { randomUUID } from "node:crypto";
+import { createPrivateKey, randomUUID, sign } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import type { RuntimeConfig } from "./config.js";
@@ -23,7 +23,7 @@ import {
 import { EventStreamWriter } from "./stream.js";
 import {
   type ChatRequest,
-  hasCodexAuth,
+  hasLocalAuth,
   type ProviderHealth,
   type ProviderId,
   type Runner,
@@ -190,11 +190,19 @@ export class RuntimeServer {
       return;
     }
     if (request.method === "GET" && url.pathname === "/v1/auth/codex/status") {
-      await this.handleCodexStatus(response);
+      await this.handleAuthStatus(response, "codex");
       return;
     }
     if (request.method === "POST" && url.pathname === "/v1/auth/codex/device-login") {
-      await this.handleCodexDeviceLogin(request, response, url);
+      await this.handleDeviceLogin(request, response, url, "codex");
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/v1/auth/anthropic/status") {
+      await this.handleAuthStatus(response, "anthropic");
+      return;
+    }
+    if (request.method === "POST" && url.pathname === "/v1/auth/anthropic/device-login") {
+      await this.handleDeviceLogin(request, response, url, "anthropic");
       return;
     }
     if (request.method === "POST" && url.pathname === "/v1/chat") {
@@ -235,35 +243,36 @@ export class RuntimeServer {
     writeJson(response, 200, { providers });
   }
 
-  private async handleCodexStatus(response: ServerResponse): Promise<void> {
-    const runner = this.registry.get("codex");
-    if (!hasCodexAuth(runner)) {
-      throw new HttpError(501, "auth_unavailable", "The Codex auth connector is unavailable.");
+  private async handleAuthStatus(response: ServerResponse, provider: ProviderId): Promise<void> {
+    const runner = this.registry.get(provider);
+    if (!hasLocalAuth(runner)) {
+      throw new HttpError(501, "auth_unavailable", "The provider auth connector is unavailable.");
     }
     writeJson(response, 200, await runner.authStatus());
   }
 
-  private async handleCodexDeviceLogin(
+  private async handleDeviceLogin(
     request: IncomingMessage,
     response: ServerResponse,
     url: URL,
+    provider: ProviderId,
   ): Promise<void> {
     const body = await readJsonBody(request, this.config.maxRequestBytes, { optional: true });
     assertDeviceLoginBody(body);
-    const runner = this.registry.get("codex");
-    if (!hasCodexAuth(runner)) {
-      throw new HttpError(501, "auth_unavailable", "The Codex auth connector is unavailable.");
+    const runner = this.registry.get(provider);
+    if (!hasLocalAuth(runner)) {
+      throw new HttpError(501, "auth_unavailable", "The provider auth connector is unavailable.");
     }
 
     const format = parseStreamFormat(request, url);
     const runId = randomUUID();
     const controller = new AbortController();
     const detach = attachDisconnectCancellation(request, response, controller);
-    this.activeOperations.set(runId, { controller, provider: "codex" });
+    this.activeOperations.set(runId, { controller, provider });
     const writer = new EventStreamWriter(response, format);
 
     try {
-      await writer.write({ type: "start", runId, provider: "codex", operation: "device-login" });
+      await writer.write({ type: "start", runId, provider, operation: "device-login" });
       for await (const event of runner.deviceLogin(controller.signal)) await writer.write(event);
     } catch (error) {
       if (controller.signal.aborted) {
@@ -271,7 +280,7 @@ export class RuntimeServer {
       } else {
         await writer.write({
           type: "error",
-          code: "codex_login_failed",
+          code: `${provider}_login_failed`,
           message: toPublicError(error),
           retryable: true,
         });
@@ -455,7 +464,43 @@ export class RuntimeServer {
         envelopeVersion,
         expectedSha256,
       });
-      writeJson(response, 200, { manifest });
+      const manifestId = request.headers["x-monte-carlo-manifest-id"];
+      const encodedPrivateKey = this.config.blobAttestationPrivateKey;
+      if (typeof manifestId !== "string" || !manifestId || !encodedPrivateKey) {
+        throw new HttpError(
+          503,
+          "blob_attestation_unavailable",
+          "Blob attestation is not configured.",
+        );
+      }
+      const payload = [
+        manifestId,
+        manifest.backend,
+        manifest.key,
+        manifest.sha256,
+        manifest.byteLength,
+        manifest.envelopeVersion,
+        manifest.mediaType,
+      ].join("\n");
+      let attestation: string;
+      try {
+        const privateKey = createPrivateKey({
+          key: Buffer.from(encodedPrivateKey, "base64"),
+          format: "der",
+          type: "pkcs8",
+        });
+        attestation = sign("sha256", Buffer.from(payload), {
+          key: privateKey,
+          dsaEncoding: "ieee-p1363",
+        }).toString("base64url");
+      } catch {
+        throw new HttpError(
+          503,
+          "blob_attestation_unavailable",
+          "Blob attestation is not configured.",
+        );
+      }
+      writeJson(response, 200, { manifest, attestation });
     } catch (error) {
       throw this.mapObjectStoreError(error, "put");
     }

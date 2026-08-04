@@ -4,6 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 const webPort = process.env.PLAYWRIGHT_WEB_PORT ?? "5173";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${webPort}`;
+const authWebPort = process.env.PLAYWRIGHT_AUTH_WEB_PORT ?? "5174";
+const authBaseURL = `http://localhost:${authWebPort}`;
 const convexSiteURL = process.env.CONVEX_SITE_URL ?? "http://127.0.0.1:3211";
 const convexSitePort = Number(new URL(convexSiteURL).port);
 const convexReadyPort =
@@ -19,6 +21,8 @@ const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "true";
 const externalSpecs = ["**/*.external.spec.ts"];
 const nightlySpecs = ["**/*.nightly.external.spec.ts"];
 const perfSpecs = ["**/*.perf.spec.ts"];
+const authSpecs = ["**/auth/session.spec.ts"];
+const desktopSpecs = ["**/desktop/*.spec.ts"];
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -38,8 +42,17 @@ export default defineConfig({
   projects: [
     {
       name: "chromium-core",
-      testIgnore: [...externalSpecs, ...perfSpecs],
+      testIgnore: [...externalSpecs, ...perfSpecs, ...authSpecs, ...desktopSpecs],
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "chromium-auth",
+      testMatch: authSpecs,
+      use: { ...devices["Desktop Chrome"], baseURL: authBaseURL },
+    },
+    {
+      name: "electron-desktop",
+      testMatch: desktopSpecs,
     },
     {
       name: "chromium-external",
@@ -70,6 +83,12 @@ export default defineConfig({
         {
           command: `bash -c 'while [ ! -f ${convexReadyFile} ]; do sleep 1; done; bun --env-file=${envFile} run --filter "./apps/web" dev -- --port ${webPort} --strictPort'`,
           url: baseURL,
+          reuseExistingServer: true,
+          timeout: 120_000,
+        },
+        {
+          command: `bash -c 'while [ ! -f ${convexReadyFile} ]; do sleep 1; done; VITE_AUTH_REQUIRED=true bun --env-file=${envFile} run --filter "./apps/web" dev -- --port ${authWebPort} --strictPort'`,
+          url: authBaseURL,
           reuseExistingServer: true,
           timeout: 120_000,
         },

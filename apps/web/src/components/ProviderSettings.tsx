@@ -6,8 +6,7 @@ import {
   Cpu,
   KeyRound,
   LoaderCircle,
-  LockKeyhole,
-  ShieldAlert,
+  Sparkles,
   Terminal,
   X,
 } from "lucide-react";
@@ -20,6 +19,7 @@ import {
   type ProviderStatus,
   saveProviderEndpoint,
   saveProviderSecret,
+  startClaudeLogin,
   startCodexDeviceLogin,
 } from "@/lib/runtimeClient";
 import { Button } from "./ui/button";
@@ -32,7 +32,7 @@ export const ProviderSettings = memo(function ProviderSettings({
   const { t } = useTranslation();
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [busyProvider, setBusyProvider] = useState<string>();
-  const [editingProvider, setEditingProvider] = useState<"openrouter" | "anthropic">();
+  const [editingProvider, setEditingProvider] = useState<"openrouter">();
   const [secret, setSecret] = useState("");
   const [notice, setNotice] = useState<string>();
   const [loginOutput, setLoginOutput] = useState("");
@@ -84,9 +84,30 @@ export const ProviderSettings = memo(function ProviderSettings({
     }
   };
 
+  const connectClaude = async () => {
+    setBusyProvider("anthropic");
+    setNotice(undefined);
+    setLoginOutput("");
+    const controller = new AbortController();
+    try {
+      await startClaudeLogin(controller.signal, (event) => {
+        if (event.type === "output") {
+          setLoginOutput((current) => `${current}${event.delta}`.slice(-4_000));
+        }
+        if (event.type === "status") setNotice(event.message);
+        if (event.type === "error") setNotice(event.message);
+      });
+      await refreshProviders();
+    } catch {
+      setNotice(t("settings.runtimeUnavailable"));
+    } finally {
+      setBusyProvider(undefined);
+    }
+  };
+
   const persistSecret = async () => {
-    if (!editingProvider || !secret.trim()) return;
-    const provider = editingProvider;
+    if (!secret.trim()) return;
+    const provider = "openrouter" as const;
     setBusyProvider(provider);
     setNotice(undefined);
     try {
@@ -126,12 +147,12 @@ export const ProviderSettings = memo(function ProviderSettings({
       >
         <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-5 backdrop-blur">
           <KeyRound className="size-4 text-primary" />
-          <div className="min-w-0 flex-1">
-            <h2 id="provider-settings-title" className="font-display text-lg font-bold">
-              {t("settings.providersTitle")}
-            </h2>
-            <p className="text-[11px] text-muted-foreground">{t("settings.providersSubtitle")}</p>
-          </div>
+          <h2
+            id="provider-settings-title"
+            className="min-w-0 flex-1 font-display text-lg font-bold"
+          >
+            {t("settings.providersTitle")}
+          </h2>
           <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>
             <X />
           </Button>
@@ -150,8 +171,6 @@ export const ProviderSettings = memo(function ProviderSettings({
             icon={Terminal}
             title={t("providers.codex.name")}
             badge={badgeFor("codex", t("settings.checking"))}
-            description={t("settings.codexDescription")}
-            note={providerStatus("codex")?.health.detail ?? t("settings.codexSecurity")}
             action={
               providerStatus("codex")?.health.status === "ready"
                 ? t("settings.checkConnection")
@@ -174,8 +193,6 @@ export const ProviderSettings = memo(function ProviderSettings({
             icon={Cpu}
             title={t("providers.ollama.name")}
             badge={badgeFor("ollama", t("settings.local"))}
-            description={t("settings.ollamaDescription")}
-            note={providerStatus("ollama")?.health.detail ?? "http://127.0.0.1:11434"}
             action={t("settings.testEndpoint")}
             onAction={() => void refreshProviders()}
             ready={providerStatus("ollama")?.health.status === "ready"}
@@ -190,8 +207,6 @@ export const ProviderSettings = memo(function ProviderSettings({
             icon={Cloud}
             title={t("providers.openrouter.name")}
             badge={badgeFor("openrouter", t("settings.needsKey"))}
-            description={t("settings.openrouterDescription")}
-            note={t("settings.keyLocalOnly")}
             action={t("settings.addKey")}
             busy={busyProvider === "openrouter"}
             onAction={() => {
@@ -215,47 +230,27 @@ export const ProviderSettings = memo(function ProviderSettings({
             ) : null}
           </ProviderCard>
           <ProviderCard
-            icon={KeyRound}
+            icon={Sparkles}
             title={t("providers.anthropic.name")}
-            badge={badgeFor("anthropic", t("settings.needsKey"))}
-            description={t("settings.anthropicDescription")}
-            note={t("settings.keyLocalOnly")}
-            action={t("settings.addKey")}
+            badge={badgeFor("anthropic", t("settings.needsSetup"))}
+            action={
+              providerStatus("anthropic")?.health.status === "ready"
+                ? t("settings.checkConnection")
+                : t("settings.connect")
+            }
             busy={busyProvider === "anthropic"}
             onAction={() => {
-              setEditingProvider("anthropic");
-              setSecret("");
+              if (providerStatus("anthropic")?.health.status === "ready") void refreshProviders();
+              else void connectClaude();
             }}
             ready={providerStatus("anthropic")?.health.status === "ready"}
           >
-            {editingProvider === "anthropic" ? (
-              <SecretEditor
-                value={secret}
-                onChange={setSecret}
-                onSave={() => void persistSecret()}
-                onCancel={() => setEditingProvider(undefined)}
-              />
+            {loginOutput && busyProvider === "anthropic" ? (
+              <pre className="mt-3 max-h-28 overflow-auto whitespace-pre-wrap rounded-md bg-secondary/60 p-2 text-[10px] leading-4 text-muted-foreground">
+                {loginOutput}
+              </pre>
             ) : null}
           </ProviderCard>
-
-          <div className="rounded-lg border border-amber-500/35 bg-amber-500/8 p-4">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
-              <div>
-                <p className="text-xs font-semibold">{t("settings.claudePlanTitle")}</p>
-                <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-                  {t("settings.claudePlanBlocked")}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 rounded-lg border border-border bg-secondary/35 p-4">
-            <LockKeyhole className="mt-0.5 size-4 shrink-0 text-primary" />
-            <p className="text-[11px] leading-5 text-muted-foreground">
-              {t("settings.credentialsBoundary")}
-            </p>
-          </div>
         </div>
       </section>
     </div>
@@ -266,8 +261,6 @@ const ProviderCard = memo(function ProviderCard({
   icon: Icon,
   title,
   badge,
-  description,
-  note,
   action,
   busy = false,
   onAction,
@@ -277,8 +270,6 @@ const ProviderCard = memo(function ProviderCard({
   icon: typeof Terminal;
   title: string;
   badge: string;
-  description: string;
-  note: string;
   action: string;
   busy?: boolean;
   onAction: () => void;
@@ -299,9 +290,8 @@ const ProviderCard = memo(function ProviderCard({
               {badge}
             </span>
           </div>
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{description}</p>
           <div className="mt-3 flex items-center justify-between gap-3">
-            <code className="min-w-0 truncate text-[10px] text-muted-foreground">{note}</code>
+            <span />
             <Button size="xs" variant="outline" disabled={busy} onClick={onAction}>
               {busy ? <LoaderCircle className="animate-spin" /> : null}
               {action}

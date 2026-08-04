@@ -25,11 +25,26 @@ ensure_default_var() {
   printf '%s=%s\n' "$key" "$value" >> "$TARGET_FILE"
 }
 
+ensure_nonempty_default_var() {
+  local key="$1"
+  local value="$2"
+
+  if grep -q "^${key}=." "$TARGET_FILE"; then
+    return
+  fi
+  if grep -q "^${key}=" "$TARGET_FILE"; then
+    KEY="$key" VALUE="$value" perl -0pi -e 's/^$ENV{KEY}=.*$/$ENV{KEY}=$ENV{VALUE}/mg' "$TARGET_FILE"
+    return
+  fi
+  printf '%s=%s\n' "$key" "$value" >> "$TARGET_FILE"
+}
+
 ensure_default_var "CONVEX_AGENT_MODE" "anonymous"
 ensure_default_var "CONVEX_URL" "http://127.0.0.1:3210"
 ensure_default_var "CONVEX_SITE_URL" "http://127.0.0.1:3211"
 ensure_default_var "VITE_CONVEX_URL" "http://127.0.0.1:3210"
 ensure_default_var "VITE_CONVEX_SITE_URL" "http://127.0.0.1:3211"
+ensure_nonempty_default_var "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY" "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPb6x9CwdZxD/1T1yR0kN6ohcSuLtjEIFRuNkVoIhFKSy1iQAwHEqnT1bMM1tUHjEy2HXpFQJpHhB656+DGmv5Q=="
 
 upsert_var() {
   local key="$1"

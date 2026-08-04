@@ -43,27 +43,27 @@
   },
   "workspace": {
     "defaultName": "Richard's workspace",
-    "localStatus": "Local workspace · on this device",
-    "cloudStatus": "Cloud workspace · synced",
-    "persistenceError": "The workspace could not save that change. Your current session is still available.",
+    "localStatus": "Files on this device",
+    "cloudStatus": "Cloud file storage",
+    "persistenceError": "The workspace could not save that change.",
     "projectLabel": "Probability lab",
     "setupEyebrow": "Workspace setup",
-    "setupTitle": "Where should this workspace live?",
+    "setupTitle": "Where should message content be stored?",
     "setupSubtitle": "Choose local-first privacy or cloud sync. You can move it later.",
     "existingTitle": "Open an existing workspace",
-    "localTitle": "Local workspace",
+    "localTitle": "On this device",
     "localDescription": "Convex and model harnesses run on this machine.",
     "localBulletOne": "Filesystem object storage",
     "localBulletTwo": "No account or cloud dependency",
-    "cloudTitle": "Cloud workspace",
+    "cloudTitle": "Cloud object storage",
     "cloudDescription": "Use the multi-tenant Convex deployment across devices.",
     "cloudBulletOne": "R2 object storage",
     "cloudBulletTwo": "Secure sync between devices",
     "nameLabel": "Workspace name",
     "portabilityNote": "Both modes use the same versioned IDs, message envelopes, and blob manifest. Export, verify, and import moves data in either direction without provider-specific history.",
     "noBilling": "Cloud billing is not enabled yet.",
-    "createLocal": "Create local workspace",
-    "createCloud": "Create cloud workspace"
+    "createLocal": "Create with device storage",
+    "createCloud": "Create with cloud storage"
   },
   "providers": {
     "choose": "Choose a provider",
@@ -82,8 +82,8 @@
       "detail": "Local endpoint"
     },
     "anthropic": {
-      "name": "Claude API",
-      "detail": "Console API key"
+      "name": "Claude",
+      "detail": "Pro or Max plan"
     }
   },
   "settings": {
@@ -107,22 +107,18 @@
     "endpointSaved": "The endpoint will be used for new local runtime requests.",
     "invalidEndpoint": "Use a valid, policy-compliant provider endpoint.",
     "openrouterDescription": "Use a key stored locally, or a centrally managed key in cloud mode.",
-    "anthropicDescription": "Supported direct Claude access through an Anthropic Console API key.",
     "keyLocalOnly": "Encrypted local credential",
     "addKey": "Add key",
     "keyPlaceholder": "Paste API key",
     "keySaved": "The encrypted local credential was saved and the runtime restarted.",
     "desktopKeyOnly": "Open the Electron app to save a key securely, or configure the runtime environment.",
     "runtimeUnavailable": "The local runtime is unavailable. Start it and try again.",
-    "claudePlanTitle": "Claude Pro and Max connector is disabled",
-    "claudePlanBlocked": "Anthropic currently prohibits third-party products from offering Claude.ai login or routing subscription credentials. This connector stays off until Anthropic approves the integration.",
     "credentialsBoundary": "Subscription credentials never enter Convex, R2, chat records, analytics, or renderer persistence. The authenticated loopback runtime invokes official local SDKs and returns normalized stream events only."
   },
   "chat": {
     "initialTitle": "New conversation",
     "you": "You",
     "assistant": "Monte Carlo",
-    "retry": "Retry",
     "share": "Share chat"
   },
   "branch": {
@@ -152,6 +148,30 @@
     "contextIndependent": "A fresh provider session that can move independently",
     "create": "Create branch",
     "following": "Following a branch from"
+  },
+  "canvas": {
+    "viewMode": "Conversation view",
+    "thread": "Thread",
+    "canvas": "Canvas",
+    "threadView": "Thread view",
+    "canvasView": "Canvas view",
+    "region": "Conversation canvas",
+    "branchCard": "{{title}} branch",
+    "active": "Active",
+    "openThread": "Open {{title}} in thread view",
+    "askFollowUp": "Ask follow-up",
+    "followUpDialog": "Ask a follow-up",
+    "promptLabel": "Follow-up question",
+    "promptPlaceholder": "Type your follow-up question…",
+    "ask": "Ask",
+    "emptyBranch": "Ready for a follow-up",
+    "generating": "Generating response",
+    "loading": "Loading canvas",
+    "controls": "Canvas controls",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitView": "Fit canvas to view",
+    "minimap": "Conversation minimap"
   },
   "composer": {
     "placeholder": "Ask a follow-up or start a new direction…",

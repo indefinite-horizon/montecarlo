@@ -82,7 +82,7 @@ function messageFromEnvelope(
   };
 }
 
-export function useConvexConversationData(requestedBranchId: string) {
+export function useConvexConversationData(requestedBranchId: string, hydrateAllBranches = false) {
   const me = useQuery(api.auth.me);
   const authenticated = me !== undefined && me !== null;
   const workspacePage = useQuery(
@@ -116,10 +116,14 @@ export function useConvexConversationData(requestedBranchId: string) {
         : ([] as Id<"chat_branches">[]),
     [requestedBranchId, tree],
   );
+  const requestedMessageBranchIds = useMemo(
+    () => (hydrateAllBranches && tree ? tree.branches.map((branch) => branch.id) : activeLineage),
+    [activeLineage, hydrateAllBranches, tree],
+  );
   const messageRequests = useMemo(
     () =>
       Object.fromEntries(
-        activeLineage.map((branchId) => [
+        requestedMessageBranchIds.map((branchId) => [
           String(branchId),
           {
             query: domainApi.messages.list,
@@ -127,10 +131,10 @@ export function useConvexConversationData(requestedBranchId: string) {
           },
         ]),
       ),
-    [activeLineage, workspace?.id],
+    [requestedMessageBranchIds, workspace?.id],
   );
   const messageResults = useQueries(messageRequests);
-  const messagePagesLoading = activeLineage.some(
+  const messagePagesLoading = requestedMessageBranchIds.some(
     (branchId) => messageResults[String(branchId)] === undefined,
   );
   const messageSummaries = useMemo(
@@ -146,12 +150,15 @@ export function useConvexConversationData(requestedBranchId: string) {
   useEffect(() => {
     const controller = new AbortController();
     const seen = new Set<string>();
-    const targets = messageSummaries.slice(-MAX_HYDRATED_MESSAGES).filter((message) => {
-      const key = hydrationKey(message);
-      if (seen.has(key) || hydratedContentRef.current[key] !== undefined) return false;
-      seen.add(key);
-      return true;
-    });
+    const targets = [...messageSummaries]
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .slice(-MAX_HYDRATED_MESSAGES)
+      .filter((message) => {
+        const key = hydrationKey(message);
+        if (seen.has(key) || hydratedContentRef.current[key] !== undefined) return false;
+        seen.add(key);
+        return true;
+      });
     let cursor = 0;
 
     const hydrateNext = async () => {
@@ -339,7 +346,8 @@ export function useConvexConversationData(requestedBranchId: string) {
         sha256: envelope.sha256,
       });
       if (reserved.status !== "available") {
-        await putRuntimeBlob({
+        const attestation = await putRuntimeBlob({
+          manifestId: String(reserved.id),
           objectKey: reserved.objectKey,
           backend: reserved.backend,
           data: envelope.data,
@@ -349,6 +357,7 @@ export function useConvexConversationData(requestedBranchId: string) {
         const available = await markBlobAvailableMutation({
           workspaceId: workspace.id,
           manifestId: reserved.id,
+          attestation,
         });
         if (available.status !== "available") {
           throw new Error("Message content did not become available.");

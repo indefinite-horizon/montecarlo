@@ -94,7 +94,10 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   const busy = pendingCommand !== null;
 
   return (
-    <div ref={menuRef} className="fixed top-2 right-2 z-50 flex flex-col items-end gap-2">
+    <div
+      ref={menuRef}
+      className="pointer-events-none fixed left-1/2 top-2 z-50 flex -translate-x-1/2 flex-col items-center gap-2"
+    >
       <div className="flex items-center gap-1 rounded-md bg-foreground px-2 py-1 font-mono text-[10px] text-background shadow-sm">
         <span className="max-w-56 truncate" title={branchLabel}>
           {branchLabel}
@@ -102,7 +105,7 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
         <button
           type="button"
           className={cn(
-            "ml-1 rounded p-0.5 transition-colors hover:bg-background/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-background",
+            "pointer-events-auto ml-1 rounded p-0.5 transition-colors hover:bg-background/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-background",
             open && "bg-background/20",
           )}
           aria-label={t("devTools.open")}
@@ -114,16 +117,12 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
       </div>
 
       {open ? (
-        <div className="w-[min(calc(100vw-1rem),24rem)] rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg">
-          <div className="mb-3">
-            <p className="text-sm font-semibold">{t("devTools.title")}</p>
-            <p className="text-xs text-muted-foreground">{t("devTools.description")}</p>
-          </div>
+        <div className="pointer-events-auto w-[min(calc(100vw-1rem),24rem)] rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+          <p className="mb-3 text-sm font-semibold">{t("devTools.title")}</p>
           <div className="flex flex-col gap-2">
             <DevToolsCommand
               icon={<DatabaseZap className="size-4" />}
               title={t("devTools.wipeAndReseedTitle")}
-              description={t("devTools.wipeAndReseedDescription")}
               actionLabel={
                 pendingCommand === "wipeAndReseed"
                   ? t("devTools.wipeAndReseeding")
@@ -136,7 +135,6 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
             <DevToolsCommand
               icon={<Trash2 className="size-4" />}
               title={t("devTools.wipeTitle")}
-              description={t("devTools.wipeDescription")}
               actionLabel={pendingCommand === "wipe" ? t("devTools.wiping") : t("devTools.wipe")}
               destructive
               disabled={busy}
@@ -145,7 +143,6 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
             <DevToolsCommand
               icon={<RotateCcw className="size-4" />}
               title={t("devTools.reseedTitle")}
-              description={t("devTools.reseedDescription")}
               actionLabel={
                 pendingCommand === "reseed" ? t("devTools.reseeding") : t("devTools.reseed")
               }
@@ -162,7 +159,6 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
 interface DevToolsCommandProps {
   icon: React.ReactNode;
   title: string;
-  description: string;
   actionLabel: string;
   destructive?: boolean;
   disabled: boolean;
@@ -172,7 +168,6 @@ interface DevToolsCommandProps {
 function DevToolsCommand({
   icon,
   title,
-  description,
   actionLabel,
   destructive = false,
   disabled,
@@ -182,10 +177,7 @@ function DevToolsCommand({
     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
       <div className="flex min-w-0 items-start gap-3">
         <div className="mt-0.5 text-muted-foreground">{icon}</div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium leading-5">{title}</p>
-          <p className="text-xs leading-5 text-muted-foreground">{description}</p>
-        </div>
+        <p className="min-w-0 text-sm font-medium leading-5">{title}</p>
       </div>
       <Button
         type="button"

@@ -20,7 +20,7 @@ type RuntimeEvent =
   | { type: "error"; code: string; message: string };
 ```
 
-Codex runs through the official SDK and its own credential cache. OpenRouter, Ollama, and Anthropic API models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction: their current bridge implementations require a network sandbox, which is the wrong execution location for local subscription credentials.
+Codex runs through the official SDK and its own credential cache. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction: their current bridge implementations require a network sandbox, which is the wrong execution location for local subscription credentials.
 
 ## Chat graph
 

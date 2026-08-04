@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@convex-dev/better-auth": "0.12.0",
-    "@radix-ui/react-slot": "^1.2.4",
+    "@dagrejs/dagre": "3.0.0",
     "@monte-carlo/app-constants": "workspace:*",
+    "@radix-ui/react-slot": "^1.2.4",
     "@tanstack/react-router": "^1.167.3",
+    "@xyflow/react": "^12.11.2",
     "better-auth": "1.6.11",
     "class-variance-authority": "^0.7.1",
     "convex": "^1.37.0",

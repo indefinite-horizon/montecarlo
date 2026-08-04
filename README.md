@@ -1,6 +1,6 @@
 # Monte Carlo
 
-Monte Carlo is a local-first, multi-model conversation workspace built around a branchable chat graph. Highlight part of an answer and follow it into a focused thread, or branch the current conversation with a fresh prompt. Every branch keeps its provenance and can use a different model provider without changing the stored chat format.
+Monte Carlo is a multi-model conversation workspace built around a branchable chat graph. Highlight part of an answer and follow it into a focused thread, or branch the current conversation with a fresh prompt. Every branch keeps its provenance and can use a different model provider without changing the stored chat format.
 
 The repository starts from [`richardwu/convex-project-template`](https://github.com/richardwu/convex-project-template) at `37dcb99a44d38bbb5285fe71db1500fc4b0384f7` and reimplements the warm editorial design language of Socrates at `84f64c37a6f8777599b6c2de6580b12b1249058a`.
 
@@ -8,13 +8,12 @@ The repository starts from [`richardwu/convex-project-template`](https://github.
 
 - React/Vite SPA with project/chat creation, editable model and compatible-endpoint selection, message composition, selection-to-branch, prompt-only branching, and an interactive branch map.
 - Electron 43 shell with a sandboxed renderer, navigation guards, denied browser permissions, narrow IPC, and an authenticated loopback runtime on a child-attested ephemeral port.
-- Provider-neutral local runtime with streamed events for Codex, OpenRouter, Ollama, and direct Anthropic API access.
+- Provider-neutral local runtime with streamed events for Codex, Claude, OpenRouter, and Ollama.
 - Codex uses the official local SDK and the user's existing Codex/ChatGPT login. Credentials remain owned by Codex and never enter the renderer, Convex, or object storage.
+- Claude uses the official local CLI and the user's existing Claude Pro/Max login. Credentials remain owned by Claude Code and never enter the renderer, Convex, or object storage.
 - Multi-tenant Convex schema for workspaces, memberships, projects, chats, branches, message metadata, blob manifests, and model runs.
-- Versioned portable domain envelopes and context materialization for moving a workspace between local and cloud storage.
+- Versioned portable domain envelopes and validators. No workspace transfer workflow is exposed yet.
 - Local filesystem and cloud R2 are routed per workspace behind the same blob-manifest contract; provider credentials are deliberately outside that contract.
-
-Claude Pro/Max authentication is intentionally disabled. Anthropic's current [authentication and credential-use policy](https://code.claude.com/docs/en/legal-and-compliance) says third-party products may not offer Claude.ai login or route subscription credentials. Monte Carlo supports Anthropic Console API keys now and keeps a connector boundary for a future approved integration.
 
 ## Architecture
 
@@ -26,9 +25,9 @@ React SPA / Electron renderer
         │
         └── authenticated loopback runtime (Electron or companion)
                   ├── Codex SDK ── existing local ChatGPT-plan login
+                  ├── Claude CLI ── existing local Pro/Max login
                   ├── AI SDK 7 ─── OpenRouter
-                  ├── AI SDK 7 ─── Ollama's OpenAI-compatible endpoint
-                  └── AI SDK 7 ─── Anthropic Console API key
+                  └── AI SDK 7 ─── Ollama's OpenAI-compatible endpoint
 
 Message bodies / tool artifacts
         ├── local workspace: filesystem objects
@@ -75,8 +74,7 @@ bun run build:runtime
 | Codex | Existing `codex login` / ChatGPT-plan session | Local only | Requires the official Codex CLI on `PATH` (or `CODEX_PATH`). `codex login --device-auth` is available through the companion. The app never reads `~/.codex/auth.json`. |
 | Ollama | No credential by default | Local only | Defaults to `http://127.0.0.1:11434/v1`; arbitrary insecure remote endpoints are rejected. |
 | OpenRouter | User API key or administrator-provisioned runtime key | Local companion | User keys stay in the local credential boundary; settings or `OPENROUTER_BASE_URL` selects an HTTPS-compatible endpoint, and managed keys are never forwarded to request-selected endpoints. |
-| Claude API | Anthropic Console API key | Local companion | Standard API billing. |
-| Claude Pro/Max | Disabled | — | Requires written Anthropic approval for a third-party integration. |
+| Claude | Existing Claude Code Pro/Max session | Local only | Requires the official Claude CLI on `PATH` (or `CLAUDE_PATH`). Monte Carlo invokes the CLI but never reads its credential store. |
 
 Runtime-only secrets belong in `.env.runtime.local`, not `.env.local`. The latter is synchronized to the local Convex backend by the development scripts. Never put model-provider secrets in Convex function arguments or documents.
 
@@ -86,15 +84,7 @@ Local message objects live under Electron's `app.getPath("userData")/workspaces/
 
 Cloud workspace metadata uses the shared multi-tenant Convex deployment and R2-compatible manifests. The companion can route R2 when trusted credentials are configured, but a public multi-tenant storage/provider gateway is not enabled yet; it requires short-lived Better Auth-bound capabilities rather than a browser-visible shared bearer. Every tenant-owned record carries `workspaceId`; public Convex functions verify active membership. Provider credentials never sync with the workspace.
 
-The transfer command is not wired into the UI yet. Its enforced domain format uses stable public IDs and a versioned manifest, with this import/export sequence:
-
-1. Export metadata and object references.
-2. Copy objects and verify SHA-256 and byte length.
-3. Import into a staging workspace.
-4. Run schema migrations and validate counts/references.
-5. Activate the imported workspace.
-
-Convex `_id` values and absolute local paths are never part of the portable format.
+The repository retains a versioned portable format and validator, but does not expose local/cloud transfer. A workspace's storage mode is fixed when it is created. Convex `_id` values and absolute local paths are never part of the portable format.
 
 ## Branch semantics
 
@@ -107,7 +97,7 @@ Context for a new branch is snapshotted at creation and materialized determinist
 - the selected passage and provenance;
 - the branch prompt.
 
-This makes a branch reconstructible on Codex, OpenRouter, Ollama, or Claude API without persisting provider-native transcripts.
+This makes a branch reconstructible on Codex, Claude, OpenRouter, or Ollama without persisting provider-native transcripts.
 
 ## Environment files
 

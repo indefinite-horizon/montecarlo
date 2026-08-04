@@ -1,6 +1,5 @@
 /** Adapts AI SDK 7 providers to the normalized local runner contract. */
 
-import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { type LanguageModel, type LanguageModelUsage, streamText } from "ai";
 import { runtimeDefaults } from "../config.js";
@@ -100,6 +99,7 @@ function configuredHealth(configured: boolean, label: string): Promise<ProviderH
 }
 
 export function createOpenRouterRunner(env: NodeJS.ProcessEnv = process.env): Runner {
+  const userApiKey = env.MONTE_CARLO_USER_OPENROUTER_API_KEY?.trim();
   const managedApiKey =
     env.MONTE_CARLO_MANAGED_OPENROUTER_API_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
   return new AiSdkRunner({
@@ -110,7 +110,7 @@ export function createOpenRouterRunner(env: NodeJS.ProcessEnv = process.env): Ru
       available: true,
       description: "OpenRouter models through a user-provided or locally managed API key.",
     },
-    health: () => configuredHealth(Boolean(managedApiKey), "OpenRouter API key"),
+    health: () => configuredHealth(Boolean(userApiKey || managedApiKey), "OpenRouter API key"),
     createModel: (input) => {
       const baseURL = resolveOpenRouterBaseURL(
         input.connection?.baseURL ?? env.OPENROUTER_BASE_URL,
@@ -118,7 +118,9 @@ export function createOpenRouterRunner(env: NodeJS.ProcessEnv = process.env): Ru
       const defaultBaseURL = resolveOpenRouterBaseURL(env.OPENROUTER_BASE_URL);
       // Never forward a centrally managed key to a request-selected endpoint.
       const apiKey =
-        input.connection?.apiKey ?? (baseURL === defaultBaseURL ? managedApiKey : undefined);
+        input.connection?.apiKey ??
+        userApiKey ??
+        (baseURL === defaultBaseURL ? managedApiKey : undefined);
       if (apiKey === undefined || apiKey === "") {
         throw new Error("An OpenRouter API key is required for this endpoint.");
       }
@@ -163,25 +165,5 @@ export function createOllamaRunner(env: NodeJS.ProcessEnv = process.env): Runner
         baseURL: resolveOllamaBaseURL(input.connection?.baseURL ?? configuredBaseURL),
         includeUsage: true,
       })(input.model),
-  });
-}
-
-export function createAnthropicRunner(env: NodeJS.ProcessEnv = process.env): Runner {
-  return new AiSdkRunner({
-    descriptor: {
-      id: "anthropic",
-      name: "Anthropic API",
-      auth: "api-key",
-      available: true,
-      description: "Claude models through the official Anthropic API.",
-    },
-    health: () => configuredHealth(Boolean(env.ANTHROPIC_API_KEY?.trim()), "ANTHROPIC_API_KEY"),
-    createModel: (input) => {
-      const apiKey = input.connection?.apiKey ?? env.ANTHROPIC_API_KEY?.trim();
-      if (apiKey === undefined || apiKey === "") {
-        throw new Error("An Anthropic API key is required.");
-      }
-      return createAnthropic({ apiKey })(input.model);
-    },
   });
 }

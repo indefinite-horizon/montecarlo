@@ -43,27 +43,27 @@
   },
   "workspace": {
     "defaultName": "Espace de Richard",
-    "localStatus": "Espace local · sur cet appareil",
-    "cloudStatus": "Espace cloud · synchronisé",
-    "persistenceError": "L'espace n'a pas pu enregistrer cette modification. Votre session actuelle reste disponible.",
+    "localStatus": "Fichiers sur cet appareil",
+    "cloudStatus": "Stockage de fichiers cloud",
+    "persistenceError": "L'espace n'a pas pu enregistrer cette modification.",
     "projectLabel": "Laboratoire de probabilités",
     "setupEyebrow": "Configuration de l'espace",
-    "setupTitle": "Où cet espace doit-il résider ?",
+    "setupTitle": "Où stocker le contenu des messages ?",
     "setupSubtitle": "Choisissez la confidentialité locale ou la synchronisation cloud. Vous pourrez le déplacer plus tard.",
     "existingTitle": "Ouvrir un espace existant",
-    "localTitle": "Espace local",
+    "localTitle": "Sur cet appareil",
     "localDescription": "Convex et les moteurs de modèles s'exécutent sur cette machine.",
     "localBulletOne": "Stockage objet sur le système de fichiers",
     "localBulletTwo": "Aucun compte ni dépendance cloud",
-    "cloudTitle": "Espace cloud",
+    "cloudTitle": "Stockage objet cloud",
     "cloudDescription": "Utilisez le déploiement Convex multi-tenant sur plusieurs appareils.",
     "cloudBulletOne": "Stockage objet R2",
     "cloudBulletTwo": "Synchronisation sécurisée entre appareils",
     "nameLabel": "Nom de l'espace",
     "portabilityNote": "Les deux modes utilisent les mêmes identifiants versionnés, enveloppes de messages et manifestes de blobs. L'export et l'import déplacent les données dans les deux sens.",
     "noBilling": "La facturation cloud n'est pas encore activée.",
-    "createLocal": "Créer l'espace local",
-    "createCloud": "Créer l'espace cloud"
+    "createLocal": "Créer avec stockage local",
+    "createCloud": "Créer avec stockage cloud"
   },
   "providers": {
     "choose": "Choisir un fournisseur",
@@ -82,8 +82,8 @@
       "detail": "Point d'accès local"
     },
     "anthropic": {
-      "name": "API Claude",
-      "detail": "Clé API Console"
+      "name": "Claude",
+      "detail": "Forfait Pro ou Max"
     }
   },
   "settings": {
@@ -107,22 +107,18 @@
     "endpointSaved": "Ce point de terminaison sera utilisé pour les nouvelles requêtes locales.",
     "invalidEndpoint": "Utilisez un point de terminaison de fournisseur valide et conforme.",
     "openrouterDescription": "Utilisez une clé locale ou une clé gérée centralement en mode cloud.",
-    "anthropicDescription": "Accès direct pris en charge via une clé API Anthropic Console.",
     "keyLocalOnly": "Identifiant local chiffré",
     "addKey": "Ajouter une clé",
     "keyPlaceholder": "Coller la clé API",
     "keySaved": "L'identifiant local chiffré a été enregistré et le moteur redémarré.",
     "desktopKeyOnly": "Ouvrez l'application Electron pour enregistrer une clé en toute sécurité, ou configurez l'environnement du moteur.",
     "runtimeUnavailable": "Le moteur local est indisponible. Démarrez-le puis réessayez.",
-    "claudePlanTitle": "Le connecteur Claude Pro et Max est désactivé",
-    "claudePlanBlocked": "Anthropic interdit actuellement aux produits tiers de proposer la connexion Claude.ai ou d'acheminer les identifiants d'abonnement. Ce connecteur restera désactivé jusqu'à approbation.",
     "credentialsBoundary": "Les identifiants d'abonnement ne sont jamais envoyés à Convex, R2, aux discussions, aux analyses ni au stockage du moteur d'affichage. Le moteur local authentifié ne renvoie que des événements normalisés."
   },
   "chat": {
     "initialTitle": "Nouvelle conversation",
     "you": "Vous",
     "assistant": "Monte Carlo",
-    "retry": "Réessayer",
     "share": "Partager la discussion"
   },
   "branch": {
@@ -152,6 +148,30 @@
     "contextIndependent": "Une nouvelle session fournisseur indépendante",
     "create": "Créer la branche",
     "following": "Branche créée à partir de"
+  },
+  "canvas": {
+    "viewMode": "Vue de la conversation",
+    "thread": "Fil",
+    "canvas": "Canevas",
+    "threadView": "Vue en fil",
+    "canvasView": "Vue en canevas",
+    "region": "Canevas de conversation",
+    "branchCard": "Branche {{title}}",
+    "active": "Active",
+    "openThread": "Ouvrir {{title}} dans la vue en fil",
+    "askFollowUp": "Poser une question",
+    "followUpDialog": "Poser une question de suivi",
+    "promptLabel": "Question de suivi",
+    "promptPlaceholder": "Saisissez votre question de suivi…",
+    "ask": "Demander",
+    "emptyBranch": "Prête pour une question de suivi",
+    "generating": "Génération de la réponse",
+    "loading": "Chargement du canevas",
+    "controls": "Commandes du canevas",
+    "zoomIn": "Agrandir",
+    "zoomOut": "Réduire",
+    "fitView": "Ajuster le canevas à la vue",
+    "minimap": "Mini-carte de la conversation"
   },
   "composer": {
     "placeholder": "Posez une question ou ouvrez une nouvelle direction…",

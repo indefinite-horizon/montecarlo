@@ -202,11 +202,12 @@ READY_CANDIDATES=()
 add_ready_candidate "${CONVEX_SITE_URL:-}"
 add_backend_plus_one_candidate "${CONVEX_URL:-}"
 
+logged_urls="$(grep -o 'http://127\.0\.0\.1:[0-9]\+' "$LOG_FILE" || true)"
 while IFS= read -r logged_url; do
   [ -z "$logged_url" ] && continue
   add_ready_candidate "$logged_url"
   add_backend_plus_one_candidate "$logged_url"
-done < <(grep -o 'http://127\.0\.0\.1:[0-9]\+' "$LOG_FILE" || true)
+done <<< "$logged_urls"
 
 if [ "${#READY_CANDIDATES[@]}" -eq 0 ]; then
   echo "Failed to determine the local Convex readiness URL from $LOG_FILE."
