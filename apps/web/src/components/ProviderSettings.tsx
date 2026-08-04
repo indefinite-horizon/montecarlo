@@ -183,7 +183,7 @@ export const ProviderSettings = memo(function ProviderSettings({
             }}
             ready={providerStatus("codex")?.health.status === "ready"}
           >
-            {loginOutput ? (
+            {loginOutput && busyProvider === "codex" ? (
               <pre className="mt-3 max-h-28 overflow-auto whitespace-pre-wrap rounded-md bg-secondary/60 p-2 text-[10px] leading-4 text-muted-foreground">
                 {loginOutput}
               </pre>

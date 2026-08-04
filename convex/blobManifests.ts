@@ -133,9 +133,20 @@ export const reserve = mutation({
       createdAt: now,
       updatedAt: now,
     });
-    const manifest = await ctx.db.get(manifestId);
-    if (!manifest) throw new Error("Reserved blob manifest could not be loaded.");
-    return toManifestResult(manifest);
+    return {
+      id: manifestId,
+      publicId,
+      workspaceId: args.workspaceId,
+      backend: args.backend,
+      objectKey,
+      envelopeVersion,
+      contentType,
+      byteLength,
+      sha256,
+      status: "reserved" as const,
+      createdAt: now,
+      updatedAt: now,
+    };
   },
 });
 

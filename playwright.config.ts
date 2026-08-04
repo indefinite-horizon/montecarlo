@@ -15,7 +15,9 @@ const convexReadyURL = `http://127.0.0.1:${convexReadyPort}/ready`;
 const convexReadyFile = ".context/playwright-convex-ready";
 // envFile is only used in webServer commands below.
 const envFile = process.env.PLAYWRIGHT_ENV_FILE ?? ".env.local";
-const workerCount = Number(process.env.PLAYWRIGHT_WORKERS ?? "8");
+// A single local Convex/auth stack backs every browser worker. Keep CI concurrency
+// low enough that auth callbacks and workspace subscriptions remain deterministic.
+const workerCount = Number(process.env.PLAYWRIGHT_WORKERS ?? (process.env.CI ? "2" : "4"));
 const expectTimeout = Number(process.env.PLAYWRIGHT_EXPECT_TIMEOUT ?? "5000");
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "true";
 const externalSpecs = ["**/*.external.spec.ts"];

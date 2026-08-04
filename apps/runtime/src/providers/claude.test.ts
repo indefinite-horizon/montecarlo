@@ -17,6 +17,10 @@ function fakeClaudeCli(): string {
     `#!/usr/bin/env node
 const args = process.argv.slice(2);
 if (args[0] === "auth" && args[1] === "status") process.exit(0);
+if (args[0] === "auth" && args[1] === "login") {
+  process.stdout.write("Open the browser now\\n");
+  setTimeout(() => process.exit(0), 20);
+}
 if (args.includes("--print")) {
   process.stdin.resume();
   process.stdin.on("end", () => {
@@ -38,6 +42,21 @@ afterEach(() => {
 });
 
 describe("ClaudeRunner", () => {
+  it("streams official CLI login output before finishing", async () => {
+    const runner = new ClaudeRunner({ CLAUDE_PATH: fakeClaudeCli() });
+    const events = [];
+    for await (const event of runner.deviceLogin(new AbortController().signal)) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      { type: "status", status: "starting", message: "Starting the official Claude CLI." },
+      { type: "status", status: "waiting", message: "Complete sign-in in your browser." },
+      { type: "output", delta: "Open the browser now", stream: "stdout" },
+      { type: "finish", success: true },
+    ]);
+  });
+
   it("uses the official CLI sign-in and normalizes streamed JSON", async () => {
     const runner = new ClaudeRunner({ CLAUDE_PATH: fakeClaudeCli() });
     await expect(runner.health()).resolves.toMatchObject({

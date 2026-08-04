@@ -2,17 +2,23 @@
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
+import { AsyncQueue } from "../asyncQueue.js";
 import { runtimeDefaults } from "../config.js";
 import { sanitizeProcessOutput } from "../errors.js";
 import type {
   AuthEvent,
+  ChatMessage,
   ChatRequest,
   LocalAuthRunner,
   ProviderHealth,
   RunnerEvent,
   TokenUsage,
 } from "../types.js";
-import { transcriptPrompt } from "./codex.js";
+
+type LoginProcessEvent =
+  | { type: "output"; delta: string; stream: "stdout" | "stderr" }
+  | { type: "close"; code: number | null }
+  | { type: "failure"; error: Error };
 
 function abortError(): Error {
   const error = new Error("The operation was cancelled.");
@@ -100,6 +106,13 @@ async function waitForExit(child: ChildProcess, signal: AbortSignal): Promise<nu
   });
 }
 
+function conversationPrompt(messages: ChatMessage[]): string {
+  return [
+    "Continue the conversation below and reply to the final user message.",
+    ...messages.map((message) => `${message.role.toUpperCase()}:\n${message.content}`),
+  ].join("\n\n");
+}
+
 export class ClaudeRunner implements LocalAuthRunner {
   readonly descriptor = {
     id: "anthropic",
@@ -151,22 +164,37 @@ export class ClaudeRunner implements LocalAuthRunner {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
-    const outputs: Array<{ delta: string; stream: "stdout" | "stderr" }> = [];
+    const events = new AsyncQueue<LoginProcessEvent>();
     const push = (stream: "stdout" | "stderr") => (chunk: Buffer | string) => {
       const delta = sanitizeProcessOutput(chunk.toString());
-      if (delta) outputs.push({ delta, stream });
+      if (delta) events.push({ type: "output", delta, stream });
     };
     child.stdout.on("data", push("stdout"));
     child.stderr.on("data", push("stderr"));
-    const onAbort = () => terminate(child);
+    child.once("error", (error) => events.push({ type: "failure", error }));
+    child.once("close", (code) => {
+      events.push(
+        signal.aborted ? { type: "failure", error: abortError() } : { type: "close", code },
+      );
+      events.close();
+    });
+    const onAbort = () => {
+      terminate(child);
+    };
     signal.addEventListener("abort", onAbort, { once: true });
-    const exit = waitForExit(child, signal);
     try {
       yield { type: "status", status: "waiting", message: "Complete sign-in in your browser." };
-      const code = await exit;
-      for (const output of outputs) yield { type: "output", ...output };
-      if (code !== 0) throw new Error("Claude login ended before sign-in completed.");
-      yield { type: "finish", success: true };
+      for await (const event of events) {
+        if (event.type === "output") {
+          yield event;
+        } else if (event.type === "failure") {
+          throw event.error;
+        } else if (event.code === 0) {
+          yield { type: "finish", success: true };
+        } else {
+          throw new Error("Claude login ended before sign-in completed.");
+        }
+      }
     } finally {
       signal.removeEventListener("abort", onAbort);
       if (signal.aborted) terminate(child);
@@ -192,7 +220,7 @@ export class ClaudeRunner implements LocalAuthRunner {
     const onAbort = () => terminate(child);
     signal.addEventListener("abort", onAbort, { once: true });
     const exit = waitForExit(child, signal);
-    child.stdin.end(transcriptPrompt(input.messages));
+    child.stdin.end(conversationPrompt(input.messages));
     let stderr = "";
     child.stderr.on("data", (chunk: Buffer | string) => {
       stderr = `${stderr}${sanitizeProcessOutput(chunk.toString())}`.slice(-2_000);
