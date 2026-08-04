@@ -46,6 +46,6 @@ describe("filter_convex_env.sh", () => {
     expect(output).not.toContain("storage-secret");
     expect(output).not.toContain("deployment-secret");
     expect(output).not.toContain("browser-value");
-    expect(output).not.toContain("unknown");
+    expect(output).not.toContain("UNREVIEWED_ENVIRONMENT_VALUE");
   });
 });

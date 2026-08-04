@@ -1,6 +1,21 @@
 /** Converts a browser text range into the stable offsets used by branch anchors. */
 
+import { sharedConfig } from "../../../../lib/config";
 import type { ChatMessage, SelectionAnchor } from "./conversation";
+
+export function selectionTextWithinPreview(
+  content: string,
+  start: number,
+  text: string,
+): string | undefined {
+  const selectableLength = sharedConfig.domain.limits.contentPreviewLength - start;
+  if (selectableLength < 3) return undefined;
+  const selectedText = text.slice(0, Math.min(2_000, selectableLength));
+  return selectedText.length >= 3 &&
+    content.slice(start, start + selectedText.length) === selectedText
+    ? selectedText
+    : undefined;
+}
 
 export function selectionAnchorFromMessage(
   container: HTMLElement,
@@ -25,10 +40,8 @@ export function selectionAnchorFromMessage(
   prefix.selectNodeContents(container);
   prefix.setEnd(range.startContainer, range.startOffset);
   const start = prefix.toString().length + leadingWhitespace;
-  const selectedText = text.slice(0, 2_000);
-  if (message.content.slice(start, start + selectedText.length) !== selectedText) {
-    return undefined;
-  }
+  const selectedText = selectionTextWithinPreview(message.content, start, text);
+  if (!selectedText) return undefined;
 
   return {
     messageId: message.id,

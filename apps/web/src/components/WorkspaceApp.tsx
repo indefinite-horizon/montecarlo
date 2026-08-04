@@ -100,7 +100,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
           >
             <Menu />
           </Button>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 sm:min-w-24">
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
               <span>{controller.workspaceName ?? t("workspace.defaultName")}</span>
               <span>/</span>

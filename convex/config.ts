@@ -49,7 +49,7 @@ export const convexConfig = {
       projectNameLength: 160,
       projectDescriptionLength: 2_000,
       chatTitleLength: 200,
-      contentPreviewLength: 1_000,
+      contentPreviewLength: sharedConfig.domain.limits.contentPreviewLength,
       branchPromptLength: 16_000,
       selectionQuoteLength: 8_000,
       providerNameLength: 120,

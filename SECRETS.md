@@ -79,6 +79,7 @@ backend variables.
 | `ANALYTICS_DISABLED` | Analytics kill switch |
 | `ENABLE_DANGEROUS_DEV_TOOLS` | Explicit local-only destructive-tool opt-in |
 | `ALLOW_LOCAL_ANONYMOUS_WORKSPACES` | Explicit account-free local-workspace opt-in |
+| `CONVEX_AGENT_MODE` | Convex CLI mode set automatically by local development and test scripts |
 
 Convex-managed deployment selectors and URLs such as `CONVEX_DEPLOYMENT`,
 `CONVEX_URL`, and `CONVEX_SITE_URL` may be written into `.env.local` by the CLI

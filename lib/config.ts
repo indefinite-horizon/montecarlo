@@ -12,4 +12,9 @@ export const sharedConfig = {
       name: "Test User",
     },
   },
+  domain: {
+    limits: {
+      contentPreviewLength: 1_000,
+    },
+  },
 } as const;
