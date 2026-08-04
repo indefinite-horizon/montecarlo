@@ -26,7 +26,7 @@
     "test:unit": "vitest run && bun run --filter './apps/runtime' test && bun run --filter './apps/desktop' test",
     "test:e2e": "PLAYWRIGHT_ENV_FILE=.env.local bun --env-file=.env.local run test:e2e:core:raw && PLAYWRIGHT_ENV_FILE=.env.local bun --env-file=.env.local run test:e2e:perf:raw && PLAYWRIGHT_ENV_FILE=.env.local bun --env-file=.env.local run test:e2e:external:raw",
     "test:e2e:core": "PLAYWRIGHT_ENV_FILE=.env.local bun --env-file=.env.local run test:e2e:core:raw",
-    "test:e2e:core:raw": "PLAYWRIGHT_WORKERS=1 bunx playwright test --project chromium-core && PLAYWRIGHT_WORKERS=1 bunx playwright test --project chromium-auth",
+    "test:e2e:core:raw": "PLAYWRIGHT_WORKERS=2 bunx playwright test --project chromium-core && PLAYWRIGHT_WORKERS=1 bunx playwright test --project chromium-auth",
     "test:e2e:desktop": "PLAYWRIGHT_ENV_FILE=.env.local bun --env-file=.env.local run test:e2e:desktop:raw",
     "test:e2e:desktop:raw": "RUN_DESKTOP_E2E=true bunx playwright test --project electron-desktop",
     "test:e2e:perf": "PLAYWRIGHT_ENV_FILE=.env.local bun --env-file=.env.local run test:e2e:perf:raw",

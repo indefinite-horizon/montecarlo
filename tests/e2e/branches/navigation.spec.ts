@@ -20,8 +20,11 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 async function chooseProvider(page: Page, label: string) {
-  await page.locator("header button[aria-expanded]").filter({ hasText: /.+/u }).first().click();
-  await page.getByRole("button", { name: new RegExp(`^${label}`, "u") }).click();
+  await page.getByTestId("provider-trigger").click();
+  await page
+    .getByTestId("provider-menu")
+    .getByRole("button", { name: new RegExp(`^${label}`, "u") })
+    .click();
 }
 
 test("branch map selection keeps header, transcript, provenance, and marker aligned", async ({

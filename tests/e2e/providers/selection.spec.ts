@@ -13,15 +13,15 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 async function openProviderMenu(page: Page) {
-  await page.locator("header button[aria-expanded]").filter({ hasText: /.+/u }).first().click();
+  await page.getByTestId("provider-trigger").click();
   await expect(page.getByText("Choose a provider", { exact: true })).toBeVisible();
 }
 
 async function selectProvider(page: Page, name: string, model: string) {
   await openProviderMenu(page);
   await page
-    .getByRole("menu", { name: "Choose a provider" })
-    .getByRole("menuitem", { name: new RegExp(`^${name}`, "u") })
+    .getByTestId("provider-menu")
+    .getByRole("button", { name: new RegExp(`^${name}`, "u") })
     .click();
   await openProviderMenu(page);
   await page.getByLabel("Model ID").fill(model);

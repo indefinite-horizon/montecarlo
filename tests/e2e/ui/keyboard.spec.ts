@@ -1,10 +1,16 @@
 /** Keyboard reachability for primary composition and branching commands. */
 
 import { expect, test } from "@playwright/test";
-import { userMessage } from "../helpers/workspace";
+import { installRuntimeMock } from "../helpers/runtime";
+import { createWorkspace, openFreshUser, userMessage } from "../helpers/workspace";
+
+test.beforeEach(async ({ context, page }) => {
+  await installRuntimeMock(context);
+  await openFreshUser(page, "keyboard");
+  await createWorkspace(page, `Keyboard workspace ${Date.now()}`);
+});
 
 test("message and prompt-branch flows are operable from the keyboard", async ({ page }) => {
-  await page.goto("/");
   const composer = page.getByPlaceholder("Ask a follow-up or start a new direction…");
   await composer.focus();
   await composer.fill("Keyboard message");
