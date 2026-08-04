@@ -58,8 +58,11 @@ test("provider error preserves the user turn and allows a later successful send"
 }) => {
   const failedPrompt = "[e2e:error] Keep this user message";
   await sendMessage(page, failedPrompt);
-  await expect(page.getByText("local model runtime is offline", { exact: false })).toBeVisible();
+  const errorToast = page.getByText("local model runtime is offline", { exact: false });
+  await expect(errorToast).toBeVisible();
   await expect(userMessage(page, failedPrompt)).toBeVisible();
+  await page.getByPlaceholder("Ask a follow-up or start a new direction…").click();
+  await expect(errorToast).toBeHidden({ timeout: 10_000 });
 
   await sendMessage(page, "Recovery prompt", "Stub response: Recovery prompt");
   await expect(userMessage(page, failedPrompt)).toBeVisible();

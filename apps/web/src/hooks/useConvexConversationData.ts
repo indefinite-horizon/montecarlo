@@ -25,6 +25,7 @@ import {
 } from "@/lib/runtimeClient";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { sharedConfig } from "../../../../lib/config";
 
 const PROJECT_COLORS = ["terracotta", "blue", "gold", "green"] as const;
 const MAX_HYDRATED_MESSAGES = 256;
@@ -335,7 +336,9 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
       replyToMessageId?: Id<"messages">;
     }): Promise<MessageItem | null> => {
       if (!workspace || !chat) return null;
-      const preview = input.content.trim().slice(0, 1_000);
+      const preview = input.content
+        .trim()
+        .slice(0, sharedConfig.domain.limits.contentPreviewLength);
       if (!preview) return null;
       const envelope = await encodeMessageEnvelope(input.content);
       const reserved = await reserveBlobMutation({
