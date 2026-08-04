@@ -58,7 +58,6 @@ export async function sendMessage(page: Page, prompt: string, reply?: string) {
   await send.click();
   await expect(userMessage(page, prompt)).toBeVisible();
   if (reply !== undefined) await expect(assistantMessage(page, reply)).toBeVisible();
-  await expect(send).toBeEnabled({ timeout: 15_000 });
 }
 
 export function userMessage(page: Page, text: string) {

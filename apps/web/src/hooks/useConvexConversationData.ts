@@ -91,9 +91,9 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
   );
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>();
   const [selectedChatId, setSelectedChatId] = useState<string>();
-  const workspace =
-    workspacePage?.items.find((item) => String(item.id) === selectedWorkspaceId) ??
-    workspacePage?.items[0];
+  const workspace = selectedWorkspaceId
+    ? workspacePage?.items.find((item) => String(item.id) === selectedWorkspaceId)
+    : workspacePage?.items[0];
   const projectPage = useQuery(
     domainApi.projects.list,
     workspace ? { workspaceId: workspace.id, limit: 100 } : "skip",
@@ -102,8 +102,9 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
     domainApi.chats.list,
     workspace ? { workspaceId: workspace.id, limit: 100 } : "skip",
   );
-  const chat =
-    chatPage?.items.find((item) => String(item.id) === selectedChatId) ?? chatPage?.items[0];
+  const chat = selectedChatId
+    ? chatPage?.items.find((item) => String(item.id) === selectedChatId)
+    : chatPage?.items[0];
   const tree = useQuery(
     domainApi.chats.getTree,
     workspace && chat ? { workspaceId: workspace.id, chatId: chat.id, limit: 500 } : "skip",
