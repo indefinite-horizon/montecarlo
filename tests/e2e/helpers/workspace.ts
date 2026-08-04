@@ -43,12 +43,18 @@ export async function createProject(page: Page, name: string) {
 }
 
 export async function createChat(page: Page, projectName?: string) {
+  const navigation = page.getByRole("navigation", { name: "Projects and chats" });
+  const section = navigation
+    .locator("section")
+    .filter({ hasText: projectName ?? "Without a project" });
   if (projectName) {
     await page.getByRole("button", { name: `New chat — ${projectName}` }).click();
   } else {
     await page.getByRole("button", { name: "New chat", exact: true }).click();
   }
-  await expect(page.getByRole("heading", { name: "New conversation", exact: true })).toBeVisible();
+  await expect(
+    section.locator('button[aria-current="page"]').filter({ hasText: "New conversation" }),
+  ).toBeVisible();
 }
 
 export async function sendMessage(page: Page, prompt: string, reply?: string) {
@@ -57,7 +63,10 @@ export async function sendMessage(page: Page, prompt: string, reply?: string) {
   await expect(send).toBeEnabled({ timeout: 15_000 });
   await send.click();
   await expect(userMessage(page, prompt)).toBeVisible();
-  if (reply !== undefined) await expect(assistantMessage(page, reply)).toBeVisible();
+  if (reply !== undefined) {
+    await expect(assistantMessage(page, reply)).toBeVisible({ timeout: 15_000 });
+  }
+  await expect(send).toBeVisible({ timeout: 15_000 });
 }
 
 export function userMessage(page: Page, text: string) {

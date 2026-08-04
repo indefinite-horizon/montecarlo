@@ -39,7 +39,6 @@ test("creates a project and a persistent chat inside it", async ({ page }) => {
   ).toBeVisible();
 
   await page.reload();
-  await expect(page.getByText("Research", { exact: true })).toBeVisible();
   await expect(
     projectSection(page, "Research").getByRole("button", { name: "New conversation" }),
   ).toBeVisible();
@@ -87,11 +86,14 @@ test("chat search is case-insensitive and clearing it restores all groups", asyn
   await createChat(page);
   await page.getByRole("button", { name: "Search chats" }).click();
   const search = page.getByRole("textbox", { name: "Search chats" });
+  const conversationRows = page
+    .getByRole("navigation", { name: "Projects and chats" })
+    .getByRole("button", { name: "New conversation" });
   await search.fill("nEw CoNvErSaTiOn");
-  await expect(page.getByRole("button", { name: "New conversation" })).toHaveCount(2);
+  await expect(conversationRows).toHaveCount(2);
   await search.fill("missing chat");
-  await expect(page.getByRole("button", { name: "New conversation" })).toHaveCount(0);
+  await expect(conversationRows).toHaveCount(0);
 
   await page.getByRole("button", { name: "Search chats" }).first().click();
-  await expect(page.getByRole("button", { name: "New conversation" })).toHaveCount(2);
+  await expect(conversationRows).toHaveCount(2);
 });

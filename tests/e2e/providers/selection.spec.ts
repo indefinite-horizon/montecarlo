@@ -50,8 +50,9 @@ test("selected provider and model control each new run without rewriting prior a
   expect(runtime.chatRequests.map(({ provider, model }) => ({ provider, model }))).toEqual(
     cases.map(([, provider, model]) => ({ provider, model })),
   );
+  const transcript = page.getByTestId("transcript-scroller");
   for (const [, , model] of cases) {
-    await expect(page.getByText(model, { exact: true })).toBeVisible();
+    await expect(transcript.getByText(model, { exact: true })).toBeVisible();
   }
 });
 

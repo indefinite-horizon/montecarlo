@@ -158,7 +158,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
                 placeholder={t("sidebar.projectName")}
                 aria-label={t("sidebar.projectName")}
               />
-              <Button size="xs" disabled={!projectName.trim() || submittingProject}>
+              <Button type="submit" size="xs" disabled={!projectName.trim() || submittingProject}>
                 {t("sidebar.createProject")}
               </Button>
             </form>

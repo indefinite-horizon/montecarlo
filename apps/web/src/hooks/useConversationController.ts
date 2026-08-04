@@ -398,6 +398,7 @@ export function useConversationController(
       abortRef.current = controller;
       let outcome: "succeeded" | "failed" | "canceled" = "succeeded";
       let assistantContent = "";
+      let persistedAssistantId: string | undefined;
       try {
         await streamRuntimeChat({
           provider,
@@ -428,7 +429,6 @@ export function useConversationController(
           }));
         }
       } finally {
-        updateMessage(branchId, assistantId, (message) => ({ ...message, isStreaming: false }));
         if (run) {
           let outputMessageId: MessageItem["id"] | undefined;
           if (assistantContent.trim()) {
@@ -445,6 +445,7 @@ export function useConversationController(
               messagePersistenceRef.current.delete(assistantId);
               if (outputMessage) {
                 outputMessageId = outputMessage.id;
+                persistedAssistantId = String(outputMessage.id);
                 persistedMessageIdsRef.current.set(assistantId, String(outputMessage.id));
                 updateMessage(branchId, assistantId, (message) => ({
                   ...message,
@@ -468,6 +469,10 @@ export function useConversationController(
             toast.error(persistenceErrorMessage);
           }
         }
+        updateMessage(branchId, persistedAssistantId ?? assistantId, (message) => ({
+          ...message,
+          isStreaming: false,
+        }));
       }
     },
     [
