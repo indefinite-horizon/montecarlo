@@ -10,6 +10,7 @@ import {
   branchAnchorTypeValidator,
   branchSelectionValidator,
   type ProviderId,
+  providerIds,
   providerIdValidator,
 } from "./lib/domainValidators";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
@@ -54,7 +55,7 @@ const autoTitleClaimValidator = v.object({
 });
 
 function isProviderId(value: string | undefined): value is ProviderId {
-  return value === "codex" || value === "openrouter" || value === "ollama" || value === "anthropic";
+  return providerIds.includes(value as ProviderId);
 }
 
 function toBranchNode(branch: Doc<"chat_branches">) {

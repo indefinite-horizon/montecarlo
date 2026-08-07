@@ -53,13 +53,9 @@ export type MessageRole = Infer<typeof messageRoleValidator>;
 
 export const runRuntimeValidator = v.union(v.literal("model"), v.literal("harness"));
 
-export const providerIdValidator = v.union(
-  v.literal("codex"),
-  v.literal("openrouter"),
-  v.literal("ollama"),
-  v.literal("anthropic"),
-);
-export type ProviderId = Infer<typeof providerIdValidator>;
+export const providerIds = ["codex", "openrouter", "ollama", "anthropic"] as const;
+export type ProviderId = (typeof providerIds)[number];
+export const providerIdValidator = v.union(...providerIds.map((provider) => v.literal(provider)));
 
 export const reasoningEffortValidator = v.union(
   v.literal("none"),
