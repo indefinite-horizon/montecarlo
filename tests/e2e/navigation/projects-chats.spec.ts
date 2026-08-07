@@ -125,6 +125,7 @@ test("back and forward restore fully specified chat locations", async ({ page })
 });
 
 test("app navigation controls exclude an external redirect round trip", async ({ page }) => {
+  await createWorkspace(page, "External redirect workspace");
   await expectCompleteWorkspaceUrl(page);
   const appUrl = page.url();
   await page.route("https://oauth.example.test/**", async (route) => {
