@@ -131,6 +131,33 @@ describe("portable workspace envelope", () => {
     expect(Object.keys(envelope.manifest.blobs[0] ?? {})).not.toContain("storagePath");
   });
 
+  it("validates portable reasoning effort and fast-mode settings", () => {
+    const envelope = makePortableWorkspaceEnvelope();
+    requireEntry(envelope.manifest.runs, 0, "run").settings = {
+      reasoningEffort: "max",
+      fastMode: true,
+    };
+
+    expect(validatePortableWorkspaceEnvelope(envelope)).toEqual({ ok: true, value: envelope });
+
+    const invalidEnvelope = makePortableWorkspaceEnvelope();
+    const settings = { reasoningEffort: "high", fastMode: true };
+    (settings as { reasoningEffort: unknown }).reasoningEffort = "ultra";
+    (settings as { fastMode: unknown }).fastMode = "yes";
+    requireEntry(invalidEnvelope.manifest.runs, 0, "run").settings = settings as never;
+    const result = validatePortableWorkspaceEnvelope(invalidEnvelope);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.issues.map((issue) => issue.path)).toEqual(
+        expect.arrayContaining([
+          "$.manifest.runs[0].settings.reasoningEffort",
+          "$.manifest.runs[0].settings.fastMode",
+        ]),
+      );
+    }
+  });
+
   it("throws one typed error carrying all validation issues", () => {
     const envelope = makePortableWorkspaceEnvelope();
     requireEntry(envelope.manifest.chats, 0, "chat").rootBranchId = fixtureIds.childBranch;

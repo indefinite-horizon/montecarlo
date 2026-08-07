@@ -220,7 +220,15 @@ export const append = mutation({
       createdAt: now,
     });
     await ctx.db.patch(args.branchId, { nextMessageOrdinal: ordinal + 1 });
-    await ctx.db.patch(args.chatId, { updatedAt: now });
+    await ctx.db.patch(args.chatId, {
+      updatedAt: now,
+      ...(args.role === "user" &&
+      chat.autoTitleStatus !== undefined &&
+      chat.autoTitleStatus !== "generated" &&
+      chat.autoTitleInputMessageId === undefined
+        ? { autoTitleInputMessageId: messageId }
+        : {}),
+    });
 
     return {
       id: messageId,

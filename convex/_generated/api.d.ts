@@ -35,6 +35,7 @@ import type * as lib_devToolsGate from "../lib/devToolsGate.js";
 import type * as lib_domainValidation from "../lib/domainValidation.js";
 import type * as lib_domainValidators from "../lib/domainValidators.js";
 import type * as lib_localIdentity from "../lib/localIdentity.js";
+import type * as lib_localWorkspaceBootstrap from "../lib/localWorkspaceBootstrap.js";
 import type * as lib_logger from "../lib/logger.js";
 import type * as lib_workspaceAuth from "../lib/workspaceAuth.js";
 import type * as messages from "../messages.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   "lib/domainValidation": typeof lib_domainValidation;
   "lib/domainValidators": typeof lib_domainValidators;
   "lib/localIdentity": typeof lib_localIdentity;
+  "lib/localWorkspaceBootstrap": typeof lib_localWorkspaceBootstrap;
   "lib/logger": typeof lib_logger;
   "lib/workspaceAuth": typeof lib_workspaceAuth;
   messages: typeof messages;

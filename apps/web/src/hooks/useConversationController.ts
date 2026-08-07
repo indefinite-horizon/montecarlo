@@ -2,18 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { startAutomaticChatTitle } from "@/lib/autoChatTitle";
 import {
   type BranchAnchor,
   type ChatBranch,
   type ChatMessage,
   type ProviderId,
+  type ReasoningEffort,
   visibleMessages,
 } from "@/lib/conversation";
+import {
+  appendToBranch,
+  branchTitle,
+  contextSnapshot,
+  updateBranchMessage,
+} from "@/lib/conversationBranchState";
 import type { MessageItem } from "@/lib/convexDomainApi";
-import { demoBranches, demoChats, demoProjects } from "@/lib/demoConversation";
-import { defaultProviderModels } from "@/lib/providerConfig";
+import { demoBranches, demoChats, demoProjects, demoWorkspace } from "@/lib/demoConversation";
+import { initialProviderModels, saveSelectedProviderModel } from "@/lib/providerConfig";
 import { streamRuntimeChat } from "@/lib/runtimeClient";
 import { buildRuntimeContext } from "@/lib/runtimeContext";
+import { useAutomaticChatTitle } from "./useAutomaticChatTitle";
 import { useConvexConversationData } from "./useConvexConversationData";
 
 const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -23,50 +32,14 @@ type SessionBranch = {
   persisted: boolean;
   branch: ChatBranch;
 };
-
-function branchTitle(anchor: BranchAnchor): string {
-  const value = anchor.prompt || anchor.selectedText || "New branch";
-  return value.length > 38 ? `${value.slice(0, 37).trim()}…` : value;
-}
-
-function contextSnapshot(messages: readonly ChatMessage[], sourceMessageId?: string): string[] {
-  const recent = messages.slice(-16).map((message) => message.id);
-  if (!sourceMessageId || recent.includes(sourceMessageId)) return recent;
-  return [...recent.slice(-15), sourceMessageId];
-}
-
-function appendToBranch(
-  branches: ChatBranch[],
-  branchId: string,
-  messages: ChatMessage[],
-): ChatBranch[] {
-  return branches.map((branch) =>
-    branch.id === branchId ? { ...branch, messages: [...branch.messages, ...messages] } : branch,
-  );
-}
-
-function updateBranchMessage(
-  branches: ChatBranch[],
-  branchId: string,
-  messageId: string,
-  update: (message: ChatMessage) => ChatMessage,
-): ChatBranch[] {
-  return branches.map((branch) =>
-    branch.id === branchId
-      ? {
-          ...branch,
-          messages: branch.messages.map((message) =>
-            message.id === messageId ? update(message) : message,
-          ),
-        }
-      : branch,
-  );
-}
-
 export function useConversationController(
   runtimeOfflineMessage: string,
   persistenceErrorMessage: string,
-  hydrateAllBranches = false,
+  hydrateAllBranches: boolean,
+  initialChatTitle: string,
+  requestedWorkspacePublicId?: string,
+  requestedChatPublicId?: string,
+  requestedBranchPublicId?: string,
 ) {
   const [fallbackBranches, setFallbackBranches] = useState<ChatBranch[]>(demoBranches);
   const [demoActiveChatId, setDemoActiveChatId] = useState(demoChats[0]?.id ?? "");
@@ -78,10 +51,25 @@ export function useConversationController(
     prompt: string;
   }>();
   const [provider, setProvider] = useState<ProviderId>("codex");
-  const [providerModels, setProviderModels] = useState<Record<ProviderId, string>>({
-    ...defaultProviderModels,
-  });
-  const domain = useConvexConversationData(requestedBranchId, hydrateAllBranches);
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("medium");
+  const [fastMode, setFastMode] = useState(false);
+  const [providerModels, setProviderModels] =
+    useState<Record<ProviderId, string>>(initialProviderModels);
+  const setProviderModel = useCallback((targetProvider: ProviderId, model: string) => {
+    const normalized = model.trim().slice(0, 256);
+    if (!normalized) return;
+    saveSelectedProviderModel(targetProvider, normalized);
+    setProviderModels((current) => ({ ...current, [targetProvider]: normalized }));
+  }, []);
+  const domain = useConvexConversationData(
+    requestedBranchId,
+    hydrateAllBranches,
+    initialChatTitle,
+    persistenceErrorMessage,
+    requestedWorkspacePublicId,
+    requestedChatPublicId,
+    requestedBranchPublicId,
+  );
   const abortRef = useRef<AbortController>();
   const startedBranchTurnsRef = useRef(new Set<string>());
   const messagePersistenceRef = useRef(new Map<string, Promise<MessageItem | null>>());
@@ -93,6 +81,16 @@ export function useConversationController(
     : demoMode
       ? demoActiveChatId
       : String(domain.activeChat?.id ?? "");
+  useAutomaticChatTitle({
+    activeChatId,
+    enabled: durable && domain.activeChat?.autoTitleReady === true,
+    status: domain.activeChat?.autoTitleStatus,
+    provider,
+    model: providerModels[provider],
+    claim: domain.claimAutoTitle,
+    complete: domain.completeAutoTitle,
+    release: domain.releaseAutoTitle,
+  });
   const activeSessionBranches = useMemo(
     () => sessionBranches.filter((entry) => entry.chatId === activeChatId),
     [activeChatId, sessionBranches],
@@ -106,6 +104,7 @@ export function useConversationController(
         ? [
             {
               id: `branch-root-${activeDemoChat.id}`,
+              publicId: activeDemoChat.rootBranchPublicId,
               contextMessageIds: [],
               title: activeDemoChat.title,
               depth: 0,
@@ -195,6 +194,7 @@ export function useConversationController(
       anchor: BranchAnchor,
       parent: ChatBranch,
       id: string,
+      publicId: string,
       persisted: boolean,
       depth?: number,
       contextMessageIds?: string[],
@@ -202,6 +202,7 @@ export function useConversationController(
       const createdAt = Date.now();
       const next: ChatBranch = {
         id,
+        publicId,
         parentBranchId: parent.id,
         contextMessageIds: contextMessageIds ?? contextSnapshot(messages, anchor.sourceMessageId),
         title: branchTitle(anchor),
@@ -264,6 +265,7 @@ export function useConversationController(
             persistedAnchor,
             parent,
             String(created.id),
+            created.publicId,
             true,
             created.depth,
             created.contextMessageIds.map(String),
@@ -274,7 +276,7 @@ export function useConversationController(
               prompt: persistedAnchor.prompt.trim(),
             });
           }
-          return true;
+          return { id: String(created.id), publicId: created.publicId };
         } catch {
           toast.error(persistenceErrorMessage);
           return false;
@@ -286,6 +288,7 @@ export function useConversationController(
       const createdAt = Date.now();
       const next: ChatBranch = {
         id,
+        publicId: id,
         parentBranchId: parent.id,
         contextMessageIds: contextSnapshot(messages, anchor.sourceMessageId),
         title: branchTitle(anchor),
@@ -299,7 +302,7 @@ export function useConversationController(
       if (anchor.prompt.trim()) {
         setPendingBranchTurn({ branchId: id, prompt: anchor.prompt.trim() });
       }
-      return true;
+      return { id, publicId: id };
     },
     [
       activeBranchId,
@@ -318,6 +321,10 @@ export function useConversationController(
       const text = prompt.trim();
       if (!text) return;
       const branchId = activeBranchId;
+      const chatId = activeChatId;
+      const runFastMode = provider === "codex" && fastMode;
+      const runProvider = provider;
+      const runModel = providerModels[provider];
       const runtimeMessages = buildRuntimeContext(
         messages,
         branches.find((branch) => branch.id === branchId)?.anchor,
@@ -336,8 +343,8 @@ export function useConversationController(
         role: "assistant",
         content: "",
         createdAt: Date.now() + 1,
-        provider,
-        model: providerModels[provider],
+        provider: runProvider,
+        model: runModel,
         isStreaming: true,
       };
       appendMessages(branchId, [userMessage, assistantMessage]);
@@ -363,11 +370,19 @@ export function useConversationController(
               ...message,
               id: String(inputMessage.id),
             }));
+            const titleClaimToken = crypto.randomUUID();
+            void startAutomaticChatTitle({
+              claim: () => domain.claimAutoTitle(chatId, titleClaimToken, runProvider, runModel),
+              complete: (title) => domain.completeAutoTitle(chatId, titleClaimToken, title),
+              release: () => domain.releaseAutoTitle(chatId, titleClaimToken),
+            });
             run = await domain.createRun({
               branchId,
-              provider,
-              model: providerModels[provider],
+              provider: runProvider,
+              model: runModel,
               inputMessageId: inputMessage.id,
+              reasoningEffort,
+              fastMode: runFastMode,
             });
           }
         } catch {
@@ -401,10 +416,12 @@ export function useConversationController(
       let persistedAssistantId: string | undefined;
       try {
         await streamRuntimeChat({
-          provider,
-          model: providerModels[provider],
+          provider: runProvider,
+          model: runModel,
           messages: runtimeMessages,
           prompt: text,
+          reasoningEffort,
+          fastMode: runFastMode,
           signal: controller.signal,
           onEvent: (event) => {
             if (event.type === "error") throw new Error(event.message);
@@ -477,16 +494,19 @@ export function useConversationController(
     },
     [
       activeBranchId,
+      activeChatId,
       activeSessionBranches,
       appendMessages,
       branches,
       domain,
       durable,
+      fastMode,
       loading,
       messages,
       persistenceErrorMessage,
       provider,
       providerModels,
+      reasoningEffort,
       runtimeOfflineMessage,
       updateMessage,
     ],
@@ -506,7 +526,15 @@ export function useConversationController(
       if (loading) return false;
       if (!domain.authenticated) return true;
       try {
-        return Boolean(await domain.createWorkspace(input));
+        const created = await domain.createWorkspace(input);
+        if (!created) return false;
+        return {
+          workspaceId: String(created.workspace.id),
+          workspacePublicId: created.workspace.publicId,
+          chatId: String(created.chat.id),
+          chatPublicId: created.chat.publicId,
+          branchPublicId: created.chat.rootBranchPublicId,
+        };
       } catch {
         toast.error(persistenceErrorMessage);
         return false;
@@ -535,7 +563,11 @@ export function useConversationController(
         const created = await domain.createChat(title, projectId);
         if (!created) return false;
         setRequestedBranchId("");
-        return true;
+        return {
+          id: String(created.id),
+          publicId: created.publicId,
+          rootBranchPublicId: created.rootBranchPublicId,
+        };
       } catch {
         toast.error(persistenceErrorMessage);
         return false;
@@ -544,9 +576,38 @@ export function useConversationController(
     [domain, persistenceErrorMessage],
   );
 
+  const selectWorkspace = useCallback(
+    async (workspaceId: string) => {
+      if (demoMode) {
+        if (workspaceId !== demoWorkspace.id) return null;
+        const activeChat = demoChats.find((chat) => chat.id === demoActiveChatId) ?? demoChats[0];
+        setRequestedBranchId("");
+        return activeChat
+          ? {
+              workspacePublicId: demoWorkspace.publicId,
+              chatPublicId: activeChat.publicId ?? activeChat.id,
+              branchPublicId: activeChat.rootBranchPublicId ?? activeChat.id,
+            }
+          : null;
+      }
+      const selected = await domain.selectWorkspace(workspaceId);
+      setRequestedBranchId("");
+      return selected;
+    },
+    [demoActiveChatId, domain.selectWorkspace],
+  );
+
   return {
     activeBranchId,
+    activeBranchPublicId:
+      branches.find((branch) => branch.id === activeBranchId)?.publicId ??
+      (demoMode ? activeBranchId : undefined),
     activeChatId,
+    activeChatPublicId:
+      domain.activeChat?.publicId ??
+      (demoMode
+        ? (demoChats.find((chat) => chat.id === activeChatId)?.publicId ?? activeChatId)
+        : undefined),
     activeChatTitle:
       durable || !demoMode
         ? domain.activeChat?.title
@@ -564,10 +625,13 @@ export function useConversationController(
     createChat,
     createProject,
     createWorkspace,
+    fastMode,
     loading,
     messages,
     projects: demoMode ? demoProjects : domain.projects,
     provider,
+    providerModels,
+    reasoningEffort,
     model: providerModels[provider],
     selectChat: (chatId: string) => {
       if (demoMode) {
@@ -580,20 +644,23 @@ export function useConversationController(
     },
     sendMessage,
     setActiveBranchId: setRequestedBranchId,
+    setFastMode,
     setProvider,
+    setProviderModel,
+    setReasoningEffort,
     setModel: (model: string) => {
-      const normalized = model.trim().slice(0, 256);
-      if (!normalized) return;
-      setProviderModels((current) => ({ ...current, [provider]: normalized }));
+      setProviderModel(provider, model);
     },
-    selectWorkspace: (workspaceId: string) => {
-      domain.selectWorkspace(workspaceId);
-      setRequestedBranchId("");
-    },
+    selectWorkspace,
     stop: () => abortRef.current?.abort(),
-    workspaceId: domain.workspace ? String(domain.workspace.id) : undefined,
-    workspaceMode: domain.workspace?.storageMode,
-    workspaceName: domain.workspace?.name,
-    workspaces: domain.workspaces,
+    workspaceId: demoMode
+      ? demoWorkspace.id
+      : domain.workspace
+        ? String(domain.workspace.id)
+        : undefined,
+    workspacePublicId: demoMode ? demoWorkspace.publicId : domain.workspace?.publicId,
+    workspaceMode: demoMode ? demoWorkspace.storageMode : domain.workspace?.storageMode,
+    workspaceName: demoMode ? demoWorkspace.name : domain.workspace?.name,
+    workspaces: demoMode ? [demoWorkspace] : domain.workspaces,
   };
 }

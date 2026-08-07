@@ -165,7 +165,8 @@ export interface RuntimeTarget {
 export interface GenerationSettings {
   maxOutputTokens?: number;
   temperature?: number;
-  reasoningEffort?: "none" | "low" | "medium" | "high";
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  fastMode?: boolean;
 }
 
 export interface TokenUsage {

@@ -1,7 +1,10 @@
 /** Runs Claude through the user's official CLI and Claude Pro/Max sign-in. */
 
 import { type ChildProcess, spawn } from "node:child_process";
+import { accessSync, constants } from "node:fs";
+import { delimiter, isAbsolute, join, sep } from "node:path";
 import { createInterface } from "node:readline";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import { AsyncQueue } from "../asyncQueue.js";
 import { runtimeDefaults } from "../config.js";
 import { sanitizeProcessOutput } from "../errors.js";
@@ -10,7 +13,11 @@ import type {
   ChatMessage,
   ChatRequest,
   LocalAuthRunner,
+  ProviderConnection,
   ProviderHealth,
+  ProviderModel,
+  ProviderModelCatalog,
+  ReasoningEffort,
   RunnerEvent,
   TokenUsage,
 } from "../types.js";
@@ -19,6 +26,98 @@ type LoginProcessEvent =
   | { type: "output"; delta: string; stream: "stdout" | "stderr" }
   | { type: "close"; code: number | null }
   | { type: "failure"; error: Error };
+
+const claudeReasoningEfforts = new Set<ReasoningEffort>(["low", "medium", "high", "xhigh", "max"]);
+
+function executablePath(executable: string, env: NodeJS.ProcessEnv): string {
+  if (isAbsolute(executable) || executable.includes(sep)) return executable;
+  const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
+  for (const directory of (env.PATH ?? "").split(delimiter)) {
+    if (!directory) continue;
+    for (const extension of extensions) {
+      const candidate = join(directory, `${executable}${extension}`);
+      try {
+        accessSync(candidate, constants.X_OK);
+        return candidate;
+      } catch {
+        // Continue searching PATH; the SDK will report a clear error if no executable exists.
+      }
+    }
+  }
+  return executable;
+}
+
+export function normalizeClaudeModelCatalog(value: unknown): ProviderModel[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((candidate) => {
+    if (typeof candidate !== "object" || candidate === null) return [];
+    const model = candidate as Record<string, unknown>;
+    if (
+      typeof model.value !== "string" ||
+      typeof model.displayName !== "string" ||
+      seen.has(model.value)
+    ) {
+      return [];
+    }
+    seen.add(model.value);
+    const reasoningEfforts = Array.isArray(model.supportedEffortLevels)
+      ? model.supportedEffortLevels.filter(
+          (effort): effort is ReasoningEffort =>
+            typeof effort === "string" && claudeReasoningEfforts.has(effort as ReasoningEffort),
+        )
+      : [];
+    return [
+      {
+        id: model.value,
+        displayName: model.displayName,
+        description: typeof model.description === "string" ? model.description : undefined,
+        reasoningEfforts,
+        supportsFastMode: model.supportsFastMode === true,
+      },
+    ];
+  });
+}
+
+async function readClaudeModelCatalog(
+  executable: string,
+  signal?: AbortSignal,
+): Promise<ProviderModel[]> {
+  signal?.throwIfAborted();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), runtimeDefaults.providerHealthTimeoutMs);
+  timeout.unref();
+  const onAbort = () => controller.abort();
+  signal?.addEventListener("abort", onAbort, { once: true });
+  async function* input(): AsyncIterable<never> {
+    if (!controller.signal.aborted) {
+      await new Promise<void>((resolve) =>
+        controller.signal.addEventListener("abort", () => resolve(), { once: true }),
+      );
+    }
+  }
+  // SDK 0.3.219 initializes supportedModels() before consuming the first prompt. Keep the
+  // iterable open until teardown so model discovery does not start an actual conversation turn.
+  const modelQuery = query({
+    prompt: input(),
+    options: {
+      abortController: controller,
+      pathToClaudeCodeExecutable: executable,
+      settingSources: [],
+      tools: [],
+    },
+  });
+  try {
+    const models = await modelQuery.supportedModels();
+    if (controller.signal.aborted) throw abortError();
+    return normalizeClaudeModelCatalog(models);
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", onAbort);
+    controller.abort();
+    modelQuery.close();
+  }
+}
 
 function abortError(): Error {
   const error = new Error("The operation was cancelled.");
@@ -113,6 +212,26 @@ export function conversationPrompt(messages: ChatMessage[]): string {
   ].join("\n\n");
 }
 
+export function claudeEffort(reasoningEffort?: ReasoningEffort): string | undefined {
+  if (reasoningEffort === "none" || reasoningEffort === "minimal") return "low";
+  return reasoningEffort;
+}
+
+export function claudeRunArguments(input: ChatRequest): string[] {
+  const effort = claudeEffort(input.options?.reasoningEffort);
+  return [
+    "--print",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--model",
+    input.model,
+    ...(effort ? ["--effort", effort] : []),
+    "--tools",
+    "",
+  ];
+}
+
 export class ClaudeRunner implements LocalAuthRunner {
   readonly descriptor = {
     id: "anthropic",
@@ -123,9 +242,11 @@ export class ClaudeRunner implements LocalAuthRunner {
   } as const;
 
   private readonly executable: string;
+  private readonly modelDiscoveryExecutable: string;
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
     this.executable = env.CLAUDE_PATH?.trim() || "claude";
+    this.modelDiscoveryExecutable = executablePath(this.executable, env);
   }
 
   health(signal?: AbortSignal): Promise<ProviderHealth> {
@@ -201,22 +322,25 @@ export class ClaudeRunner implements LocalAuthRunner {
     }
   }
 
+  async listModels(
+    _connection?: Pick<ProviderConnection, "baseURL">,
+    signal?: AbortSignal,
+  ): Promise<ProviderModelCatalog> {
+    return {
+      provider: "anthropic",
+      models: await readClaudeModelCatalog(this.modelDiscoveryExecutable, signal),
+      source: "cli",
+      fetchedAt: Date.now(),
+    };
+  }
+
   async *run(input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent> {
     signal.throwIfAborted();
-    const child = spawn(
-      this.executable,
-      [
-        "--print",
-        "--output-format",
-        "stream-json",
-        "--verbose",
-        "--model",
-        input.model,
-        "--tools",
-        "",
-      ],
-      { shell: false, stdio: ["pipe", "pipe", "pipe"], windowsHide: true },
-    );
+    const child = spawn(this.executable, claudeRunArguments(input), {
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
     const onAbort = () => terminate(child);
     signal.addEventListener("abort", onAbort, { once: true });
     const exit = waitForExit(child, signal);

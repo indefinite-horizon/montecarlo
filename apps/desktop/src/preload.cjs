@@ -3,6 +3,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const workspaceSwitchHandlers = new WeakMap();
+const newChatHandlers = new WeakMap();
 
 contextBridge.exposeInMainWorld("monteCarloDesktop", {
   platform: process.platform,
@@ -23,5 +24,18 @@ contextBridge.exposeInMainWorld("monteCarloDesktop", {
     if (!handler) return;
     ipcRenderer.removeListener("switch-workspace", handler);
     workspaceSwitchHandlers.delete(callback);
+  },
+  onNewChat: (callback) => {
+    const existingHandler = newChatHandlers.get(callback);
+    if (existingHandler) ipcRenderer.removeListener("new-chat", existingHandler);
+    const handler = () => callback();
+    ipcRenderer.on("new-chat", handler);
+    newChatHandlers.set(callback, handler);
+  },
+  offNewChat: (callback) => {
+    const handler = newChatHandlers.get(callback);
+    if (!handler) return;
+    ipcRenderer.removeListener("new-chat", handler);
+    newChatHandlers.delete(callback);
   },
 });

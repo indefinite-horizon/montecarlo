@@ -43,7 +43,7 @@ if (import.meta.env.DEV) {
 }
 
 const convexClient = new ConvexReactClient(convexUrl, {
-  expectAuth: true,
+  expectAuth: import.meta.env.VITE_AUTH_REQUIRED === "true",
 });
 
 function RouteErrorComponent({ error }: { error: unknown }) {

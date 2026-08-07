@@ -8,6 +8,7 @@ import {
   branchAnchorTypeValidator,
   branchSelectionValidator,
   messageRoleValidator,
+  reasoningEffortValidator,
   runRuntimeValidator,
   runStatusValidator,
   workspaceMembershipStatusValidator,
@@ -123,7 +124,16 @@ export default defineSchema({
     workspaceId: v.id("workspaces"),
     projectId: v.optional(v.id("projects")),
     title: v.string(),
+    autoTitleStatus: v.optional(
+      v.union(v.literal("pending"), v.literal("generating"), v.literal("generated")),
+    ),
+    autoTitleInputMessageId: v.optional(v.id("messages")),
+    autoTitleClaimToken: v.optional(v.string()),
+    autoTitleClaimedAt: v.optional(v.number()),
+    autoTitleProvider: v.optional(v.string()),
+    autoTitleModel: v.optional(v.string()),
     rootBranchId: v.optional(v.id("chat_branches")),
+    rootBranchPublicId: v.optional(v.string()),
     createdByUserId: v.id("users"),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -171,6 +181,7 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_workspace_chat_created_at", ["workspaceId", "chatId", "createdAt"])
     .index("by_workspace_branch_ordinal", ["workspaceId", "branchId", "ordinal"]),
 
   agent_runs: defineTable({
@@ -184,6 +195,8 @@ export default defineSchema({
     provider: v.string(),
     model: v.string(),
     providerSessionId: v.optional(v.string()),
+    reasoningEffort: v.optional(reasoningEffortValidator),
+    fastMode: v.optional(v.boolean()),
     status: runStatusValidator,
     errorCode: v.optional(v.string()),
     errorMessage: v.optional(v.string()),

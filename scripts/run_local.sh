@@ -364,15 +364,15 @@ fs.writeFileSync(configFile, JSON.stringify(config));
 }
 
 write_selected_ports_to_env() {
-  local attestation_public_key attestation_private_key
+  local attestation_key_pair attestation_public_key attestation_private_key
   attestation_public_key="$(env_file_value "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY")"
   attestation_private_key="$(env_file_value "MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$RUNTIME_ENV_FILE")"
   if [ -z "$attestation_public_key" ] || [ -z "$attestation_private_key" ]; then
-    mapfile -t attestation_keys < <(
+    attestation_key_pair="$(
       bun -e 'const { publicKey, privateKey } = require("node:crypto").generateKeyPairSync("ec", { namedCurve: "P-256" }); console.log(publicKey.export({ format: "der", type: "spki" }).toString("base64")); console.log(privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"));'
-    )
-    attestation_public_key="${attestation_keys[0]}"
-    attestation_private_key="${attestation_keys[1]}"
+    )"
+    attestation_public_key="${attestation_key_pair%%$'\n'*}"
+    attestation_private_key="${attestation_key_pair#*$'\n'}"
   fi
   upsert_env_var "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY" "$attestation_public_key"
   upsert_env_var "MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$attestation_private_key" "$RUNTIME_ENV_FILE"
@@ -568,9 +568,6 @@ CONVEX_AGENT_MODE=anonymous \
   $CONVEX_CLI dev \
     --env-file "$ENV_FILE" \
     --typecheck enable \
-    --local \
-    --local-cloud-port "$backend_port" \
-    --local-site-port "$backend_site_port" \
     --once
 
 wait_for_convex_ports_free "push"
@@ -597,9 +594,6 @@ VITE_DEV_GIT_BRANCH="$DEV_GIT_REF" \
   $CONVEX_CLI dev \
     --env-file "$ENV_FILE" \
     --typecheck enable \
-    --local \
-    --local-cloud-port "$backend_port" \
-    --local-site-port "$backend_site_port" \
     --tail-logs pause-on-deploy \
     --start "$APP_DEV_COMMAND" &
 DEV_PID=$!

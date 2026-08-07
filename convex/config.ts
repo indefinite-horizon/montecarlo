@@ -36,6 +36,9 @@ export const convexConfig = {
     },
   },
   domain: {
+    chatNaming: {
+      claimLeaseMs: 5 * oneMinuteMs,
+    },
     workspaceSchemaVersion: 1,
     limits: {
       defaultPageSize: 50,
@@ -62,5 +65,14 @@ export const convexConfig = {
   },
   dev: {
     defaultAuthUser: sharedConfig.dev.defaultAuthUser,
+    localWorkspaceBootstrap: {
+      userName: "Local user",
+      workspaceName: "My Workspace",
+      workspacePublicId: "ws_local_default",
+      membershipPublicId: "member_local_default_owner",
+      chatTitle: "Pancakes",
+      chatPublicId: "chat_local_default",
+      rootBranchPublicId: "branch_local_default_root",
+    },
   },
 } as const;

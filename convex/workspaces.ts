@@ -25,6 +25,38 @@ const workspaceSummaryValidator = v.object({
   updatedAt: v.number(),
 });
 
+export const getByPublicId = query({
+  args: { publicId: v.string() },
+  returns: v.union(workspaceSummaryValidator, v.null()),
+  handler: async (ctx, args) => {
+    const user = await requireAppUser(ctx);
+    const workspace = await ctx.db
+      .query("workspaces")
+      .withIndex("by_public_id", (index) => index.eq("publicId", args.publicId))
+      .unique();
+    if (!workspace) return null;
+    const membership = await ctx.db
+      .query("workspace_memberships")
+      .withIndex("by_workspace_user", (index) =>
+        index.eq("workspaceId", workspace._id).eq("userId", user._id),
+      )
+      .unique();
+    if (membership?.status !== "active") return null;
+    return {
+      id: workspace._id,
+      publicId: workspace.publicId,
+      name: workspace.name,
+      storageMode: workspace.storageMode,
+      schemaVersion: workspace.schemaVersion,
+      role: membership.role,
+      membershipStatus: membership.status,
+      permissions: permissionsForRole(membership.role),
+      createdAt: workspace.createdAt,
+      updatedAt: workspace.updatedAt,
+    };
+  },
+});
+
 export const list = query({
   args: { limit: v.optional(v.number()) },
   returns: v.object({

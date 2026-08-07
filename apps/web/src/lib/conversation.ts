@@ -2,6 +2,33 @@
 
 export type ProviderId = "codex" | "anthropic" | "ollama" | "openrouter";
 
+export const reasoningEfforts = ["none", "low", "medium", "high", "xhigh", "max"] as const;
+export type ReasoningEffort = (typeof reasoningEfforts)[number];
+export const fallbackReasoningEfforts = [
+  "none",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as const satisfies readonly ReasoningEffort[];
+export const userReasoningEfforts = [
+  "none",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const satisfies readonly ReasoningEffort[];
+
+export function nextReasoningEffort(
+  current: ReasoningEffort,
+  options: readonly ReasoningEffort[] = userReasoningEfforts,
+): ReasoningEffort {
+  if (options.length === 0) return current;
+  const currentIndex = options.indexOf(current);
+  return options[(currentIndex + 1) % options.length] ?? options[0] ?? current;
+}
+
 export type ChatMessage = {
   id: string;
   branchId: string;
@@ -24,6 +51,8 @@ export type BranchAnchor = {
 
 export type ChatBranch = {
   id: string;
+  /** Stable portable identity used at browser and persistence boundaries. */
+  publicId?: string;
   parentBranchId?: string;
   /** Immutable ancestor message snapshot captured when this branch is created. */
   contextMessageIds?: string[];
@@ -36,6 +65,10 @@ export type ChatBranch = {
 
 export type ChatSummary = {
   id: string;
+  /** Stable portable identity used at browser and persistence boundaries. */
+  publicId?: string;
+  /** Stable portable identity of the chat's root branch. */
+  rootBranchPublicId?: string;
   projectId?: string;
   title: string;
   updatedAt: number;
@@ -44,6 +77,8 @@ export type ChatSummary = {
 
 export type ProjectSummary = {
   id: string;
+  /** Stable portable identity used at browser and persistence boundaries. */
+  publicId?: string;
   name: string;
   color: string;
 };

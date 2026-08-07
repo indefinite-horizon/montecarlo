@@ -8,8 +8,8 @@ import { CodexRunner } from "./codex.js";
 export function createDefaultRegistry(env: NodeJS.ProcessEnv = process.env): RunnerRegistry {
   return new RunnerRegistry([
     new CodexRunner(env),
-    createOpenRouterRunner(env),
-    createOllamaRunner(env),
     new ClaudeRunner(env),
+    createOllamaRunner(env),
+    createOpenRouterRunner(env),
   ]);
 }

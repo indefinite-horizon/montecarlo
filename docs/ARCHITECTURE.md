@@ -22,6 +22,47 @@ type RuntimeEvent =
 
 Codex runs through the official SDK and its own credential cache. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction: their current bridge implementations require a network sandbox, which is the wrong execution location for local subscription credentials.
 
+## Chat execution
+
+Every provider receives the same bounded, provider-neutral context and returns the same normalized event stream. Only the execution adapter inside the local companion changes:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as React / Electron renderer
+    participant Data as Convex + object store
+    participant Runtime as Authenticated local companion
+    participant Harness as Codex SDK / Claude CLI
+    participant AISDK as AI SDK 7
+    participant Endpoint as OpenRouter / local Ollama
+
+    User->>UI: Send prompt with provider and model
+    UI->>UI: Materialize bounded context from the chat DAG
+    UI->>Data: Persist user message and create run
+    Data-->>UI: Run ID
+    UI->>Runtime: POST /v1/chat with context, provider, and model
+    Runtime->>Runtime: Validate bearer, origin, request, and endpoint policy
+
+    alt Codex or Claude subscription
+        Runtime->>Harness: Start SDK thread or spawn CLI with full context
+        Note over Harness: Official tooling owns login and credential access
+        Harness-->>Runtime: Native streamed events and optional session/thread ID
+    else OpenRouter or Ollama model
+        Runtime->>AISDK: streamText with messages and abort signal
+        AISDK->>Endpoint: OpenAI-compatible streaming request
+        Note over Runtime,Endpoint: OpenRouter keys stay in the runtime boundary; Ollama is restricted to loopback
+        Endpoint-->>AISDK: Provider stream
+        AISDK-->>Runtime: AI SDK stream parts
+    end
+
+    loop Until finish, error, or cancellation
+        Runtime-->>UI: Normalized SSE events (text, reasoning, usage, status)
+        UI-->>User: Render incremental assistant output
+    end
+    UI->>Data: Persist assistant message and complete run
+    Note over UI,Data: The app-owned DAG remains authoritative; provider session IDs are optional and discardable
+```
+
 ## Chat graph
 
 ```text

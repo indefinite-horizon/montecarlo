@@ -1,7 +1,7 @@
 /** Durable reload and recoverable runtime/object-store failures. */
 
 import { expect, test } from "@playwright/test";
-import { installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
+import { conversationRequests, installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
 import {
   createProject,
   createPromptBranch,
@@ -58,7 +58,7 @@ test("reload during a delayed generation returns to a usable non-streaming state
   await page.getByPlaceholder("Ask a follow-up or start a new direction…").fill(prompt);
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByRole("button", { name: "Stop generation" })).toBeVisible();
-  await expect.poll(() => runtime.chatRequests.length).toBe(1);
+  await expect.poll(() => conversationRequests(runtime).length).toBe(1);
   await page.reload();
   await expect(userMessage(page, prompt)).toBeVisible();
   await expect(page.getByRole("button", { name: "Send message" })).toBeVisible();

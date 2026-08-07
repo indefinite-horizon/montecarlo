@@ -26,6 +26,10 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 - Every tenant-owned document carries `workspaceId`; tenant compound indexes begin with it and reads use those indexes.
 - Keep stable public IDs and versioned envelopes at persistence boundaries. Never export Convex `_id` values or absolute local paths as portable identity.
 - Keep branch persistence provider-neutral. Native Codex/Claude forks may optimize a run but do not define the graph.
+- Use TanStack Router for in-app navigation. Push fully specified paths, including every state-bearing
+  query parameter, so browser back and forward restore the complete workspace, chat, branch, and view.
+- Keep in-app Back and Forward controls on an application-owned route stack. Never delegate those
+  controls to browser history, where external referrers and authentication redirects can appear.
 - Claude subscription authentication has written Anthropic approval. Use the official
   local Claude CLI login and never read or persist its credential cache.
 - Do not read, copy, return, or persist Codex's auth cache. Let the official local SDK/CLI own and refresh it.
@@ -33,6 +37,10 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 - Do not hand-edit generated Convex or TanStack Router files except to resolve a documented codegen conflict.
 - User-facing product copy uses locale keys. Run `bun run validate:i18n` after copy changes.
 - UI descriptions: do not add subtitles, helper text, or descriptive copy beneath headings, labels, cards, or settings by default. Prefer one concise, self-explanatory heading or label. Only add supporting copy when the user explicitly asks for it or when it is necessary to prevent misunderstanding or error, and never use it to restate the heading.
+- Use toasts for ephemeral success, error, and completion feedback. Reserve inline notices for state that must remain visible or requires an in-context action.
+- Treat keyboard shortcuts as first-class UX: show platform-correct shortcut hints, preserve accessible click or menu equivalents, and add broadly useful actions to the Cmd/Ctrl+K palette unless they are context-specific or unsafe to invoke globally.
+- Icon-only action buttons must have an accessible name and a hover/focus tooltip. Show the shortcut at the right side of the tooltip when one exists.
+- Co-located buttons, segmented controls, and toggles must use the same visible height and hit-target size unless a documented hierarchy requires otherwise.
 
 ## Development
 
@@ -54,6 +62,11 @@ consult [docs/TESTING.md](docs/TESTING.md) during planning and again after
 implementation. Review the existing E2E suite, identify core user flows that
 need coverage, and add, update, consolidate, or remove tests as needed to keep
 the suite MECE.
+
+Whenever adding E2E coverage for a new flow, determine whether the flow touches
+persistence whose behavior or storage boundary differs between local-storage
+and cloud-storage workspaces. If it does, add equivalent E2E coverage for both
+workspace modes.
 
 After completing any other implementation work, consult
 [docs/TESTING.md](docs/TESTING.md) to determine whether new or updated tests are

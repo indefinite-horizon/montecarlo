@@ -1,8 +1,18 @@
 /** Defines normalized provider, request, health, and streaming event contracts. */
 
 export const providerIds = ["codex", "openrouter", "ollama", "anthropic"] as const;
+export const reasoningEfforts = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
 
 export type ProviderId = (typeof providerIds)[number];
+export type ReasoningEffort = (typeof reasoningEfforts)[number];
 export type MessageRole = "system" | "user" | "assistant";
 
 export interface ChatMessage {
@@ -24,6 +34,8 @@ export interface ChatRequest {
   options?: {
     maxOutputTokens?: number;
     temperature?: number;
+    reasoningEffort?: ReasoningEffort;
+    fastMode?: boolean;
   };
 }
 
@@ -55,6 +67,26 @@ export interface ProviderHealth {
   detail: string;
 }
 
+export interface ProviderModel {
+  id: string;
+  displayName: string;
+  description?: string;
+  reasoningEfforts?: ReasoningEffort[];
+  supportsFastMode?: boolean;
+}
+
+export interface ProviderModelCatalog {
+  provider: ProviderId;
+  models: ProviderModel[];
+  source: "cli" | "endpoint" | "curated";
+  fetchedAt: number;
+}
+
+export interface ModelCatalogRequest {
+  provider: ProviderId;
+  connection?: Pick<ProviderConnection, "baseURL">;
+}
+
 export interface ProviderDescriptor {
   id: ProviderId;
   name: string;
@@ -67,6 +99,10 @@ export interface ProviderDescriptor {
 export interface Runner {
   readonly descriptor: ProviderDescriptor;
   health(signal?: AbortSignal): Promise<ProviderHealth>;
+  listModels?(
+    connection?: Pick<ProviderConnection, "baseURL">,
+    signal?: AbortSignal,
+  ): Promise<ProviderModelCatalog>;
   run(input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent>;
 }
 

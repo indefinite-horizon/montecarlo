@@ -6,6 +6,7 @@ import {
   createProject,
   createWorkspace,
   openFreshUser,
+  selectWorkspace,
   workspaceButton,
 } from "../helpers/workspace";
 
@@ -23,14 +24,19 @@ test("creates distinct local-storage and cloud-storage workspaces", async ({ pag
   await expect(page.getByText("Cloud file storage")).toBeVisible();
   await expect(page.getByText("Local project", { exact: true })).toHaveCount(0);
 
-  await workspaceButton(page, cloudName).click();
-  await workspaceButton(page, localName).click();
+  await selectWorkspace(page, cloudName, localName);
   await expect(page.getByText("Files on this device")).toBeVisible();
   await expect(page.getByText("Local project", { exact: true })).toBeVisible();
 });
 
 test("workspace creation trims names and prevents blank submission", async ({ page }) => {
-  await workspaceButton(page, "Richard's workspace").click();
+  await workspaceButton(page, "My Workspace").click();
+  const menu = page.getByRole("menu", { name: "Workspaces" });
+  await expect(menu).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Where should message content be stored?" }),
+  ).toHaveCount(0);
+  await menu.getByRole("menuitem", { name: "New workspace", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Where should message content be stored?" });
   const submit = dialog.getByRole("button", { name: "Create with device storage" });
   await dialog.getByLabel("Workspace name").fill("   ");
@@ -47,13 +53,15 @@ test("workspace projects, chats, and branches stay isolated while switching", as
   const branchDialog = page.getByRole("dialog", { name: "Branch this conversation" });
   await branchDialog.getByLabel("What should this branch explore?").fill("Alpha branch");
   await branchDialog.getByRole("button", { name: "Create branch" }).click();
+  const alphaBranch = page
+    .locator('[data-testid="branch-map-row"][data-branch-depth="1"]')
+    .filter({ hasText: "Alpha branch" });
 
   await createWorkspace(page, "Workspace Beta", "local", "Workspace Alpha");
   await expect(page.getByText("Alpha-only project", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Alpha branch", exact: true })).toHaveCount(0);
+  await expect(alphaBranch).toHaveCount(0);
 
-  await workspaceButton(page, "Workspace Beta").click();
-  await workspaceButton(page, "Workspace Alpha").click();
+  await selectWorkspace(page, "Workspace Beta", "Workspace Alpha");
   await expect(page.getByText("Alpha-only project", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Alpha branch", exact: true })).toBeVisible();
+  await expect(alphaBranch).toBeVisible();
 });

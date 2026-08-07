@@ -4,6 +4,7 @@ import { ArrowRight, GitBranch, Quote, X } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BranchAnchor, SelectionAnchor } from "@/lib/conversation";
+import { ActionTooltip } from "./ActionTooltip";
 import { Button } from "./ui/button";
 
 export const SelectionBranchAction = memo(function SelectionBranchAction({
@@ -87,9 +88,11 @@ export const BranchComposer = memo(function BranchComposer({
           <h2 id="branch-composer-title" className="min-w-0 flex-1 font-display text-lg font-bold">
             {selection ? t("branch.selectionTitle") : t("branch.promptTitle")}
           </h2>
-          <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>
-            <X />
-          </Button>
+          <ActionTooltip label={t("common.close")} side="left">
+            <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>
+              <X />
+            </Button>
+          </ActionTooltip>
         </header>
 
         <div className="flex-1 overflow-y-auto p-5">

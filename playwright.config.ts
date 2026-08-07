@@ -24,6 +24,7 @@ const externalSpecs = ["**/*.external.spec.ts"];
 const nightlySpecs = ["**/*.nightly.external.spec.ts"];
 const perfSpecs = ["**/*.perf.spec.ts"];
 const authSpecs = ["**/auth/session.spec.ts"];
+const localAnonymousSpecs = ["**/workspaces/local-anonymous.spec.ts"];
 const desktopSpecs = ["**/desktop/*.spec.ts"];
 
 export default defineConfig({
@@ -44,7 +45,18 @@ export default defineConfig({
   projects: [
     {
       name: "chromium-core",
-      testIgnore: [...externalSpecs, ...perfSpecs, ...authSpecs, ...desktopSpecs],
+      testIgnore: [
+        ...externalSpecs,
+        ...perfSpecs,
+        ...authSpecs,
+        ...localAnonymousSpecs,
+        ...desktopSpecs,
+      ],
+      use: { ...devices["Desktop Chrome"], baseURL: authBaseURL },
+    },
+    {
+      name: "chromium-local",
+      testMatch: localAnonymousSpecs,
       use: { ...devices["Desktop Chrome"] },
     },
     {
@@ -60,7 +72,7 @@ export default defineConfig({
       name: "chromium-external",
       testMatch: externalSpecs,
       testIgnore: nightlySpecs,
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], baseURL: authBaseURL },
     },
     {
       name: "chromium-nightly",

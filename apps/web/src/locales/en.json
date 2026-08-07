@@ -32,8 +32,12 @@
   "sidebar": {
     "collapse": "Collapse sidebar",
     "open": "Open sidebar",
+    "create": "Create",
     "newChat": "New chat",
-    "search": "Search chats",
+    "search": "Search",
+    "searchCommands": "Search commands",
+    "back": "Back",
+    "forward": "Forward",
     "navigation": "Projects and chats",
     "projects": "Projects",
     "newProject": "New project",
@@ -42,11 +46,13 @@
     "unfiled": "Without a project"
   },
   "workspace": {
-    "defaultName": "Richard's workspace",
+    "defaultName": "My Workspace",
     "localStatus": "Files on this device",
     "cloudStatus": "Cloud file storage",
     "persistenceError": "The workspace could not save that change.",
     "projectLabel": "Probability lab",
+    "switcherLabel": "Workspaces",
+    "newWorkspace": "New workspace",
     "setupEyebrow": "Workspace setup",
     "setupTitle": "Where should message content be stored?",
     "setupSubtitle": "Choose local-first privacy or cloud sync. You can move it later.",
@@ -67,7 +73,15 @@
   },
   "providers": {
     "choose": "Choose a provider",
+    "selectModel": "Select provider and model",
     "modelId": "Model ID",
+    "editModel": "Edit model ID",
+    "chooseModel": "Choose model",
+    "searchModels": "Search models",
+    "loadingModels": "Loading models…",
+    "noModels": "No models found",
+    "resolvingModels": "Resolving models…",
+    "notConfigured": "Not configured",
     "manage": "Manage providers and credentials",
     "codex": {
       "name": "Codex",
@@ -93,6 +107,8 @@
     "connected": "Connected",
     "connect": "Connect",
     "checking": "Checking",
+    "connectionReady": "{{provider}} is connected.",
+    "connectionUnavailable": "{{provider}} is not ready. Check its setup and try again.",
     "unavailable": "Unavailable",
     "needsSetup": "Needs setup",
     "local": "Local",
@@ -179,7 +195,34 @@
     "hint": "Enter to send · Shift+Enter for a new line",
     "stop": "Stop generation",
     "send": "Send message",
+    "fast": "Fast",
+    "fastMode": "Fast mode",
+    "thinkingLevel": "Thinking level",
+    "adjustThinking": "Adjust thinking level",
+    "thinkingLevels": {
+      "none": "Off",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "xhigh": "Extra high",
+      "max": "Max"
+    },
     "persistence": "Messages persist in Convex; large content stays in the workspace object store."
+  },
+  "commandPalette": {
+    "label": "Command menu",
+    "placeholder": "Search commands, chats, and workspaces…",
+    "empty": "No matching commands",
+    "selectProvider": "Select provider and model",
+    "adjustThinking": "Adjust thinking level",
+    "newProject": "Create a new project",
+    "newWorkspace": "Create a new workspace",
+    "providerSettings": "Open provider settings",
+    "threadView": "Switch to thread view",
+    "canvasView": "Switch to canvas view",
+    "newBranch": "Create a new branch",
+    "openChat": "Open chat: {{title}}",
+    "switchWorkspace": "Switch workspace: {{name}}"
   },
   "runtime": {
     "offline": "The local model runtime is offline. Start the desktop app or `bun run dev:runtime`, then try again."

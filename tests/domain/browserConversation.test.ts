@@ -1,8 +1,12 @@
 /** Browser conversation tests for immutable branch transcript snapshots. */
 
 import { describe, expect, it } from "vitest";
-import type { ChatBranch, ChatMessage } from "../../apps/web/src/lib/conversation";
-import { visibleMessages } from "../../apps/web/src/lib/conversation";
+import {
+  type ChatBranch,
+  type ChatMessage,
+  nextReasoningEffort,
+  visibleMessages,
+} from "../../apps/web/src/lib/conversation";
 
 function message(id: string, branchId: string, createdAt: number): ChatMessage {
   return { id, branchId, role: "user", content: id, createdAt };
@@ -56,5 +60,25 @@ describe("browser branch transcript", () => {
     ];
 
     expect(visibleMessages(branches, "child").map((item) => item.id)).toEqual(["before"]);
+  });
+});
+
+describe("reasoning effort cycling", () => {
+  it("advances through every user level and wraps back to Off", () => {
+    expect(nextReasoningEffort("none")).toBe("low");
+    expect(nextReasoningEffort("low")).toBe("medium");
+    expect(nextReasoningEffort("medium")).toBe("high");
+    expect(nextReasoningEffort("high")).toBe("xhigh");
+    expect(nextReasoningEffort("xhigh")).toBe("max");
+    expect(nextReasoningEffort("max")).toBe("none");
+  });
+
+  it("skips unsupported levels and safely recovers an unsupported current value", () => {
+    const sparseOptions = ["none", "low", "high"] as const;
+    expect(nextReasoningEffort("none", sparseOptions)).toBe("low");
+    expect(nextReasoningEffort("low", sparseOptions)).toBe("high");
+    expect(nextReasoningEffort("high", sparseOptions)).toBe("none");
+    expect(nextReasoningEffort("medium", sparseOptions)).toBe("none");
+    expect(nextReasoningEffort("medium", [])).toBe("medium");
   });
 });

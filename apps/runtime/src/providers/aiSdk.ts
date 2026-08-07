@@ -1,13 +1,22 @@
 /** Adapts AI SDK 7 providers to the normalized local runner contract. */
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { type LanguageModel, type LanguageModelUsage, streamText } from "ai";
+import {
+  type LanguageModel,
+  type LanguageModelUsage,
+  streamText,
+  type TextStreamPart,
+  type ToolSet,
+} from "ai";
 import { runtimeDefaults } from "../config.js";
 import type {
   ChatMessage,
   ChatRequest,
   ProviderDescriptor,
   ProviderHealth,
+  ProviderId,
+  ProviderModelCatalog,
+  ReasoningEffort,
   Runner,
   RunnerEvent,
   TokenUsage,
@@ -18,6 +27,7 @@ interface AiSdkRunnerOptions {
   descriptor: ProviderDescriptor;
   createModel: (input: ChatRequest) => LanguageModel;
   health: (signal?: AbortSignal) => Promise<ProviderHealth>;
+  listModels?: Runner["listModels"];
 }
 
 function toModelMessages(messages: ChatMessage[]) {
@@ -38,15 +48,61 @@ function toTokenUsage(usage: LanguageModelUsage): TokenUsage {
   };
 }
 
+export function aiSdkReasoningEffort(
+  provider: ProviderId,
+  reasoningEffort?: ReasoningEffort,
+): ReasoningEffort | undefined {
+  if (provider === "ollama" && (reasoningEffort === "xhigh" || reasoningEffort === "max")) {
+    return "high";
+  }
+  if (provider === "ollama" && reasoningEffort === "minimal") return "low";
+  return reasoningEffort;
+}
+
+export async function* normalizeAiSdkStream<TOOLS extends ToolSet>(
+  parts: AsyncIterable<TextStreamPart<TOOLS>>,
+): AsyncIterable<RunnerEvent> {
+  let hasVisibleText = false;
+  for await (const part of parts) {
+    switch (part.type) {
+      case "text-delta":
+        if (part.text !== "") {
+          hasVisibleText = true;
+          yield { type: "text-delta", delta: part.text };
+        }
+        break;
+      case "reasoning-delta":
+        if (part.text !== "") yield { type: "reasoning-delta", delta: part.text };
+        break;
+      case "finish":
+        if (!hasVisibleText) {
+          throw new Error("The provider finished without a text response.");
+        }
+        yield {
+          type: "finish",
+          finishReason: part.finishReason,
+          usage: toTokenUsage(part.totalUsage),
+        };
+        break;
+      case "abort":
+        return;
+      case "error":
+        throw part.error;
+    }
+  }
+}
+
 export class AiSdkRunner implements Runner {
   readonly descriptor: ProviderDescriptor;
   private readonly createModel: AiSdkRunnerOptions["createModel"];
   private readonly getHealth: AiSdkRunnerOptions["health"];
+  readonly listModels?: Runner["listModels"];
 
   constructor(options: AiSdkRunnerOptions) {
     this.descriptor = options.descriptor;
     this.createModel = options.createModel;
     this.getHealth = options.health;
+    this.listModels = options.listModels;
   }
 
   health(signal?: AbortSignal): Promise<ProviderHealth> {
@@ -54,35 +110,20 @@ export class AiSdkRunner implements Runner {
   }
 
   async *run(input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent> {
+    const reasoningEffort = aiSdkReasoningEffort(
+      this.descriptor.id,
+      input.options?.reasoningEffort,
+    );
     const result = streamText({
       model: this.createModel(input),
       messages: toModelMessages(input.messages),
       abortSignal: signal,
       maxOutputTokens: input.options?.maxOutputTokens,
       temperature: input.options?.temperature,
+      providerOptions: reasoningEffort ? { [this.descriptor.id]: { reasoningEffort } } : undefined,
     });
 
-    for await (const part of result.stream) {
-      switch (part.type) {
-        case "text-delta":
-          if (part.text !== "") yield { type: "text-delta", delta: part.text };
-          break;
-        case "reasoning-delta":
-          if (part.text !== "") yield { type: "reasoning-delta", delta: part.text };
-          break;
-        case "finish":
-          yield {
-            type: "finish",
-            finishReason: part.finishReason,
-            usage: toTokenUsage(part.totalUsage),
-          };
-          break;
-        case "abort":
-          return;
-        case "error":
-          throw part.error;
-      }
-    }
+    yield* normalizeAiSdkStream(result.stream);
   }
 }
 
@@ -158,6 +199,24 @@ export function createOllamaRunner(env: NodeJS.ProcessEnv = process.env): Runner
       } catch {
         return { status: "unavailable", detail: "Ollama is not reachable on its local endpoint." };
       }
+    },
+    listModels: async (connection, signal): Promise<ProviderModelCatalog> => {
+      const baseURL = resolveOllamaBaseURL(connection?.baseURL ?? configuredBaseURL);
+      const modelsURL = new URL("/api/tags", `${baseURL}/`);
+      const timeoutSignal = AbortSignal.timeout(runtimeDefaults.providerHealthTimeoutMs);
+      const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+      const response = await fetch(modelsURL, { method: "GET", signal: combinedSignal });
+      if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}.`);
+      const body = (await response.json()) as { models?: unknown };
+      const models = Array.isArray(body.models)
+        ? body.models.flatMap((candidate) => {
+            if (typeof candidate !== "object" || candidate === null) return [];
+            const name = (candidate as { name?: unknown }).name;
+            if (typeof name !== "string" || name.trim() === "") return [];
+            return [{ id: name, displayName: name }];
+          })
+        : [];
+      return { provider: "ollama", models, source: "endpoint", fetchedAt: Date.now() };
     },
     createModel: (input) =>
       createOpenAICompatible({
