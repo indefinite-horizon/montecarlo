@@ -3,6 +3,7 @@
 import type { FunctionReference } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { ProviderId, ReasoningEffort } from "./conversation";
 
 type PublicQuery<Args extends Record<string, unknown>, Result> = FunctionReference<
   "query",
@@ -47,7 +48,10 @@ type ChatItem = {
   workspaceId: Id<"workspaces">;
   projectId?: Id<"projects">;
   title: string;
+  autoTitleStatus?: "pending" | "generating" | "generated";
+  autoTitleReady?: boolean;
   rootBranchId: Id<"chat_branches">;
+  rootBranchPublicId: string;
   archivedAt?: number;
   createdAt: number;
   updatedAt: number;
@@ -124,6 +128,8 @@ export type RunItem = {
   provider: string;
   model: string;
   providerSessionId?: string;
+  reasoningEffort?: ReasoningEffort | "none" | "minimal";
+  fastMode?: boolean;
   status: "running" | "succeeded" | "failed" | "canceled";
   errorCode?: string;
   errorMessage?: string;
@@ -135,6 +141,7 @@ export type RunItem = {
 
 type DomainApi = {
   workspaces: {
+    getByPublicId: PublicQuery<{ publicId: string }, WorkspaceItem | null>;
     list: PublicQuery<{ limit?: number }, { items: WorkspaceItem[]; hasMore: boolean }>;
     create: PublicMutation<
       {
@@ -147,6 +154,10 @@ type DomainApi = {
     >;
   };
   projects: {
+    get: PublicQuery<
+      { workspaceId: Id<"workspaces">; projectId: Id<"projects"> },
+      ProjectItem | null
+    >;
     list: PublicQuery<
       { workspaceId: Id<"workspaces">; limit?: number },
       { items: ProjectItem[]; hasMore: boolean }
@@ -162,6 +173,10 @@ type DomainApi = {
     >;
   };
   chats: {
+    getByPublicId: PublicQuery<
+      { workspaceId: Id<"workspaces">; publicId: string },
+      ChatItem | null
+    >;
     list: PublicQuery<
       { workspaceId: Id<"workspaces">; projectId?: Id<"projects">; limit?: number },
       { items: ChatItem[]; hasMore: boolean }
@@ -173,11 +188,44 @@ type DomainApi = {
         publicId?: string;
         rootBranchPublicId?: string;
         title: string;
+        autoTitle?: boolean;
       },
       ChatItem
     >;
+    claimAutoTitle: PublicMutation<
+      {
+        workspaceId: Id<"workspaces">;
+        chatId: Id<"chats">;
+        claimToken: string;
+        provider?: ProviderId;
+        model?: string;
+      },
+      { inputMessageId: Id<"messages">; intent: string; provider: ProviderId; model: string } | null
+    >;
+    releaseAutoTitle: PublicMutation<
+      { workspaceId: Id<"workspaces">; chatId: Id<"chats">; claimToken: string },
+      boolean
+    >;
+    completeAutoTitle: PublicMutation<
+      {
+        workspaceId: Id<"workspaces">;
+        chatId: Id<"chats">;
+        claimToken: string;
+        title: string;
+      },
+      boolean
+    >;
+    ensureInitial: PublicMutation<
+      { workspaceId: Id<"workspaces">; title: string; autoTitle?: boolean },
+      ChatItem
+    >;
     getTree: PublicQuery<
-      { workspaceId: Id<"workspaces">; chatId: Id<"chats">; limit?: number },
+      {
+        workspaceId: Id<"workspaces">;
+        chatId: Id<"chats">;
+        limit?: number;
+        targetBranchPublicId?: string;
+      },
       { chat: ChatItem; branches: BranchItem[]; truncated: boolean }
     >;
   };
@@ -259,6 +307,8 @@ type DomainApi = {
         provider: string;
         model: string;
         providerSessionId?: string;
+        reasoningEffort?: ReasoningEffort;
+        fastMode?: boolean;
       },
       RunItem
     >;

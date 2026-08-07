@@ -79,15 +79,19 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
     );
   }
 
-  const configuredOrigins = env.MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS?.split(",").filter(
+  const configuredOriginValues = env.MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS?.split(",").filter(
     (origin) => origin.trim() !== "",
   );
+  const configuredOrigins = configuredOriginValues?.length ? configuredOriginValues : undefined;
   const defaults = development
     ? [...runtimeDefaults.developmentOrigins, ...runtimeDefaults.desktopOrigins]
     : [...runtimeDefaults.desktopOrigins];
-  const configuredWorkspaceIds = env.MONTE_CARLO_RUNTIME_WORKSPACE_IDS?.split(",")
+  const configuredWorkspaceIdValues = env.MONTE_CARLO_RUNTIME_WORKSPACE_IDS?.split(",")
     .map((workspaceId) => workspaceId.trim())
     .filter(Boolean);
+  const configuredWorkspaceIds = configuredWorkspaceIdValues?.length
+    ? configuredWorkspaceIdValues
+    : undefined;
   if (
     configuredWorkspaceIds?.some(
       (workspaceId) => !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(workspaceId),

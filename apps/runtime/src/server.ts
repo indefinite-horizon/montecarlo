@@ -31,6 +31,7 @@ import {
 import {
   assertDeviceLoginBody,
   parseChatRequest,
+  parseModelCatalogRequest,
   parseStreamFormat,
   readBinaryBody,
   readJsonBody,
@@ -189,6 +190,10 @@ export class RuntimeServer {
       await this.handleProviders(response);
       return;
     }
+    if (request.method === "POST" && url.pathname === "/v1/models") {
+      await this.handleModels(request, response);
+      return;
+    }
     if (request.method === "GET" && url.pathname === "/v1/auth/codex/status") {
       await this.handleAuthStatus(response, "codex");
       return;
@@ -241,6 +246,21 @@ export class RuntimeServer {
       })),
     );
     writeJson(response, 200, { providers });
+  }
+
+  private async handleModels(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const input = parseModelCatalogRequest(
+      await readJsonBody(request, this.config.maxRequestBytes),
+    );
+    const runner = this.registry.get(input.provider);
+    if (!runner.listModels) {
+      throw new HttpError(
+        501,
+        "model_catalog_unavailable",
+        "This provider does not expose a model catalog.",
+      );
+    }
+    writeJson(response, 200, await runner.listModels(input.connection));
   }
 
   private async handleAuthStatus(response: ServerResponse, provider: ProviderId): Promise<void> {

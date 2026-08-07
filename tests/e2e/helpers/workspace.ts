@@ -1,6 +1,7 @@
 /** High-level helpers for isolated durable workspace journeys. */
 
 import { expect, type Page } from "@playwright/test";
+import { foodChatNames } from "../../../lib/foodChatNames";
 import { signIn } from "./auth";
 import { uniqueEmail } from "./ids";
 
@@ -15,6 +16,12 @@ export async function createWorkspace(
   currentWorkspaceName = "Richard's workspace",
 ) {
   await workspaceButton(page, currentWorkspaceName).click();
+  const menu = page.getByRole("menu", { name: "Workspaces" });
+  await expect(menu).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Where should message content be stored?" }),
+  ).toHaveCount(0);
+  await menu.getByRole("menuitem", { name: "New workspace", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Where should message content be stored?" });
   await expect(dialog).toBeVisible();
   if (mode === "cloud") {
@@ -28,17 +35,31 @@ export async function createWorkspace(
   await createButton.click();
   await expect(dialog).toBeHidden();
   await expect(workspaceButton(page, name)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "New conversation", exact: true })).toBeVisible();
+  const title = page.getByTestId("chat-breadcrumb-title");
+  await expect(title).not.toHaveText("", { timeout: 15_000 });
+  expect(foodChatNames).toContain((await title.innerText()).trim());
+  return (await title.innerText()).trim();
 }
 
 export function workspaceButton(page: Page, name: string) {
-  return page.getByRole("button").filter({ hasText: name }).first();
+  return page.getByTestId("workspace-selector").filter({ hasText: name });
+}
+
+export async function selectWorkspace(page: Page, currentName: string, nextName: string) {
+  await workspaceButton(page, currentName).click();
+  const menu = page.getByRole("menu", { name: "Workspaces" });
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem").filter({ hasText: nextName }).click();
+  await expect(workspaceButton(page, nextName)).toBeVisible();
 }
 
 export async function createProject(page: Page, name: string) {
   await page.getByRole("button", { name: "New project" }).click();
-  await page.getByLabel("Project name").fill(name);
-  await page.getByRole("button", { name: "Create", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "New project" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Project name").fill(name);
+  await dialog.getByRole("button", { name: "Create", exact: true }).click();
+  await expect(dialog).toBeHidden();
   await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 15_000 });
 }
 
@@ -47,14 +68,25 @@ export async function createChat(page: Page, projectName?: string) {
   const section = navigation
     .locator("section")
     .filter({ hasText: projectName ?? "Without a project" });
+  const rows = section.getByTestId("chat-row");
+  const before = await rows.count();
   if (projectName) {
     await page.getByRole("button", { name: `New chat — ${projectName}` }).click();
   } else {
     await page.getByRole("button", { name: "New chat", exact: true }).click();
   }
-  await expect(
-    section.locator('button[aria-current="page"]').filter({ hasText: "New conversation" }),
-  ).toBeVisible();
+  await expect(rows).toHaveCount(before + 1);
+  const activeRow = section.locator('button[aria-current="page"]');
+  await expect(activeRow).toBeVisible();
+  const title = (await activeRow.innerText()).trim();
+  expect(foodChatNames).toContain(title);
+  return title;
+}
+
+export function activeChatRow(page: Page) {
+  return page
+    .getByRole("navigation", { name: "Projects and chats" })
+    .locator('button[aria-current="page"]');
 }
 
 export async function sendMessage(page: Page, prompt: string, reply?: string) {

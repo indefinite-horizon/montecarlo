@@ -1,63 +1,79 @@
 /** Lists projects and chats in the active tenant workspace. */
 
-import { ChevronDown, Folder, PanelLeftClose, Plus, Search, X } from "lucide-react";
-import { memo, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Cloud,
+  Folder,
+  HardDrive,
+  PanelLeft,
+  Plus,
+  Search,
+} from "lucide-react";
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatSummary, ProjectSummary } from "@/lib/conversation";
+import { appShortcutLabel } from "@/lib/keyboardShortcuts";
 import { cn } from "@/lib/utils";
-import { MonteCarloBrand } from "./MonteCarloBrand";
+import { ActionTooltip } from "./ActionTooltip";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   chats,
   projects,
   activeChatId,
+  workspaceId,
   workspaceName,
   workspaceMode,
+  workspaces,
   onCreateChat,
-  onCreateProject,
   onSelectChat,
-  onOpenWorkspaceSetup,
+  onSelectWorkspace,
+  onCreateWorkspace,
+  onOpenProjectCreate,
+  onOpenCommandPalette,
+  canGoBack,
+  canGoForward,
+  onBack,
+  onForward,
   open,
   onClose,
 }: {
   chats: ChatSummary[];
   projects: ProjectSummary[];
   activeChatId: string;
+  workspaceId?: string;
   workspaceName?: string;
   workspaceMode?: "local" | "cloud";
+  workspaces: Array<{ id: string; name: string; storageMode: "local" | "cloud" }>;
   onCreateChat: (projectId?: string) => void;
-  onCreateProject: (name: string) => Promise<boolean>;
   onSelectChat: (chatId: string) => void;
-  onOpenWorkspaceSetup: () => void;
+  onSelectWorkspace: (workspaceId: string) => void;
+  onCreateWorkspace: () => void;
+  onOpenProjectCreate: () => void;
+  onOpenCommandPalette: () => void;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  onBack: () => void;
+  onForward: () => void;
   open: boolean;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [submittingProject, setSubmittingProject] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const visibleChats = normalizedQuery
-    ? chats.filter((chat) => chat.title.toLocaleLowerCase().includes(normalizedQuery))
-    : chats;
-  const looseChats = visibleChats.filter((chat) => !chat.projectId);
-
-  const submitProject = async () => {
-    const name = projectName.trim();
-    if (!name || submittingProject) return;
-    setSubmittingProject(true);
-    try {
-      if (await onCreateProject(name)) {
-        setProjectName("");
-        setCreatingProject(false);
-      }
-    } finally {
-      setSubmittingProject(false);
-    }
-  };
+  const newChatShortcut = appShortcutLabel("newChat");
+  const commandPaletteShortcut = appShortcutLabel("commandPalette");
+  const newProjectShortcut = appShortcutLabel("newProject");
+  const looseChats = chats.filter((chat) => !chat.projectId);
 
   if (!open) return null;
 
@@ -69,61 +85,131 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
         onClick={onClose}
         aria-label={t("common.close")}
       />
-      <aside className="fixed inset-y-0 left-0 z-50 flex h-screen w-[264px] shrink-0 flex-col border-r border-border bg-background shadow-xl md:relative md:z-auto md:bg-secondary/35 md:shadow-none">
-        <div className="flex h-16 items-center justify-between px-4">
-          <MonteCarloBrand />
-          <Button size="icon" variant="ghost" aria-label={t("sidebar.collapse")} onClick={onClose}>
-            <PanelLeftClose className="hidden md:block" />
-            <X className="md:hidden" />
-          </Button>
+      <aside
+        aria-label={t("sidebar.navigation")}
+        className="fixed inset-y-0 left-0 z-50 flex h-screen w-[264px] shrink-0 flex-col border-r border-border bg-background shadow-xl md:relative md:z-auto md:bg-secondary/35 md:shadow-none"
+      >
+        <div className="flex h-14 items-center gap-1 px-3">
+          <ActionTooltip label={t("sidebar.collapse")} side="bottom">
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={t("sidebar.collapse")}
+              onClick={onClose}
+            >
+              <PanelLeft />
+            </Button>
+          </ActionTooltip>
+          <span className="flex-1" />
+          <ActionTooltip label={t("sidebar.back")} side="bottom">
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={t("sidebar.back")}
+              disabled={!canGoBack}
+              onClick={onBack}
+            >
+              <ArrowLeft />
+            </Button>
+          </ActionTooltip>
+          <ActionTooltip label={t("sidebar.forward")} side="bottom">
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={t("sidebar.forward")}
+              disabled={!canGoForward}
+              onClick={onForward}
+            >
+              <ArrowRight />
+            </Button>
+          </ActionTooltip>
         </div>
 
         <div className="px-3 pb-3">
-          <button
-            type="button"
-            className="flex h-10 w-full items-center gap-2 rounded-md border border-border bg-card px-3 text-left text-sm shadow-sm transition-colors hover:bg-accent"
-            onClick={onOpenWorkspaceSetup}
-          >
-            <span className="grid size-6 place-items-center rounded bg-foreground text-[10px] font-bold text-background">
-              RW
-            </span>
-            <span className="min-w-0 flex-1 truncate font-medium">
-              {workspaceName ?? t("workspace.defaultName")}
-            </span>
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                data-testid="workspace-selector"
+                className="flex h-10 w-full items-center gap-2 rounded-md border border-border bg-card px-3 text-left text-sm shadow-sm transition-colors hover:bg-accent"
+              >
+                <span className="grid size-6 place-items-center rounded bg-foreground text-[10px] font-bold text-background">
+                  {workspaceInitials(workspaceName)}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {workspaceName ?? t("workspace.defaultName")}
+                </span>
+                <ChevronDown className="size-3.5 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="min-w-[var(--radix-dropdown-menu-trigger-width)]"
+              aria-labelledby="workspace-menu-label"
+            >
+              <DropdownMenuLabel id="workspace-menu-label" className="sr-only">
+                {t("workspace.switcherLabel")}
+              </DropdownMenuLabel>
+              {workspaces.map((workspace) => {
+                const StorageIcon = workspace.storageMode === "local" ? HardDrive : Cloud;
+                return (
+                  <DropdownMenuItem
+                    key={workspace.id}
+                    className="gap-2"
+                    aria-current={workspace.id === workspaceId ? "true" : undefined}
+                    onSelect={() => onSelectWorkspace(workspace.id)}
+                  >
+                    <StorageIcon className="text-primary" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{workspace.name}</span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        {workspace.storageMode === "local"
+                          ? t("workspace.localTitle")
+                          : t("workspace.cloudTitle")}
+                      </span>
+                    </span>
+                    {workspace.id === workspaceId ? <Check className="text-primary" /> : null}
+                  </DropdownMenuItem>
+                );
+              })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2" onSelect={onCreateWorkspace}>
+                <Plus />
+                {t("workspace.newWorkspace")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto] gap-2 px-3 pb-4">
-          <Button className="justify-start" size="sm" onClick={() => onCreateChat()}>
+        <div className="space-y-1 px-3 pb-4">
+          <Button
+            className="group w-full justify-start bg-transparent px-3 text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
+            variant="ghost"
+            aria-label={t("sidebar.newChat")}
+            onClick={() => onCreateChat()}
+          >
             <Plus />
-            {t("sidebar.newChat")}
+            <span className="flex-1 text-left">{t("sidebar.create")}</span>
+            <span
+              aria-hidden="true"
+              className="text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+            >
+              {newChatShortcut}
+            </span>
           </Button>
           <Button
-            size="icon"
-            variant="outline"
-            aria-label={t("sidebar.search")}
-            aria-pressed={searchOpen}
-            onClick={() => {
-              setSearchOpen((current) => !current);
-              if (searchOpen) setQuery("");
-            }}
+            className="group w-full justify-start bg-transparent px-3 text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
+            variant="ghost"
+            aria-label={t("sidebar.searchCommands")}
+            onClick={onOpenCommandPalette}
           >
             <Search />
+            <span className="flex-1 text-left">{t("sidebar.search")}</span>
+            <span className="text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+              {commandPaletteShortcut}
+            </span>
           </Button>
         </div>
-
-        {searchOpen ? (
-          <div className="px-3 pb-3">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:border-ring"
-              placeholder={t("sidebar.search")}
-              aria-label={t("sidebar.search")}
-            />
-          </div>
-        ) : null}
 
         <nav
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-5"
@@ -133,36 +219,22 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {t("sidebar.projects")}
             </p>
-            <Button
-              size="xs"
-              variant="ghost"
-              aria-label={t("sidebar.newProject")}
-              onClick={() => setCreatingProject((current) => !current)}
+            <ActionTooltip
+              label={t("sidebar.newProject")}
+              shortcut={newProjectShortcut}
+              side="right"
             >
-              <Plus />
-            </Button>
-          </div>
-
-          {creatingProject ? (
-            <form
-              className="mb-3 flex gap-1.5 px-1"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submitProject();
-              }}
-            >
-              <input
-                value={projectName}
-                onChange={(event) => setProjectName(event.target.value)}
-                className="h-8 min-w-0 flex-1 rounded-md border border-input bg-card px-2 text-xs outline-none focus:border-ring"
-                placeholder={t("sidebar.projectName")}
-                aria-label={t("sidebar.projectName")}
-              />
-              <Button type="submit" size="xs" disabled={!projectName.trim() || submittingProject}>
-                {t("sidebar.createProject")}
+              <Button
+                className="size-7"
+                size="icon"
+                variant="ghost"
+                aria-label={t("sidebar.newProject")}
+                onClick={onOpenProjectCreate}
+              >
+                <Plus />
               </Button>
-            </form>
-          ) : null}
+            </ActionTooltip>
+          </div>
 
           <div className="space-y-3">
             {projects.map((project) => (
@@ -170,17 +242,19 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
                 <div className="group flex h-8 items-center gap-2 rounded-md px-2 text-sm text-foreground/80">
                   <Folder className="size-3.5 text-primary" />
                   <span className="min-w-0 flex-1 truncate font-medium">{project.name}</span>
-                  <button
-                    type="button"
-                    className="grid size-6 place-items-center rounded text-muted-foreground opacity-0 hover:bg-card group-hover:opacity-100 focus:opacity-100"
-                    onClick={() => onCreateChat(project.id)}
-                    aria-label={`${t("sidebar.newChat")} — ${project.name}`}
-                  >
-                    <Plus className="size-3" />
-                  </button>
+                  <ActionTooltip label={`${t("sidebar.newChat")} — ${project.name}`} side="right">
+                    <button
+                      type="button"
+                      className="grid size-6 place-items-center rounded text-muted-foreground opacity-0 hover:bg-card group-hover:opacity-100 focus:opacity-100"
+                      onClick={() => onCreateChat(project.id)}
+                      aria-label={`${t("sidebar.newChat")} — ${project.name}`}
+                    >
+                      <Plus className="size-3" />
+                    </button>
+                  </ActionTooltip>
                 </div>
                 <div className="ml-4 border-l border-border pl-1.5">
-                  {visibleChats
+                  {chats
                     .filter((chat) => chat.projectId === project.id)
                     .map((chat) => (
                       <ChatRow
@@ -223,6 +297,16 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   );
 });
 
+function workspaceInitials(name?: string): string {
+  const words = name?.trim().split(/\s+/u).filter(Boolean) ?? [];
+  if (words.length === 0) return "W";
+  return words
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toLocaleUpperCase();
+}
+
 const ChatRow = memo(function ChatRow({
   chat,
   active,
@@ -235,6 +319,7 @@ const ChatRow = memo(function ChatRow({
   return (
     <button
       type="button"
+      data-testid="chat-row"
       className={cn(
         "group relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
         active

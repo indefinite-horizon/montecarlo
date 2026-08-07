@@ -23,6 +23,7 @@ import { branchAncestryIds, branchCanvasConfig, layoutBranchCanvas } from "@/lib
 import type { BranchAnchor, ChatBranch, ChatMessage, SelectionAnchor } from "@/lib/conversation";
 import { selectionAnchorFromMessage } from "@/lib/messageSelection";
 import { cn } from "@/lib/utils";
+import { ActionTooltip } from "./ActionTooltip";
 import { SelectionBranchAction } from "./BranchComposer";
 import { CanvasStreamingState } from "./CanvasStreamingState";
 import { Button } from "./ui/button";
@@ -463,15 +464,17 @@ const BranchCanvasNode = memo(function BranchCanvasNode({ data }: NodeProps<Bran
             {t("branch.turnCount", { count: turnCount })}
           </p>
         </div>
-        <Button
-          className="nodrag nopan opacity-70 transition-opacity hover:opacity-100"
-          size="icon"
-          variant="ghost"
-          aria-label={t("canvas.openThread", { title: branch.title })}
-          onClick={() => data.onOpenThread(branch.id)}
-        >
-          <ArrowUpRight />
-        </Button>
+        <ActionTooltip label={t("canvas.openThread", { title: branch.title })} side="left">
+          <Button
+            className="nodrag nopan opacity-70 transition-opacity hover:opacity-100"
+            size="icon"
+            variant="ghost"
+            aria-label={t("canvas.openThread", { title: branch.title })}
+            onClick={() => data.onOpenThread(branch.id)}
+          >
+            <ArrowUpRight />
+          </Button>
+        </ActionTooltip>
       </header>
 
       <div

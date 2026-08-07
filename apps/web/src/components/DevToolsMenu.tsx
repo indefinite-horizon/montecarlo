@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useEventListener } from "@/hooks/useEventListener";
 import { cn } from "@/lib/utils";
 import { api } from "../../../../convex/_generated/api";
+import { ActionTooltip } from "./ActionTooltip";
 import { Button } from "./ui/button";
 
 type PendingCommand = "wipe" | "reseed" | "wipeAndReseed" | null;
@@ -102,18 +103,20 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
         <span className="max-w-56 truncate" title={branchLabel}>
           {branchLabel}
         </span>
-        <button
-          type="button"
-          className={cn(
-            "pointer-events-auto ml-1 rounded p-0.5 transition-colors hover:bg-background/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-background",
-            open && "bg-background/20",
-          )}
-          aria-label={t("devTools.open")}
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          <Wrench className="size-3" />
-        </button>
+        <ActionTooltip label={t("devTools.open")} side="bottom">
+          <button
+            type="button"
+            className={cn(
+              "pointer-events-auto ml-1 rounded p-0.5 transition-colors hover:bg-background/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-background",
+              open && "bg-background/20",
+            )}
+            aria-label={t("devTools.open")}
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+          >
+            <Wrench className="size-3" />
+          </button>
+        </ActionTooltip>
       </div>
 
       {open ? (

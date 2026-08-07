@@ -1,10 +1,13 @@
 /** Talks to the authenticated loopback runtime without exposing provider secrets to Convex. */
 
-import type { ChatMessage, ProviderId } from "./conversation";
+import type { ChatMessage, ProviderId, ReasoningEffort } from "./conversation";
 
 type DesktopBridge = {
+  platform?: string;
   getRuntimeConfig: () => Promise<{ baseUrl: string; token: string }>;
   saveProviderSecret?: (provider: "openrouter", value: string) => void;
+  onNewChat?: (callback: () => void) => void;
+  offNewChat?: (callback: () => void) => void;
 };
 
 declare global {
@@ -36,6 +39,21 @@ export type ProviderStatus = {
     authenticated?: boolean;
     detail: string;
   };
+};
+
+export type ProviderModel = {
+  id: string;
+  displayName: string;
+  description?: string;
+  reasoningEfforts?: ReasoningEffort[];
+  supportsFastMode?: boolean;
+};
+
+export type ProviderModelCatalog = {
+  provider: ProviderId;
+  models: ProviderModel[];
+  source: "cli" | "endpoint" | "curated";
+  fetchedAt: number;
 };
 
 type EndpointProvider = "openrouter" | "ollama";
@@ -204,6 +222,64 @@ export async function getRuntimeProviders(): Promise<ProviderStatus[]> {
   return body.providers;
 }
 
+function modelCatalogStorageKey(provider: ProviderId): string {
+  return `monte-carlo:provider:${provider}:model-catalog`;
+}
+
+type StoredModelCatalog = ProviderModelCatalog & { connectionBaseURL?: string };
+
+export function getCachedModelCatalog(
+  provider: ProviderId,
+  connectionBaseURL?: string,
+): ProviderModelCatalog | undefined {
+  if (provider === "openrouter") return undefined;
+  try {
+    const raw = localStorage.getItem(modelCatalogStorageKey(provider));
+    if (!raw) return undefined;
+    const cached = JSON.parse(raw) as StoredModelCatalog;
+    if (
+      cached.provider !== provider ||
+      !Array.isArray(cached.models) ||
+      !cached.models.every(
+        (model) => typeof model.id === "string" && typeof model.displayName === "string",
+      ) ||
+      !["cli", "endpoint", "curated"].includes(cached.source) ||
+      typeof cached.fetchedAt !== "number" ||
+      cached.connectionBaseURL !== connectionBaseURL
+    ) {
+      return undefined;
+    }
+    return cached;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function getRuntimeModelCatalog(
+  provider: Exclude<ProviderId, "openrouter">,
+  connectionBaseURL?: string,
+): Promise<ProviderModelCatalog> {
+  const response = await runtimeFetch("/v1/models", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      provider,
+      connection: connectionBaseURL ? { baseURL: connectionBaseURL } : undefined,
+    }),
+  });
+  if (!response.ok) throw new Error(`Runtime returned ${response.status}`);
+  const catalog = (await response.json()) as ProviderModelCatalog;
+  try {
+    localStorage.setItem(
+      modelCatalogStorageKey(provider),
+      JSON.stringify({ ...catalog, connectionBaseURL } satisfies StoredModelCatalog),
+    );
+  } catch {
+    // Catalog caching is an optional performance optimization.
+  }
+  return catalog;
+}
+
 export async function saveProviderSecret(provider: "openrouter", value: string): Promise<void> {
   if (!window.monteCarloDesktop?.saveProviderSecret) {
     throw new Error("Provider keys can only be saved securely in the desktop app.");
@@ -280,6 +356,8 @@ export async function streamRuntimeChat(input: {
   model: string;
   messages: ChatMessage[];
   prompt: string;
+  reasoningEffort: ReasoningEffort;
+  fastMode: boolean;
   signal: AbortSignal;
   onEvent: (event: RuntimeStreamEvent) => void;
 }): Promise<void> {
@@ -300,6 +378,10 @@ export async function streamRuntimeChat(input: {
         { role: "user", content: input.prompt },
       ],
       connection: baseURL ? { baseURL } : undefined,
+      options: {
+        reasoningEffort: input.reasoningEffort,
+        fastMode: input.fastMode,
+      },
     }),
     signal: input.signal,
   });

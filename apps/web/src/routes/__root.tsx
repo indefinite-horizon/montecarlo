@@ -39,7 +39,11 @@ function NotFoundRedirect() {
   // lint-allow: no-direct-use-effect — not-found routes recover immediately.
   useEffect(() => {
     toast.error("Page not found");
-    void navigate({ to: "/", replace: true });
+    void navigate({
+      to: "/",
+      replace: true,
+      search: { workspace: undefined, chat: undefined, branch: undefined, view: "thread" },
+    });
   }, [navigate]);
 
   return null;

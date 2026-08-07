@@ -1,18 +1,11 @@
 /** Explains and configures provider credential modes at the local-runtime boundary. */
 
-import {
-  CheckCircle2,
-  Cloud,
-  Cpu,
-  KeyRound,
-  LoaderCircle,
-  Sparkles,
-  Terminal,
-  X,
-} from "lucide-react";
+import { CheckCircle2, KeyRound, LoaderCircle, X } from "lucide-react";
 import { memo, type ReactNode, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { useMountEffect } from "@/hooks/useMountEffect";
+import type { ProviderId } from "@/lib/conversation";
 import {
   getProviderEndpoint,
   getRuntimeProviders,
@@ -22,12 +15,16 @@ import {
   startClaudeLogin,
   startCodexDeviceLogin,
 } from "@/lib/runtimeClient";
+import { ActionTooltip } from "./ActionTooltip";
+import { ProviderIcon } from "./ProviderIcon";
 import { Button } from "./ui/button";
 
 export const ProviderSettings = memo(function ProviderSettings({
   onClose,
+  onConnectionChange,
 }: {
   onClose: () => void;
+  onConnectionChange?: () => void;
 }) {
   const { t } = useTranslation();
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
@@ -41,14 +38,45 @@ export const ProviderSettings = memo(function ProviderSettings({
     openrouter: getProviderEndpoint("openrouter") || "https://openrouter.ai/api/v1",
   }));
 
-  const refreshProviders = useCallback(async () => {
-    try {
-      setProviders(await getRuntimeProviders());
-      setNotice(undefined);
-    } catch {
-      setNotice(t("settings.runtimeUnavailable"));
-    }
-  }, [t]);
+  const providerName = useCallback(
+    (id: string) => {
+      if (id === "codex") return t("providers.codex.name");
+      if (id === "ollama") return t("providers.ollama.name");
+      if (id === "openrouter") return t("providers.openrouter.name");
+      if (id === "anthropic") return t("providers.anthropic.name");
+      return id;
+    },
+    [t],
+  );
+
+  const refreshProviders = useCallback(
+    async (announceProvider?: string) => {
+      try {
+        const nextProviders = await getRuntimeProviders();
+        setProviders(nextProviders);
+        onConnectionChange?.();
+        setNotice(undefined);
+        if (announceProvider) {
+          const checked = nextProviders.find((provider) => provider.id === announceProvider);
+          if (checked?.health.status === "ready") {
+            toast.success(
+              t("settings.connectionReady", { provider: providerName(announceProvider) }),
+            );
+          } else {
+            toast.error(
+              t("settings.connectionUnavailable", { provider: providerName(announceProvider) }),
+            );
+          }
+        }
+        return nextProviders;
+      } catch {
+        if (announceProvider) toast.error(t("settings.runtimeUnavailable"));
+        else setNotice(t("settings.runtimeUnavailable"));
+        return undefined;
+      }
+    },
+    [onConnectionChange, providerName, t],
+  );
 
   useMountEffect(() => {
     void refreshProviders();
@@ -76,7 +104,7 @@ export const ProviderSettings = memo(function ProviderSettings({
         if (event.type === "status") setNotice(event.message);
         if (event.type === "error") setNotice(event.message);
       });
-      await refreshProviders();
+      await refreshProviders("codex");
     } catch {
       setNotice(t("settings.runtimeUnavailable"));
     } finally {
@@ -97,7 +125,7 @@ export const ProviderSettings = memo(function ProviderSettings({
         if (event.type === "status") setNotice(event.message);
         if (event.type === "error") setNotice(event.message);
       });
-      await refreshProviders();
+      await refreshProviders("anthropic");
     } catch {
       setNotice(t("settings.runtimeUnavailable"));
     } finally {
@@ -114,10 +142,10 @@ export const ProviderSettings = memo(function ProviderSettings({
       await saveProviderSecret(provider, secret.trim());
       setSecret("");
       setEditingProvider(undefined);
-      setNotice(t("settings.keySaved"));
+      toast.success(t("settings.keySaved"));
       await refreshProviders();
     } catch {
-      setNotice(t("settings.desktopKeyOnly"));
+      toast.error(t("settings.desktopKeyOnly"));
     } finally {
       setBusyProvider(undefined);
     }
@@ -127,9 +155,19 @@ export const ProviderSettings = memo(function ProviderSettings({
     try {
       const saved = saveProviderEndpoint(provider, endpoints[provider]);
       setEndpoints((current) => ({ ...current, [provider]: saved }));
-      setNotice(t("settings.endpointSaved"));
+      toast.success(t("settings.endpointSaved"));
     } catch {
-      setNotice(t("settings.invalidEndpoint"));
+      toast.error(t("settings.invalidEndpoint"));
+    }
+  };
+
+  const checkProvider = async (provider: string) => {
+    setBusyProvider(provider);
+    setNotice(undefined);
+    try {
+      await refreshProviders(provider);
+    } finally {
+      setBusyProvider(undefined);
     }
   };
 
@@ -153,9 +191,11 @@ export const ProviderSettings = memo(function ProviderSettings({
           >
             {t("settings.providersTitle")}
           </h2>
-          <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>
-            <X />
-          </Button>
+          <ActionTooltip label={t("common.close")} side="left">
+            <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>
+              <X />
+            </Button>
+          </ActionTooltip>
         </header>
 
         <div className="space-y-4 p-5">
@@ -168,7 +208,7 @@ export const ProviderSettings = memo(function ProviderSettings({
             </p>
           ) : null}
           <ProviderCard
-            icon={Terminal}
+            provider="codex"
             title={t("providers.codex.name")}
             badge={badgeFor("codex", t("settings.checking"))}
             action={
@@ -178,8 +218,9 @@ export const ProviderSettings = memo(function ProviderSettings({
             }
             busy={busyProvider === "codex"}
             onAction={() => {
-              if (providerStatus("codex")?.health.status === "ready") void refreshProviders();
-              else void connectCodex();
+              if (providerStatus("codex")?.health.status === "ready") {
+                void checkProvider("codex");
+              } else void connectCodex();
             }}
             ready={providerStatus("codex")?.health.status === "ready"}
           >
@@ -190,11 +231,35 @@ export const ProviderSettings = memo(function ProviderSettings({
             ) : null}
           </ProviderCard>
           <ProviderCard
-            icon={Cpu}
+            provider="anthropic"
+            title={t("providers.anthropic.name")}
+            badge={badgeFor("anthropic", t("settings.needsSetup"))}
+            action={
+              providerStatus("anthropic")?.health.status === "ready"
+                ? t("settings.checkConnection")
+                : t("settings.connect")
+            }
+            busy={busyProvider === "anthropic"}
+            onAction={() => {
+              if (providerStatus("anthropic")?.health.status === "ready") {
+                void checkProvider("anthropic");
+              } else void connectClaude();
+            }}
+            ready={providerStatus("anthropic")?.health.status === "ready"}
+          >
+            {loginOutput && busyProvider === "anthropic" ? (
+              <pre className="mt-3 max-h-28 overflow-auto whitespace-pre-wrap rounded-md bg-secondary/60 p-2 text-[10px] leading-4 text-muted-foreground">
+                {loginOutput}
+              </pre>
+            ) : null}
+          </ProviderCard>
+          <ProviderCard
+            provider="ollama"
             title={t("providers.ollama.name")}
             badge={badgeFor("ollama", t("settings.local"))}
             action={t("settings.testEndpoint")}
-            onAction={() => void refreshProviders()}
+            busy={busyProvider === "ollama"}
+            onAction={() => void checkProvider("ollama")}
             ready={providerStatus("ollama")?.health.status === "ready"}
           >
             <EndpointEditor
@@ -204,7 +269,7 @@ export const ProviderSettings = memo(function ProviderSettings({
             />
           </ProviderCard>
           <ProviderCard
-            icon={Cloud}
+            provider="openrouter"
             title={t("providers.openrouter.name")}
             badge={badgeFor("openrouter", t("settings.needsKey"))}
             action={t("settings.addKey")}
@@ -229,28 +294,6 @@ export const ProviderSettings = memo(function ProviderSettings({
               />
             ) : null}
           </ProviderCard>
-          <ProviderCard
-            icon={Sparkles}
-            title={t("providers.anthropic.name")}
-            badge={badgeFor("anthropic", t("settings.needsSetup"))}
-            action={
-              providerStatus("anthropic")?.health.status === "ready"
-                ? t("settings.checkConnection")
-                : t("settings.connect")
-            }
-            busy={busyProvider === "anthropic"}
-            onAction={() => {
-              if (providerStatus("anthropic")?.health.status === "ready") void refreshProviders();
-              else void connectClaude();
-            }}
-            ready={providerStatus("anthropic")?.health.status === "ready"}
-          >
-            {loginOutput && busyProvider === "anthropic" ? (
-              <pre className="mt-3 max-h-28 overflow-auto whitespace-pre-wrap rounded-md bg-secondary/60 p-2 text-[10px] leading-4 text-muted-foreground">
-                {loginOutput}
-              </pre>
-            ) : null}
-          </ProviderCard>
         </div>
       </section>
     </div>
@@ -258,7 +301,7 @@ export const ProviderSettings = memo(function ProviderSettings({
 });
 
 const ProviderCard = memo(function ProviderCard({
-  icon: Icon,
+  provider,
   title,
   badge,
   action,
@@ -267,7 +310,7 @@ const ProviderCard = memo(function ProviderCard({
   ready = false,
   children,
 }: {
-  icon: typeof Terminal;
+  provider: ProviderId;
   title: string;
   badge: string;
   action: string;
@@ -280,7 +323,7 @@ const ProviderCard = memo(function ProviderCard({
     <article className="rounded-lg border border-border bg-card p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-secondary">
-          <Icon className="size-4 text-primary" />
+          <ProviderIcon provider={provider} className="size-5 text-foreground" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">

@@ -4,14 +4,33 @@ import type { ChatBranch, ChatSummary, ProjectSummary } from "./conversation";
 
 const now = Date.now();
 
+export const demoWorkspace = {
+  id: "workspace-demo",
+  publicId: "workspace-demo",
+  name: "Richard's workspace",
+  storageMode: "local",
+} as const;
+
 export const demoProjects: ProjectSummary[] = [
-  { id: "project-probability", name: "Probability lab", color: "terracotta" },
-  { id: "project-writing", name: "Writing desk", color: "blue" },
+  {
+    id: "project-probability",
+    publicId: "project-probability",
+    name: "Probability lab",
+    color: "terracotta",
+  },
+  {
+    id: "project-writing",
+    publicId: "project-writing",
+    name: "Writing desk",
+    color: "blue",
+  },
 ];
 
 export const demoChats: ChatSummary[] = [
   {
     id: "chat-convergence",
+    publicId: "chat-convergence",
+    rootBranchPublicId: "branch-root",
     projectId: "project-probability",
     title: "Why simulations converge",
     updatedAt: now,
@@ -19,6 +38,8 @@ export const demoChats: ChatSummary[] = [
   },
   {
     id: "chat-bayesian",
+    publicId: "chat-bayesian",
+    rootBranchPublicId: "branch-root-chat-bayesian",
     projectId: "project-probability",
     title: "Bayesian priors, visually",
     updatedAt: now - 86_400_000,
@@ -26,6 +47,8 @@ export const demoChats: ChatSummary[] = [
   },
   {
     id: "chat-essay",
+    publicId: "chat-essay",
+    rootBranchPublicId: "branch-root-chat-essay",
     projectId: "project-writing",
     title: "Notes on useful uncertainty",
     updatedAt: now - 172_800_000,
@@ -33,6 +56,8 @@ export const demoChats: ChatSummary[] = [
   },
   {
     id: "chat-unfiled",
+    publicId: "chat-unfiled",
+    rootBranchPublicId: "branch-root-chat-unfiled",
     title: "A quick question about entropy",
     updatedAt: now - 259_200_000,
     branchCount: 1,
@@ -42,6 +67,7 @@ export const demoChats: ChatSummary[] = [
 export const demoBranches: ChatBranch[] = [
   {
     id: "branch-root",
+    publicId: "branch-root",
     title: "Main thread",
     depth: 0,
     createdAt: now - 420_000,
@@ -68,6 +94,7 @@ export const demoBranches: ChatBranch[] = [
   },
   {
     id: "branch-rate",
+    publicId: "branch-rate",
     parentBranchId: "branch-root",
     title: "The square-root rate",
     depth: 1,
@@ -101,6 +128,7 @@ export const demoBranches: ChatBranch[] = [
   },
   {
     id: "branch-variance",
+    publicId: "branch-variance",
     parentBranchId: "branch-root",
     title: "Variance reduction",
     depth: 1,
@@ -134,6 +162,7 @@ export const demoBranches: ChatBranch[] = [
   },
   {
     id: "branch-rare-events",
+    publicId: "branch-rare-events",
     parentBranchId: "branch-variance",
     title: "Rare-event failures",
     depth: 2,

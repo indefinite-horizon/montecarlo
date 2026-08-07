@@ -2,6 +2,7 @@
 
 import { useMutation, useQueries, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import type {
   BranchAnchor,
   ChatBranch,
@@ -9,6 +10,7 @@ import type {
   ChatSummary,
   ProjectSummary,
   ProviderId,
+  ReasoningEffort,
 } from "@/lib/conversation";
 import {
   domainApi,
@@ -83,18 +85,41 @@ function messageFromEnvelope(
   };
 }
 
-export function useConvexConversationData(requestedBranchId: string, hydrateAllBranches = false) {
+export function useConvexConversationData(
+  requestedBranchId: string,
+  hydrateAllBranches: boolean,
+  initialChatTitle: string,
+  persistenceErrorMessage: string,
+  requestedWorkspacePublicId?: string,
+  requestedChatPublicId?: string,
+  requestedBranchPublicId?: string,
+) {
   const me = useQuery(api.auth.me);
   const authenticated = me !== undefined && me !== null;
   const workspacePage = useQuery(
     domainApi.workspaces.list,
     authenticated ? { limit: 100 } : "skip",
   );
+  const routedWorkspace = useQuery(
+    domainApi.workspaces.getByPublicId,
+    authenticated && requestedWorkspacePublicId ? { publicId: requestedWorkspacePublicId } : "skip",
+  );
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>();
   const [selectedChatId, setSelectedChatId] = useState<string>();
-  const workspace = selectedWorkspaceId
-    ? workspacePage?.items.find((item) => String(item.id) === selectedWorkspaceId)
-    : workspacePage?.items[0];
+  const workspaceItems = useMemo(() => {
+    const items = workspacePage?.items ?? [];
+    if (!routedWorkspace || items.some((item) => item.id === routedWorkspace.id)) return items;
+    return [routedWorkspace, ...items];
+  }, [routedWorkspace, workspacePage]);
+  const workspace = requestedWorkspacePublicId
+    ? routedWorkspace === undefined
+      ? undefined
+      : (routedWorkspace ??
+        workspaceItems.find((item) => String(item.id) === selectedWorkspaceId) ??
+        workspaceItems[0])
+    : selectedWorkspaceId
+      ? workspaceItems.find((item) => String(item.id) === selectedWorkspaceId)
+      : workspaceItems[0];
   const projectPage = useQuery(
     domainApi.projects.list,
     workspace ? { workspaceId: workspace.id, limit: 100 } : "skip",
@@ -103,12 +128,44 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
     domainApi.chats.list,
     workspace ? { workspaceId: workspace.id, limit: 100 } : "skip",
   );
-  const chat = selectedChatId
-    ? chatPage?.items.find((item) => String(item.id) === selectedChatId)
-    : chatPage?.items[0];
+  const routedChatWorkspace = requestedWorkspacePublicId ? routedWorkspace : workspace;
+  const routedChat = useQuery(
+    domainApi.chats.getByPublicId,
+    routedChatWorkspace && requestedChatPublicId
+      ? { workspaceId: routedChatWorkspace.id, publicId: requestedChatPublicId }
+      : "skip",
+  );
+  const chatItems = useMemo(() => {
+    const items = chatPage?.items ?? [];
+    if (!routedChat || items.some((item) => item.id === routedChat.id)) return items;
+    return [routedChat, ...items];
+  }, [chatPage, routedChat]);
+  const chat =
+    requestedChatPublicId && routedChatWorkspace
+      ? routedChat === undefined
+        ? undefined
+        : (routedChat ??
+          chatItems.find((item) => String(item.id) === selectedChatId) ??
+          chatItems[0])
+      : selectedChatId
+        ? chatItems.find((item) => String(item.id) === selectedChatId)
+        : chatItems[0];
+  const activeProjectRecord = useQuery(
+    domainApi.projects.get,
+    workspace && chat?.projectId
+      ? { workspaceId: workspace.id, projectId: chat.projectId }
+      : "skip",
+  );
   const tree = useQuery(
     domainApi.chats.getTree,
-    workspace && chat ? { workspaceId: workspace.id, chatId: chat.id, limit: 500 } : "skip",
+    workspace && chat
+      ? {
+          workspaceId: workspace.id,
+          chatId: chat.id,
+          limit: 500,
+          targetBranchPublicId: requestedBranchPublicId,
+        }
+      : "skip",
   );
 
   const activeLineage = useMemo(
@@ -199,25 +256,35 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
     return () => controller.abort();
   }, [messageSummaries]);
 
+  const projectItems = useMemo(() => {
+    const items = projectPage?.items ?? [];
+    if (!activeProjectRecord || items.some((item) => item.id === activeProjectRecord.id)) {
+      return items;
+    }
+    return [activeProjectRecord, ...items];
+  }, [activeProjectRecord, projectPage]);
   const projects = useMemo<ProjectSummary[]>(
     () =>
-      projectPage?.items.map((project, index) => ({
+      projectItems.map((project, index) => ({
         id: String(project.id),
+        publicId: project.publicId,
         name: project.name,
         color: PROJECT_COLORS[index % PROJECT_COLORS.length] ?? "terracotta",
-      })) ?? [],
-    [projectPage],
+      })),
+    [projectItems],
   );
   const chats = useMemo<ChatSummary[]>(
     () =>
-      chatPage?.items.map((item) => ({
+      chatItems.map((item) => ({
         id: String(item.id),
+        publicId: item.publicId,
+        rootBranchPublicId: item.rootBranchPublicId,
         projectId: item.projectId ? String(item.projectId) : undefined,
         title: item.title,
         updatedAt: item.updatedAt,
         branchCount: item.id === chat?.id && tree ? tree.branches.length : 1,
-      })) ?? [],
-    [chat?.id, chatPage, tree],
+      })),
+    [chat?.id, chatItems, tree],
   );
   const branches = useMemo<ChatBranch[]>(() => {
     if (!tree) return [];
@@ -228,6 +295,7 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
         page?.items.map((message) => messageFromEnvelope(message, hydratedContent)) ?? [];
       return {
         id: String(branch.id),
+        publicId: branch.publicId,
         parentBranchId: branch.parentBranchId ? String(branch.parentBranchId) : undefined,
         contextMessageIds: branch.contextMessageIds.map(String),
         title: titleForBranch(branch, tree.chat.title),
@@ -253,12 +321,104 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
   const createWorkspaceMutation = useMutation(domainApi.workspaces.create);
   const createProjectMutation = useMutation(domainApi.projects.create);
   const createChatMutation = useMutation(domainApi.chats.create);
+  const claimAutoTitleMutation = useMutation(domainApi.chats.claimAutoTitle);
+  const releaseAutoTitleMutation = useMutation(domainApi.chats.releaseAutoTitle);
+  const completeAutoTitleMutation = useMutation(domainApi.chats.completeAutoTitle);
+  const ensureInitialChatMutation = useMutation(domainApi.chats.ensureInitial);
   const createBranchMutation = useMutation(domainApi.branches.create);
   const reserveBlobMutation = useMutation(domainApi.blobManifests.reserve);
   const markBlobAvailableMutation = useMutation(domainApi.blobManifests.markAvailable);
   const appendMessageMutation = useMutation(domainApi.messages.append);
   const createRunMutation = useMutation(domainApi.runs.create);
   const completeRunMutation = useMutation(domainApi.runs.complete);
+  const bootstrapAttemptsRef = useRef(new Set<string>());
+  const bootstrapFailuresRef = useRef(new Map<string, number>());
+  const bootstrapRetryTimersRef = useRef(new Map<string, number>());
+  const activeWorkspaceIdRef = useRef<string>();
+  const [bootstrappingWorkspaceId, setBootstrappingWorkspaceId] = useState<string>();
+  const [bootstrapRetryNonce, setBootstrapRetryNonce] = useState(0);
+  activeWorkspaceIdRef.current = workspace ? String(workspace.id) : undefined;
+
+  const selectWorkspace = useCallback(
+    async (workspaceId: string) => {
+      const targetWorkspace = workspaceItems.find((item) => String(item.id) === workspaceId);
+      if (!targetWorkspace) return null;
+      const targetChat = await ensureInitialChatMutation({
+        workspaceId: targetWorkspace.id,
+        title: initialChatTitle,
+        autoTitle: true,
+      });
+      setSelectedWorkspaceId(workspaceId);
+      setSelectedChatId(String(targetChat.id));
+      return {
+        workspacePublicId: targetWorkspace.publicId,
+        chatPublicId: targetChat.publicId,
+        branchPublicId: targetChat.rootBranchPublicId,
+      };
+    },
+    [ensureInitialChatMutation, initialChatTitle, workspaceItems],
+  );
+
+  // lint-allow: no-direct-use-effect — clear pending repair retries on unmount.
+  useEffect(
+    () => () => {
+      for (const timer of bootstrapRetryTimersRef.current.values()) window.clearTimeout(timer);
+      bootstrapRetryTimersRef.current.clear();
+    },
+    [],
+  );
+
+  // lint-allow: no-direct-use-effect — repair legacy/partial workspaces that have no initial chat.
+  useEffect(() => {
+    if (!workspace || chatPage === undefined) return;
+    const workspaceId = String(workspace.id);
+    if ((bootstrapFailuresRef.current.get(workspaceId) ?? 0) > bootstrapRetryNonce) return;
+    if (chatPage.items.length > 0) return;
+    if (bootstrapAttemptsRef.current.has(workspaceId)) return;
+    bootstrapAttemptsRef.current.add(workspaceId);
+    setBootstrappingWorkspaceId(workspaceId);
+    void ensureInitialChatMutation({
+      workspaceId: workspace.id,
+      title: initialChatTitle,
+      autoTitle: true,
+    })
+      .then((createdChat) => {
+        bootstrapFailuresRef.current.delete(workspaceId);
+        const retryTimer = bootstrapRetryTimersRef.current.get(workspaceId);
+        if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+        bootstrapRetryTimersRef.current.delete(workspaceId);
+        if (activeWorkspaceIdRef.current === workspaceId) {
+          setSelectedChatId(String(createdChat.id));
+        }
+      })
+      .catch(() => {
+        bootstrapAttemptsRef.current.delete(workspaceId);
+        const failures = (bootstrapFailuresRef.current.get(workspaceId) ?? 0) + 1;
+        bootstrapFailuresRef.current.set(workspaceId, failures);
+        if (
+          failures < sharedConfig.workspaceBootstrap.maxAttempts &&
+          activeWorkspaceIdRef.current === workspaceId
+        ) {
+          const timer = window.setTimeout(() => {
+            bootstrapRetryTimersRef.current.delete(workspaceId);
+            setBootstrapRetryNonce((current) => current + 1);
+          }, sharedConfig.workspaceBootstrap.retryDelayMs * failures);
+          bootstrapRetryTimersRef.current.set(workspaceId, timer);
+        } else if (activeWorkspaceIdRef.current === workspaceId) {
+          toast.error(persistenceErrorMessage);
+        }
+      })
+      .finally(() => {
+        setBootstrappingWorkspaceId((current) => (current === workspaceId ? undefined : current));
+      });
+  }, [
+    bootstrapRetryNonce,
+    chatPage,
+    ensureInitialChatMutation,
+    initialChatTitle,
+    persistenceErrorMessage,
+    workspace,
+  ]);
 
   const createWorkspace = useCallback(
     async (input: { name: string; storageMode: "local" | "cloud"; initialChatTitle: string }) => {
@@ -267,15 +427,16 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
         name: input.name,
         storageMode: input.storageMode,
       });
-      const createdChat = await createChatMutation({
+      const createdChat = await ensureInitialChatMutation({
         workspaceId: createdWorkspace.id,
         title: input.initialChatTitle,
+        autoTitle: true,
       });
       setSelectedWorkspaceId(String(createdWorkspace.id));
       setSelectedChatId(String(createdChat.id));
       return { workspace: createdWorkspace, chat: createdChat };
     },
-    [authenticated, createChatMutation, createWorkspaceMutation],
+    [authenticated, createWorkspaceMutation, ensureInitialChatMutation],
   );
 
   const createProject = useCallback(
@@ -293,6 +454,7 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
         workspaceId: workspace.id,
         projectId: projectId ? (projectId as Id<"projects">) : undefined,
         title,
+        autoTitle: true,
       });
       setSelectedChatId(String(created.id));
       return created;
@@ -324,6 +486,45 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
       });
     },
     [chat, createBranchMutation, workspace],
+  );
+
+  const claimAutoTitle = useCallback(
+    async (chatId: string, claimToken: string, provider?: ProviderId, model?: string) => {
+      if (!workspace) return null;
+      return claimAutoTitleMutation({
+        workspaceId: workspace.id,
+        chatId: chatId as Id<"chats">,
+        claimToken,
+        provider,
+        model,
+      });
+    },
+    [claimAutoTitleMutation, workspace],
+  );
+
+  const releaseAutoTitle = useCallback(
+    async (chatId: string, claimToken: string) => {
+      if (!workspace) return false;
+      return releaseAutoTitleMutation({
+        workspaceId: workspace.id,
+        chatId: chatId as Id<"chats">,
+        claimToken,
+      });
+    },
+    [releaseAutoTitleMutation, workspace],
+  );
+
+  const completeAutoTitle = useCallback(
+    async (chatId: string, claimToken: string, title: string) => {
+      if (!workspace) return false;
+      return completeAutoTitleMutation({
+        workspaceId: workspace.id,
+        chatId: chatId as Id<"chats">,
+        claimToken,
+        title,
+      });
+    },
+    [completeAutoTitleMutation, workspace],
   );
 
   const persistMessage = useCallback(
@@ -388,6 +589,8 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
       provider: ProviderId;
       model: string;
       inputMessageId?: Id<"messages">;
+      reasoningEffort: ReasoningEffort;
+      fastMode: boolean;
     }): Promise<RunItem | null> => {
       if (!workspace || !chat) return null;
       return createRunMutation({
@@ -398,6 +601,8 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
         runtime: input.provider === "codex" ? "harness" : "model",
         provider: input.provider,
         model: input.model,
+        reasoningEffort: input.reasoningEffort,
+        fastMode: input.fastMode,
       });
     },
     [chat, createRunMutation, workspace],
@@ -447,9 +652,11 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
   return {
     activeBranchId,
     activeChat: chat,
-    activeProject: projectPage?.items.find((project) => project.id === chat?.projectId),
+    activeProject: projectItems.find((project) => project.id === chat?.projectId),
     authenticated,
     branches,
+    claimAutoTitle,
+    completeAutoTitle,
     chats,
     completeRun,
     createBranch,
@@ -464,17 +671,19 @@ export function useConvexConversationData(requestedBranchId: string, hydrateAllB
     loading:
       me === undefined ||
       (authenticated && workspacePage === undefined) ||
+      Boolean(authenticated && requestedWorkspacePublicId && routedWorkspace === undefined) ||
+      Boolean(routedChatWorkspace && requestedChatPublicId && routedChat === undefined) ||
       Boolean(workspace && (projectPage === undefined || chatPage === undefined)) ||
+      Boolean(workspace && chat?.projectId && activeProjectRecord === undefined) ||
+      Boolean(workspace && bootstrappingWorkspaceId === String(workspace.id)) ||
       Boolean(chat && tree === undefined) ||
       messagePagesLoading,
     persistMessage,
     projects,
+    releaseAutoTitle,
     selectChat: setSelectedChatId,
-    selectWorkspace: (workspaceId: string) => {
-      setSelectedWorkspaceId(workspaceId);
-      setSelectedChatId(undefined);
-    },
+    selectWorkspace,
     workspace: workspace as WorkspaceItem | undefined,
-    workspaces: workspacePage?.items ?? [],
+    workspaces: workspaceItems,
   };
 }

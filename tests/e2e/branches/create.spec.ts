@@ -1,7 +1,7 @@
 /** Prompt, selection, and nested branch creation semantics. */
 
 import { expect, test } from "@playwright/test";
-import { installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
+import { conversationRequests, installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
 import {
   assistantMessage,
   createPromptBranch,
@@ -38,7 +38,7 @@ test("prompt-only branch leaves its parent transcript unchanged", async ({ page 
   await createPromptBranch(page, "Child-only direction");
   await expect(userMessage(page, "Child-only direction")).toBeVisible();
 
-  await page.getByRole("button", { name: "New conversation", exact: true }).last().click();
+  await page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]').click();
   await expect(userMessage(page, "Parent-only turn")).toBeVisible();
   await expect(userMessage(page, "Child-only direction")).toHaveCount(0);
 });
@@ -57,7 +57,7 @@ test("branches from selected assistant text without requiring a prompt", async (
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(page.getByText("Following a branch from", { exact: true })).toBeVisible();
   await expect(page.getByText("“selectable passage”", { exact: true })).toBeVisible();
-  expect(runtime.chatRequests).toHaveLength(1);
+  expect(conversationRequests(runtime)).toHaveLength(1);
 });
 
 test("selection branch with a prompt sends selection provenance in normalized context", async ({
@@ -75,7 +75,7 @@ test("selection branch with a prompt sends selection provenance in normalized co
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(assistantMessage(page, "Stub response: Explain the tradeoff")).toBeVisible();
 
-  const request = runtime.chatRequests.at(-1);
+  const request = conversationRequests(runtime).at(-1);
   expect(request?.messages.some(({ content }) => content.includes("control variates"))).toBe(true);
   expect(request?.messages.at(-1)).toEqual({ role: "user", content: "Explain the tradeoff" });
 });

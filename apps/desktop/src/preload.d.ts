@@ -9,6 +9,8 @@ export interface MonteCarloDesktopBridge {
   saveProviderSecret(provider: DesktopProviderSecretId, secret: string): void;
   onSwitchWorkspace(callback: (index: number) => void): void;
   offSwitchWorkspace(callback: (index: number) => void): void;
+  onNewChat(callback: () => void): void;
+  offNewChat(callback: () => void): void;
 }
 
 declare global {

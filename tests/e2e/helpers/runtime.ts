@@ -8,11 +8,17 @@ export type RuntimeChatRequest = {
   model: string;
   messages: Array<{ role: string; content: string }>;
   connection?: { baseURL?: string };
+  options?: {
+    reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh" | "max";
+    fastMode?: boolean;
+  };
 };
 
 export type RuntimeMock = {
   chatRequests: RuntimeChatRequest[];
   blobs: Map<string, Buffer>;
+  blobBackends: Map<string, "filesystem" | "r2">;
+  blobReads: Array<{ objectKey: string; backend: "filesystem" | "r2" }>;
 };
 
 const runtimeOrigin = new URL(process.env.VITE_RUNTIME_URL ?? "http://127.0.0.1:4242").origin;
@@ -44,11 +50,32 @@ function latestPrompt(input: RuntimeChatRequest): string {
 }
 
 function responseText(prompt: string): string {
+  if (isChatTitlePrompt(prompt)) {
+    const encodedIntent = prompt.match(/<user_intent>(.+)<\/user_intent>/u)?.[1];
+    if (!encodedIntent) return "Generated Chat Title";
+    try {
+      return String(JSON.parse(encodedIntent)).trim().split(/\s+/u).slice(0, 7).join(" ");
+    } catch {
+      return "Generated Chat Title";
+    }
+  }
   const markerStart = prompt.indexOf("[reply:");
   const markerEnd = markerStart >= 0 ? prompt.indexOf("]", markerStart) : -1;
   const marker = markerEnd > markerStart ? prompt.slice(markerStart + 7, markerEnd) : undefined;
   const visiblePrompt = prompt.replaceAll("[e2e:slow]", "").replaceAll("[e2e:error]", "").trim();
   return marker ?? `Stub response: ${visiblePrompt}`;
+}
+
+export function isChatTitlePrompt(prompt: string): boolean {
+  return prompt.startsWith("Create a concise chat name that captures the user's intent.");
+}
+
+export function conversationRequests(state: RuntimeMock): RuntimeChatRequest[] {
+  return state.chatRequests.filter((request) => !isChatTitlePrompt(latestPrompt(request)));
+}
+
+export function titleRequests(state: RuntimeMock): RuntimeChatRequest[] {
+  return state.chatRequests.filter((request) => isChatTitlePrompt(latestPrompt(request)));
 }
 
 async function handleChat(route: Route, request: Request, state: RuntimeMock) {
@@ -100,6 +127,10 @@ async function handlePutBlob(
   const envelopeVersion = Number(headers["x-monte-carlo-envelope-version"]);
   const sha256 = headers["x-monte-carlo-sha256"];
   const manifestId = headers["x-monte-carlo-manifest-id"];
+  if (backend !== "filesystem" && backend !== "r2") {
+    await json(route, { error: "invalid storage backend" }, 400);
+    return;
+  }
   const payload = [
     manifestId,
     backend,
@@ -119,6 +150,7 @@ async function handlePutBlob(
     dsaEncoding: "ieee-p1363",
   }).toString("base64url");
   state.blobs.set(objectKey, body);
+  state.blobBackends.set(objectKey, backend);
   await json(route, {
     manifest: {
       version: 1,
@@ -148,11 +180,30 @@ async function handleRuntimeRoute(route: Route, state: RuntimeMock) {
     await json(route, {
       providers: [
         runtimeProvider("codex", "local-subscription", "ready"),
-        runtimeProvider("ollama", "none", "ready"),
-        runtimeProvider("openrouter", "api-key", "needs-configuration"),
         runtimeProvider("anthropic", "local-subscription", "ready"),
+        runtimeProvider("ollama", "none", "ready"),
+        runtimeProvider("openrouter", "api-key", "ready"),
       ],
     });
+    return;
+  }
+  if (url.pathname === "/v1/models" && request.method() === "POST") {
+    const provider = (request.postDataJSON() as { provider: RuntimeChatRequest["provider"] })
+      .provider;
+    const models = {
+      codex: [
+        {
+          id: "e2e-codex",
+          displayName: "E2E Codex",
+          reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+          supportsFastMode: true,
+        },
+      ],
+      anthropic: [{ id: "e2e-claude", displayName: "E2E Claude" }],
+      ollama: [{ id: "e2e-ollama", displayName: "E2E Ollama" }],
+      openrouter: [],
+    }[provider];
+    await json(route, { provider, models, source: "cli", fetchedAt: Date.now() });
     return;
   }
   if (url.pathname.startsWith("/v1/auth/anthropic/")) {
@@ -167,16 +218,23 @@ async function handleRuntimeRoute(route: Route, state: RuntimeMock) {
       return;
     }
     const body = state.blobs.get(objectKey);
-    if (!body) {
+    const backend = state.blobBackends.get(objectKey);
+    if (!body || !backend) {
       await json(route, { error: "not found" }, 404);
       return;
     }
+    if (request.headers()["x-monte-carlo-storage-backend"] !== backend) {
+      await json(route, { error: "storage backend mismatch" }, 409);
+      return;
+    }
+    state.blobReads.push({ objectKey, backend });
     await route.fulfill({
       status: 200,
       headers: {
         ...corsHeaders(envelopeContentType),
         "x-monte-carlo-envelope-version": "1",
         "x-monte-carlo-sha256": objectKey.split("/").at(-1) ?? "",
+        "x-monte-carlo-storage-backend": backend,
       },
       body,
     });
@@ -201,7 +259,12 @@ function runtimeProvider(
 }
 
 export async function installRuntimeMock(context: BrowserContext): Promise<RuntimeMock> {
-  const state: RuntimeMock = { chatRequests: [], blobs: new Map() };
+  const state: RuntimeMock = {
+    chatRequests: [],
+    blobs: new Map(),
+    blobBackends: new Map(),
+    blobReads: [],
+  };
   await context.route(runtimePattern, (route) => handleRuntimeRoute(route, state));
   return state;
 }

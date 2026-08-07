@@ -40,4 +40,15 @@ describe("desktop integration contracts", () => {
     assert.match(preloadSource, /ipcRenderer\.send\("provider-secret:save"/);
     assert.doesNotMatch(preloadSource, /ipcRenderer\.invoke\("provider-secret/);
   });
+
+  it("forwards the platform new-chat shortcut without opening a browser window", () => {
+    assert.match(mainSource, /process\.platform === "darwin"/);
+    assert.match(mainSource, /input\.meta && !input\.control/);
+    assert.match(mainSource, /input\.control && !input\.meta/);
+    assert.match(mainSource, /!input\.isAutoRepeat/);
+    assert.match(mainSource, /input\.key\.toLowerCase\(\) === "n"/);
+    assert.match(mainSource, /window\.webContents\.send\("new-chat"\)/);
+    assert.match(preloadSource, /ipcRenderer\.on\("new-chat"/);
+    assert.match(preloadSource, /ipcRenderer\.removeListener\("new-chat"/);
+  });
 });

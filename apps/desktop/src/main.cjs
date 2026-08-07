@@ -279,8 +279,22 @@ function createWindow() {
     if (!isTrustedRendererUrl(url)) event.preventDefault();
   });
   window.webContents.on("before-input-event", (event, input) => {
+    const primaryModifier =
+      process.platform === "darwin" ? input.meta && !input.control : input.control && !input.meta;
     if (
-      (input.meta || input.control) &&
+      primaryModifier &&
+      !input.alt &&
+      !input.shift &&
+      input.type === "keyDown" &&
+      !input.isAutoRepeat &&
+      input.key.toLowerCase() === "n"
+    ) {
+      window.webContents.send("new-chat");
+      event.preventDefault();
+      return;
+    }
+    if (
+      primaryModifier &&
       !input.alt &&
       !input.shift &&
       input.type === "keyDown" &&

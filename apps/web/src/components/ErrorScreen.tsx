@@ -33,7 +33,11 @@ export const ErrorScreen = memo(function ErrorScreen({ error, onReturn }: ErrorS
       onReturn();
       return;
     }
-    void navigate({ to: "/", replace: true });
+    void navigate({
+      to: "/",
+      replace: true,
+      search: { workspace: undefined, chat: undefined, branch: undefined, view: "thread" },
+    });
   }, [navigate, onReturn]);
 
   return (

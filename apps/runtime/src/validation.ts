@@ -4,7 +4,12 @@ import type { IncomingMessage } from "node:http";
 import { z } from "zod";
 import { runtimeDefaults } from "./config.js";
 import { HttpError } from "./errors.js";
-import { type ChatRequest, providerIds } from "./types.js";
+import {
+  type ChatRequest,
+  type ModelCatalogRequest,
+  providerIds,
+  reasoningEfforts,
+} from "./types.js";
 
 const messageSchema = z.object({
   role: z.enum(["system", "user", "assistant"]),
@@ -28,6 +33,8 @@ const chatRequestSchema = z
       .object({
         maxOutputTokens: z.number().int().min(1).max(65_536).optional(),
         temperature: z.number().min(0).max(2).optional(),
+        reasoningEffort: z.enum(reasoningEfforts).optional(),
+        fastMode: z.boolean().optional(),
       })
       .strict()
       .optional(),
@@ -74,6 +81,36 @@ const chatRequestSchema = z
 
 export function parseChatRequest(value: unknown): ChatRequest {
   const result = chatRequestSchema.safeParse(value);
+  if (!result.success) {
+    throw new HttpError(
+      400,
+      "invalid_request",
+      result.error.issues[0]?.message ?? "Invalid request.",
+    );
+  }
+  return result.data;
+}
+
+const modelCatalogRequestSchema = z
+  .object({
+    provider: z.enum(providerIds),
+    connection: z
+      .object({ baseURL: z.string().trim().min(1).max(2_048).optional() })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.provider !== "ollama" && input.connection?.baseURL !== undefined) {
+      context.addIssue({
+        code: "custom",
+        message: `${input.provider} does not accept a base URL for model discovery.`,
+      });
+    }
+  });
+
+export function parseModelCatalogRequest(value: unknown): ModelCatalogRequest {
+  const result = modelCatalogRequestSchema.safeParse(value);
   if (!result.success) {
     throw new HttpError(
       400,

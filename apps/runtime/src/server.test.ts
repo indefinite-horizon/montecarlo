@@ -203,6 +203,41 @@ describe("RuntimeServer", () => {
     ]);
   });
 
+  it("returns a normalized model catalog from providers that support discovery", async () => {
+    const runner = mockRunner({
+      descriptor: {
+        id: "ollama",
+        name: "Mock Ollama",
+        auth: "none",
+        available: true,
+        description: "Mock provider",
+      },
+      listModels: (_connection) =>
+        Promise.resolve({
+          provider: "ollama",
+          models: [{ id: "qwen:test", displayName: "qwen:test" }],
+          source: "endpoint",
+          fetchedAt: 1,
+        }),
+    });
+    const { baseURL } = await start([runner]);
+    const response = await fetch(`${baseURL}/v1/models`, {
+      method: "POST",
+      headers: { ...requestHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "ollama",
+        connection: { baseURL: "http://127.0.0.1:11434/v1" },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      provider: "ollama",
+      models: [{ id: "qwen:test" }],
+      source: "endpoint",
+    });
+  });
+
   it("streams provider-neutral SSE events and redacts request credentials", async () => {
     const secret = "sk-secret-value-that-must-not-leak";
     const runner = mockRunner({

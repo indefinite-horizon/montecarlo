@@ -15,7 +15,7 @@ const MESSAGE_ROLES = new Set(["system", "user", "assistant", "tool"]);
 const MESSAGE_STATUSES = new Set(["streaming", "complete", "failed", "cancelled"]);
 const RUN_STATUSES = new Set(["queued", "running", "complete", "failed", "cancelled"]);
 const RUNTIME_PROVIDERS = new Set(["codex", "anthropic", "openrouter", "ollama"]);
-const REASONING_EFFORTS = new Set(["none", "low", "medium", "high"]);
+const REASONING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
 const REASONING_STATES = new Set(["streaming", "complete"]);
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
@@ -352,6 +352,7 @@ function validateRun(value: unknown, path: string, issues: PortableValidationIss
       if (settings.reasoningEffort !== undefined) {
         requireEnum(settings, "reasoningEffort", REASONING_EFFORTS, `${path}.settings`, issues);
       }
+      optionalBoolean(settings, "fastMode", `${path}.settings`, issues);
     }
   }
   if (record.usage !== undefined) validateTokenUsage(record.usage, `${path}.usage`, issues);

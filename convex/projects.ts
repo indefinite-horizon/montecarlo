@@ -17,6 +17,29 @@ const projectSummaryValidator = v.object({
   updatedAt: v.number(),
 });
 
+export const get = query({
+  args: {
+    workspaceId: v.id("workspaces"),
+    projectId: v.id("projects"),
+  },
+  returns: v.union(projectSummaryValidator, v.null()),
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.workspaceId !== args.workspaceId) return null;
+    return {
+      id: project._id,
+      publicId: project.publicId,
+      workspaceId: project.workspaceId,
+      name: project.name,
+      description: project.description,
+      archivedAt: project.archivedAt,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+    };
+  },
+});
+
 export const list = query({
   args: {
     workspaceId: v.id("workspaces"),

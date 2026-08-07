@@ -6,6 +6,11 @@
  */
 
 export const sharedConfig = {
+  chatNaming: {
+    maxGeneratedWords: 7,
+    maxRecoveryAttempts: 3,
+    retryPollMs: 30_000,
+  },
   dev: {
     defaultAuthUser: {
       email: "test@test.local",
@@ -16,5 +21,9 @@ export const sharedConfig = {
     limits: {
       contentPreviewLength: 1_000,
     },
+  },
+  workspaceBootstrap: {
+    maxAttempts: 3,
+    retryDelayMs: 750,
   },
 } as const;

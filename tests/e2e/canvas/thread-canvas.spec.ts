@@ -1,7 +1,7 @@
 /** Canvas rendering, ancestry highlighting, and in-canvas follow-up journeys. */
 
 import { expect, type Page, test } from "@playwright/test";
-import { installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
+import { conversationRequests, installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
 import { captureScreenshot } from "../helpers/screenshots";
 import {
   assistantMessage,
@@ -46,6 +46,9 @@ test("toggles a populated multi-turn DAG and highlights the hovered ancestry", a
     "Explain Monte Carlo variance",
     "Stub response: Explain Monte Carlo variance",
   );
+  await expect(page.getByTestId("chat-breadcrumb-title")).toHaveText(
+    "Explain Monte Carlo variance",
+  );
   await createBranchAndWait(page, "Control variates path");
   await sendMessage(
     page,
@@ -54,7 +57,11 @@ test("toggles a populated multi-turn DAG and highlights the hovered ancestry", a
   );
   await createBranchAndWait(page, "Failure assumptions");
 
-  await page.getByRole("button", { name: "New conversation", exact: true }).last().click();
+  await page
+    .getByRole("complementary")
+    .last()
+    .getByRole("button", { name: "Explain Monte Carlo variance", exact: true })
+    .click();
   await createBranchAndWait(page, "Stratification path");
 
   await openCanvas(page);
@@ -64,7 +71,7 @@ test("toggles a populated multi-turn DAG and highlights the hovered ancestry", a
   await expect(canvas.getByRole("button", { name: "Zoom out" })).toBeVisible();
   await expect(canvas.getByRole("button", { name: "Fit canvas to view" })).toBeVisible();
 
-  const root = canvasCard(page, "New conversation");
+  const root = canvasCard(page, "Explain Monte Carlo variance");
   const controlVariates = canvasCard(page, "Control variates path");
   const failureAssumptions = canvasCard(page, "Failure assumptions");
   const stratification = canvasCard(page, "Stratification path");
@@ -92,7 +99,9 @@ test("toggles a populated multi-turn DAG and highlights the hovered ancestry", a
   await threadToggle.click();
   await expect(threadToggle).toHaveAttribute("aria-pressed", "true");
   await expect(canvas).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Stratification path" })).toBeVisible();
+  await expect(page.getByTestId("chat-breadcrumb-title")).toHaveText(
+    "Explain Monte Carlo variance",
+  );
   await expect(userMessage(page, "Stratification path")).toBeVisible();
 });
 
@@ -132,8 +141,8 @@ test("creates a selected-text follow-up and shows its loading and completed stat
   await expect(canvas.getByTestId("canvas-branch-node")).toHaveCount(2);
   await expect(canvas.getByTestId("canvas-edge")).toHaveCount(1);
 
-  expect(runtime.chatRequests).toHaveLength(2);
-  const request = runtime.chatRequests.at(-1);
+  expect(conversationRequests(runtime)).toHaveLength(2);
+  const request = conversationRequests(runtime).at(-1);
   expect(request?.messages.some(({ content }) => content.includes("control variates"))).toBe(true);
   expect(request?.messages.at(-1)).toEqual({ role: "user", content: prompt });
   await captureScreenshot(page, testInfo, "canvas-branch-complete");

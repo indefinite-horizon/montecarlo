@@ -1,10 +1,11 @@
 /** Displays the chat's branch DAG and switches the active line of inquiry. */
 
-import { GitBranch, PanelRightClose, Plus } from "lucide-react";
+import { GitBranch, PanelRight, Plus } from "lucide-react";
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatBranch } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
+import { ActionTooltip } from "./ActionTooltip";
 import { Button } from "./ui/button";
 
 export const BranchMap = memo(function BranchMap({
@@ -25,13 +26,24 @@ export const BranchMap = memo(function BranchMap({
   const { t } = useTranslation();
   if (!open) return null;
   return (
-    <aside className="branch-map-grid fixed inset-y-0 right-0 z-50 flex h-screen w-[304px] max-w-[88vw] shrink-0 flex-col border-l border-border bg-card shadow-xl xl:relative xl:z-auto xl:bg-card/55 xl:shadow-none">
-      <header className="flex h-16 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
+    <aside
+      aria-label={t("branch.mapTitle")}
+      className="branch-map-grid fixed inset-y-0 right-0 z-50 flex h-screen w-[304px] max-w-[88vw] shrink-0 flex-col border-l border-border bg-card shadow-xl xl:relative xl:z-auto xl:bg-card/55 xl:shadow-none"
+    >
+      <header className="flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:px-5">
         <GitBranch className="size-4 text-primary" />
         <h2 className="min-w-0 flex-1 text-xs font-semibold">{t("branch.mapTitle")}</h2>
-        <Button size="icon" variant="ghost" aria-label={t("branch.closeMap")} onClick={onClose}>
-          <PanelRightClose />
-        </Button>
+        <ActionTooltip label={t("branch.closeMap")} side="left">
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("branch.closeMap")}
+            aria-expanded={true}
+            onClick={onClose}
+          >
+            <PanelRight />
+          </Button>
+        </ActionTooltip>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -50,6 +62,8 @@ export const BranchMap = memo(function BranchMap({
               ) : null}
               <button
                 type="button"
+                data-testid="branch-map-row"
+                data-branch-depth={branch.depth}
                 className={cn(
                   "relative w-full rounded-lg border bg-card px-3 py-2.5 text-left shadow-sm transition-all hover:-translate-y-px hover:shadow-md",
                   branch.id === activeBranchId

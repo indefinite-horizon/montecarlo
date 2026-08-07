@@ -2,7 +2,15 @@
 
 import { type ChildProcess, type ChildProcessByStdio, spawn } from "node:child_process";
 import type { Readable } from "node:stream";
-import { Codex, type ThreadEvent, type ThreadItem, type Usage } from "@openai/codex-sdk";
+import {
+  Codex,
+  type CodexOptions,
+  type ModelReasoningEffort,
+  type ThreadEvent,
+  type ThreadItem,
+  type ThreadOptions,
+  type Usage,
+} from "@openai/codex-sdk";
 import { AsyncQueue } from "../asyncQueue.js";
 import { runtimeDefaults } from "../config.js";
 import { sanitizeProcessOutput } from "../errors.js";
@@ -12,6 +20,9 @@ import type {
   ChatRequest,
   LocalAuthRunner,
   ProviderHealth,
+  ProviderModel,
+  ProviderModelCatalog,
+  ReasoningEffort,
   RunnerEvent,
   TokenUsage,
 } from "../types.js";
@@ -22,6 +33,15 @@ type ProcessEvent =
   | { type: "failure"; error: Error };
 
 type CapturedChild = ChildProcessByStdio<null, Readable, Readable>;
+
+type CodexCatalogModel = {
+  slug?: unknown;
+  display_name?: unknown;
+  description?: unknown;
+  visibility?: unknown;
+  supported_reasoning_levels?: unknown;
+  additional_speed_tiers?: unknown;
+};
 
 function abortError(): Error {
   const error = new Error("The operation was cancelled.");
@@ -117,6 +137,86 @@ function streamProcess(
   };
 }
 
+export function normalizeCodexModelCatalog(value: unknown): ProviderModel[] {
+  if (typeof value !== "object" || value === null) return [];
+  const models = (value as { models?: unknown }).models;
+  if (!Array.isArray(models)) return [];
+  return models.flatMap((candidate) => {
+    if (typeof candidate !== "object" || candidate === null) return [];
+    const model = candidate as CodexCatalogModel;
+    if (typeof model.slug !== "string" || model.visibility !== "list") return [];
+    const reasoningEfforts: ReasoningEffort[] | undefined = Array.isArray(
+      model.supported_reasoning_levels,
+    )
+      ? model.supported_reasoning_levels.flatMap((level) => {
+          if (typeof level !== "object" || level === null) return [];
+          const effort = (level as { effort?: unknown }).effort;
+          return effort === "none" ||
+            effort === "minimal" ||
+            effort === "low" ||
+            effort === "medium" ||
+            effort === "high" ||
+            effort === "xhigh" ||
+            effort === "max"
+            ? [effort]
+            : [];
+        })
+      : undefined;
+    return [
+      {
+        id: model.slug,
+        displayName: typeof model.display_name === "string" ? model.display_name : model.slug,
+        description: typeof model.description === "string" ? model.description : undefined,
+        reasoningEfforts,
+        supportsFastMode:
+          Array.isArray(model.additional_speed_tiers) &&
+          model.additional_speed_tiers.includes("fast"),
+      },
+    ];
+  });
+}
+
+async function readCodexModelCatalog(
+  executable: string,
+  signal?: AbortSignal,
+): Promise<ProviderModel[]> {
+  signal?.throwIfAborted();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), runtimeDefaults.providerHealthTimeoutMs);
+  timeout.unref();
+  const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  try {
+    const child = spawn(executable, ["debug", "models"], {
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    const exit = new Promise<number | null>((resolve, reject) => {
+      child.once("error", reject);
+      child.once("close", resolve);
+    });
+    const onAbort = () => terminateProcess(child);
+    combinedSignal.addEventListener("abort", onAbort, { once: true });
+    child.stdout.on("data", (chunk: Buffer) => {
+      bytes += chunk.byteLength;
+      if (bytes > runtimeDefaults.maxRequestBytes) {
+        controller.abort();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    const code = await exit;
+    combinedSignal.removeEventListener("abort", onAbort);
+    if (combinedSignal.aborted) throw abortError();
+    if (code !== 0) throw new Error("Codex could not list models.");
+    return normalizeCodexModelCatalog(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function escapeRoleContent(content: string): string {
   return content.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
@@ -136,6 +236,34 @@ function latestUserPrompt(messages: ChatMessage[]): string {
     if (message?.role === "user") return message.content;
   }
   throw new Error("A user message is required.");
+}
+
+export function codexReasoningEffort(
+  reasoningEffort?: ReasoningEffort,
+): ModelReasoningEffort | "none" | "max" | undefined {
+  return reasoningEffort;
+}
+
+export function codexFastModeConfig(fastMode = false): NonNullable<CodexOptions["config"]> {
+  return {
+    service_tier: fastMode ? "fast" : "default",
+    features: { fast_mode: fastMode },
+  };
+}
+
+export function codexThreadOptions(input: ChatRequest): ThreadOptions {
+  return {
+    model: input.model,
+    // The CLI model catalog and config accept `none` and `max`; the SDK's declaration lags.
+    modelReasoningEffort: codexReasoningEffort(input.options?.reasoningEffort) as
+      | ModelReasoningEffort
+      | undefined,
+    sandboxMode: "read-only",
+    approvalPolicy: "never",
+    networkAccessEnabled: false,
+    webSearchMode: "disabled",
+    skipGitRepoCheck: true,
+  };
 }
 
 function usageEvent(usage: Usage): TokenUsage {
@@ -159,10 +287,10 @@ function updatedText(item: ThreadItem, seen: Map<string, string>): RunnerEvent |
     : { type: "reasoning-delta", delta };
 }
 
-function mapCodexEvent(
+export function mapCodexEvent(
   event: ThreadEvent,
   seen: Map<string, string>,
-): RunnerEvent | "failed" | undefined {
+): RunnerEvent | Error | undefined {
   switch (event.type) {
     case "thread.started":
       return { type: "provider-thread", threadId: event.thread_id };
@@ -173,8 +301,9 @@ function mapCodexEvent(
     case "turn.completed":
       return { type: "finish", finishReason: "stop", usage: usageEvent(event.usage) };
     case "turn.failed":
+      return new Error(event.error.message);
     case "error":
-      return "failed";
+      return new Error(event.message);
     default:
       return undefined;
   }
@@ -197,7 +326,10 @@ export class CodexRunner implements LocalAuthRunner {
     // The packaged Electron runtime intentionally bundles JavaScript only.
     // Use the user's official CLI so its installation and credential store
     // remain owned by Codex instead of copying either into Monte Carlo.
-    this.client = new Codex({ codexPathOverride: this.cliExecutable });
+    this.client = new Codex({
+      codexPathOverride: this.cliExecutable,
+      config: codexFastModeConfig(false),
+    });
   }
 
   health(signal?: AbortSignal): Promise<ProviderHealth> {
@@ -246,18 +378,29 @@ export class CodexRunner implements LocalAuthRunner {
     }
   }
 
-  async *run(input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent> {
-    const threadOptions = {
-      model: input.model,
-      sandboxMode: "read-only" as const,
-      approvalPolicy: "never" as const,
-      networkAccessEnabled: false,
-      webSearchMode: "disabled" as const,
-      skipGitRepoCheck: true,
+  async listModels(
+    _connection?: { baseURL?: string },
+    signal?: AbortSignal,
+  ): Promise<ProviderModelCatalog> {
+    return {
+      provider: "codex",
+      models: await readCodexModelCatalog(this.cliExecutable, signal),
+      source: "cli",
+      fetchedAt: Date.now(),
     };
+  }
+
+  async *run(input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent> {
+    const threadOptions = codexThreadOptions(input);
+    const client = input.options?.fastMode
+      ? new Codex({
+          codexPathOverride: this.cliExecutable,
+          config: codexFastModeConfig(true),
+        })
+      : this.client;
     const thread = input.providerThreadId
-      ? this.client.resumeThread(input.providerThreadId, threadOptions)
-      : this.client.startThread(threadOptions);
+      ? client.resumeThread(input.providerThreadId, threadOptions)
+      : client.startThread(threadOptions);
     const prompt = input.providerThreadId
       ? latestUserPrompt(input.messages)
       : transcriptPrompt(input.messages);
@@ -266,7 +409,7 @@ export class CodexRunner implements LocalAuthRunner {
 
     for await (const event of events) {
       const mapped = mapCodexEvent(event, seen);
-      if (mapped === "failed") throw new Error("The Codex turn failed.");
+      if (mapped instanceof Error) throw mapped;
       if (mapped !== undefined) yield mapped;
     }
   }
