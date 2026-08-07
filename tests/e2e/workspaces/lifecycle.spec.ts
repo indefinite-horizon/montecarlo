@@ -30,7 +30,7 @@ test("creates distinct local-storage and cloud-storage workspaces", async ({ pag
 });
 
 test("workspace creation trims names and prevents blank submission", async ({ page }) => {
-  await workspaceButton(page, "Richard's workspace").click();
+  await workspaceButton(page, "My Workspace").click();
   const menu = page.getByRole("menu", { name: "Workspaces" });
   await expect(menu).toBeVisible();
   await expect(

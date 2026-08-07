@@ -172,6 +172,7 @@ describe("local anonymous workspace bootstrap", () => {
       publicId: bootstrapConfig.chatPublicId,
       workspaceId: first.workspaceId,
       rootBranchId: first.rootBranchId,
+      rootBranchPublicId: bootstrapConfig.rootBranchPublicId,
       autoTitleStatus: "pending",
     });
     expect(rootBranch).toMatchObject({

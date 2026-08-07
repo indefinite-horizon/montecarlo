@@ -67,7 +67,7 @@ export const convexConfig = {
     defaultAuthUser: sharedConfig.dev.defaultAuthUser,
     localWorkspaceBootstrap: {
       userName: "Local user",
-      workspaceName: "Richard's workspace",
+      workspaceName: "My Workspace",
       workspacePublicId: "ws_local_default",
       membershipPublicId: "member_local_default_owner",
       chatTitle: "Pancakes",

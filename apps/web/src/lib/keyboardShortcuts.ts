@@ -21,7 +21,7 @@ export const appShortcuts = {
     code: "KeyN",
     key: "N",
     macos: ["meta"],
-    windowsLinux: ["control"],
+    windowsLinux: ["control", "shift"],
   },
   newProject: {
     code: "KeyA",

@@ -133,6 +133,7 @@ export default defineSchema({
     autoTitleProvider: v.optional(v.string()),
     autoTitleModel: v.optional(v.string()),
     rootBranchId: v.optional(v.id("chat_branches")),
+    rootBranchPublicId: v.optional(v.string()),
     createdByUserId: v.id("users"),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),

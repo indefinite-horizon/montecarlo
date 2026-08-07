@@ -46,7 +46,7 @@
     "unfiled": "Without a project"
   },
   "workspace": {
-    "defaultName": "Richard's workspace",
+    "defaultName": "My Workspace",
     "localStatus": "Files on this device",
     "cloudStatus": "Cloud file storage",
     "persistenceError": "The workspace could not save that change.",

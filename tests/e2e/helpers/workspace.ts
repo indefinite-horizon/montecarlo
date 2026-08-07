@@ -13,7 +13,7 @@ export async function createWorkspace(
   page: Page,
   name: string,
   mode: "local" | "cloud" = "local",
-  currentWorkspaceName = "Richard's workspace",
+  currentWorkspaceName = "My Workspace",
 ) {
   await workspaceButton(page, currentWorkspaceName).click();
   const menu = page.getByRole("menu", { name: "Workspaces" });

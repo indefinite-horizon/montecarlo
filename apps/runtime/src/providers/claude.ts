@@ -96,6 +96,8 @@ async function readClaudeModelCatalog(
       );
     }
   }
+  // SDK 0.3.219 initializes supportedModels() before consuming the first prompt. Keep the
+  // iterable open until teardown so model discovery does not start an actual conversation turn.
   const modelQuery = query({
     prompt: input(),
     options: {

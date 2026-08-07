@@ -69,13 +69,17 @@ async function toChatSummary(ctx: QueryCtx | MutationCtx, chat: Doc<"chats">) {
   if (!chat.rootBranchId) {
     throw new Error("Chat is missing its root branch.");
   }
-  const rootBranch = await ctx.db.get(chat.rootBranchId);
-  if (
-    !rootBranch ||
-    rootBranch.workspaceId !== chat.workspaceId ||
-    rootBranch.chatId !== chat._id
-  ) {
-    throw new Error("Chat root branch was not found.");
+  let rootBranchPublicId = chat.rootBranchPublicId;
+  if (!rootBranchPublicId) {
+    const rootBranch = await ctx.db.get(chat.rootBranchId);
+    if (
+      !rootBranch ||
+      rootBranch.workspaceId !== chat.workspaceId ||
+      rootBranch.chatId !== chat._id
+    ) {
+      throw new Error("Chat root branch was not found.");
+    }
+    rootBranchPublicId = rootBranch.publicId;
   }
   return {
     id: chat._id,
@@ -86,7 +90,7 @@ async function toChatSummary(ctx: QueryCtx | MutationCtx, chat: Doc<"chats">) {
     autoTitleStatus: chat.autoTitleStatus,
     autoTitleReady: chat.autoTitleInputMessageId !== undefined,
     rootBranchId: chat.rootBranchId,
-    rootBranchPublicId: rootBranch.publicId,
+    rootBranchPublicId,
     archivedAt: chat.archivedAt,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
@@ -134,6 +138,7 @@ async function insertChat(
     projectId: input.projectId,
     title,
     ...(input.autoTitle ? { autoTitleStatus: "pending" as const } : {}),
+    rootBranchPublicId,
     createdByUserId: input.createdByUserId,
     createdAt: now,
     updatedAt: now,
@@ -351,6 +356,8 @@ export const releaseAutoTitle = mutation({
       autoTitleStatus: "pending",
       autoTitleClaimToken: undefined,
       autoTitleClaimedAt: undefined,
+      autoTitleProvider: undefined,
+      autoTitleModel: undefined,
     });
     return true;
   },
@@ -491,6 +498,7 @@ export const getTree = query({
         selectedIds.add(String(cursor._id));
         cursor = cursor.parentBranchId ? await ctx.db.get(cursor.parentBranchId) : null;
       }
+      // Preserve the complete URL-target lineage even when that makes this response exceed limit.
       selectedBranches.push(...targetLineage.reverse());
     }
 

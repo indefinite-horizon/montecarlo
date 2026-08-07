@@ -114,6 +114,9 @@ async function ensureRootBranch(
       rootBranch.chatId === chat._id &&
       rootBranch.anchorType === "root"
     ) {
+      if (chat.rootBranchPublicId !== rootBranch.publicId) {
+        await ctx.db.patch(chat._id, { rootBranchPublicId: rootBranch.publicId });
+      }
       return rootBranch;
     }
   }
@@ -126,7 +129,10 @@ async function ensureRootBranch(
     .order("asc")
     .first();
   if (existingRoot?.anchorType === "root") {
-    await ctx.db.patch(chat._id, { rootBranchId: existingRoot._id });
+    await ctx.db.patch(chat._id, {
+      rootBranchId: existingRoot._id,
+      rootBranchPublicId: existingRoot.publicId,
+    });
     return existingRoot;
   }
 
@@ -152,7 +158,7 @@ async function ensureRootBranch(
     createdByUserId: userId,
     createdAt: now,
   });
-  await ctx.db.patch(chat._id, { rootBranchId });
+  await ctx.db.patch(chat._id, { rootBranchId, rootBranchPublicId });
   const rootBranch = await ctx.db.get(rootBranchId);
   if (!rootBranch) throw new Error("Local root branch could not be initialized.");
   return rootBranch;
@@ -176,6 +182,7 @@ async function ensureInitialChat(
       workspaceId,
       title: bootstrapConfig.chatTitle,
       autoTitleStatus: "pending",
+      rootBranchPublicId: bootstrapConfig.rootBranchPublicId,
       createdByUserId: userId,
       createdAt: now,
       updatedAt: now,

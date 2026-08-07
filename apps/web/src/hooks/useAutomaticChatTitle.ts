@@ -38,21 +38,32 @@ export function useAutomaticChatTitle({
   useEffect(() => {
     if (!enabled || !activeChatId) return;
     let recoveryFailures = 0;
+    let inFlight = false;
+    const controller = new AbortController();
     const attempt = () => {
       const current = currentRef.current;
       if (current.status !== "pending" && current.status !== "generating") return;
-      if (recoveryFailures >= sharedConfig.chatNaming.maxRecoveryAttempts) return;
+      if (inFlight || recoveryFailures >= sharedConfig.chatNaming.maxRecoveryAttempts) return;
       const claimToken = crypto.randomUUID();
+      inFlight = true;
       void startAutomaticChatTitle({
         claim: () => claim(activeChatId, claimToken, current.provider, current.model),
         complete: (title) => complete(activeChatId, claimToken, title),
         release: () => release(activeChatId, claimToken),
-      }).then((outcome) => {
-        if (outcome === "failed") recoveryFailures += 1;
-      });
+        signal: controller.signal,
+      })
+        .then((outcome) => {
+          if (outcome === "failed") recoveryFailures += 1;
+        })
+        .finally(() => {
+          inFlight = false;
+        });
     };
     attempt();
     const timer = window.setInterval(attempt, sharedConfig.chatNaming.retryPollMs);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      controller.abort();
+    };
   }, [activeChatId, claim, complete, enabled, release]);
 }

@@ -8,10 +8,12 @@ export function startAutomaticChatTitle({
   claim,
   complete,
   release,
+  signal,
 }: {
   claim: () => Promise<{ intent: string; provider: ProviderId; model: string } | null>;
   complete: (title: string) => Promise<boolean>;
   release: () => Promise<boolean>;
+  signal?: AbortSignal;
 }): Promise<"not-claimed" | "completed" | "failed"> {
   return (async () => {
     let claimResult: { intent: string; provider: ProviderId; model: string } | null = null;
@@ -27,7 +29,7 @@ export function startAutomaticChatTitle({
         prompt: chatTitlePrompt(claimResult.intent),
         reasoningEffort: "none",
         fastMode: false,
-        signal: new AbortController().signal,
+        signal: signal ?? new AbortController().signal,
         onEvent: (event) => {
           if (event.type === "error") throw new Error(event.message);
           if (event.type === "text-delta") generatedTitle += event.delta;

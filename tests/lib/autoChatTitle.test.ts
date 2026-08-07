@@ -21,6 +21,7 @@ describe("startAutomaticChatTitle", () => {
     );
     const complete = vi.fn(async () => true);
     const release = vi.fn(async () => true);
+    const controller = new AbortController();
 
     void startAutomaticChatTitle({
       claim: async () => ({
@@ -30,6 +31,7 @@ describe("startAutomaticChatTitle", () => {
       }),
       complete,
       release,
+      signal: controller.signal,
     });
 
     await vi.waitFor(() => expect(complete).toHaveBeenCalledWith("Plan launch campaign"));
@@ -40,6 +42,7 @@ describe("startAutomaticChatTitle", () => {
         messages: [],
         reasoningEffort: "none",
         fastMode: false,
+        signal: controller.signal,
       }),
     );
     expect(release).not.toHaveBeenCalled();

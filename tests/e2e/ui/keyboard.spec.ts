@@ -7,7 +7,7 @@ import { installRuntimeMock } from "../helpers/runtime";
 import { createWorkspace, openFreshUser, userMessage } from "../helpers/workspace";
 
 const primaryModifier = process.platform === "darwin" ? "Meta" : "Control";
-const newChatShortcutLabel = process.platform === "darwin" ? "⌘N" : "Ctrl+N";
+const newChatShortcutLabel = process.platform === "darwin" ? "⌘N" : "Ctrl+Shift+N";
 const thinkingShortcutLabel = process.platform === "darwin" ? "⌥T" : "Alt+T";
 
 test.beforeEach(async ({ context, page }) => {
@@ -84,6 +84,8 @@ test("global shortcuts open commands and cycle thinking without changing views",
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.stack ?? error.message));
   const composer = page.getByPlaceholder("Ask a follow-up or start a new direction…");
+  const thinkingTrigger = page.getByTestId("thinking-level-trigger");
+  await expect(thinkingTrigger).toHaveAccessibleName(/Medium/u);
   await composer.focus();
 
   await page.keyboard.press(`${primaryModifier}+K`);
@@ -91,8 +93,6 @@ test("global shortcuts open commands and cycle thinking without changing views",
   await expect(commandPalette).toBeVisible();
   await expect(page.getByTestId("command-palette-input")).toBeFocused();
   await expect(page.getByTestId("command-new-chat")).toContainText(newChatShortcutLabel);
-  const thinkingTrigger = page.getByTestId("thinking-level-trigger");
-  await expect(thinkingTrigger).toHaveAccessibleName(/Medium/u);
   await page.getByTestId("command-adjust-thinking").click();
   await expect(commandPalette).toHaveCount(0);
   await expect(thinkingTrigger).toHaveAccessibleName(/High/u);

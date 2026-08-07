@@ -7,7 +7,7 @@ const now = Date.now();
 export const demoWorkspace = {
   id: "workspace-demo",
   publicId: "workspace-demo",
-  name: "Richard's workspace",
+  name: "My Workspace",
   storageMode: "local",
 } as const;
 

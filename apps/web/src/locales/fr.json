@@ -46,7 +46,7 @@
     "unfiled": "Sans projet"
   },
   "workspace": {
-    "defaultName": "Espace de Richard",
+    "defaultName": "Mon espace de travail",
     "localStatus": "Fichiers sur cet appareil",
     "cloudStatus": "Stockage de fichiers cloud",
     "persistenceError": "L'espace n'a pas pu enregistrer cette modification.",

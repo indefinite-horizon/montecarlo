@@ -23,7 +23,7 @@ describe("application keyboard shortcuts", () => {
     expect(appShortcutLabel("newProject", "macos")).toBe("⌘⌥A");
     expect(appShortcutLabel("providerSelection", "macos")).toBe("⌥P");
     expect(appShortcutLabel("thinkingLevel", "windows")).toBe("Alt+T");
-    expect(appShortcutLabel("newChat", "linux")).toBe("Ctrl+N");
+    expect(appShortcutLabel("newChat", "linux")).toBe("Ctrl+Shift+N");
   });
 
   it("matches macOS Option shortcuts by physical code", () => {
@@ -43,16 +43,16 @@ describe("application keyboard shortcuts", () => {
   });
 
   it("rejects extra modifiers and uses Ctrl on Windows and Linux", () => {
-    expect(matchesAppShortcut(keyboardEvent("KeyN", { ctrlKey: true }), "newChat", "windows")).toBe(
-      true,
-    );
     expect(
       matchesAppShortcut(
         keyboardEvent("KeyN", { ctrlKey: true, shiftKey: true }),
         "newChat",
         "linux",
       ),
-    ).toBe(false);
+    ).toBe(true);
+    expect(matchesAppShortcut(keyboardEvent("KeyN", { ctrlKey: true }), "newChat", "windows")).toBe(
+      false,
+    );
     expect(matchesAppShortcut(keyboardEvent("KeyN", { metaKey: true }), "newChat", "linux")).toBe(
       false,
     );
