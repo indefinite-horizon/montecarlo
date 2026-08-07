@@ -141,6 +141,7 @@ test("app navigation controls exclude an external redirect round trip", async ({
   await expectCompleteWorkspaceUrl(page);
   const appOrigin = new URL(appUrl).origin;
   await createChat(page);
+  await createChat(page);
 
   const back = page.getByRole("button", { name: "Back" });
   const forward = page.getByRole("button", { name: "Forward" });
