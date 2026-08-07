@@ -124,10 +124,9 @@ test("back and forward restore fully specified chat locations", async ({ page })
   await expect(page.getByRole("button", { name: "Forward" })).toBeDisabled();
 });
 
-test("app navigation controls exclude an external redirect round trip", async ({
-  page,
-}, testInfo) => {
-  const appUrl = new URL("/", String(testInfo.project.use.baseURL)).href;
+test("app navigation controls exclude an external redirect round trip", async ({ page }) => {
+  await expectCompleteWorkspaceUrl(page);
+  const appUrl = page.url();
   await page.route("https://oauth.example.test/**", async (route) => {
     await route.fulfill({
       contentType: "text/html",

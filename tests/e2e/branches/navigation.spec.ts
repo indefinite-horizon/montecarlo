@@ -4,6 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 import { conversationRequests, installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
 import {
   assistantMessage,
+  childBranchRow,
   createPromptBranch,
   createWorkspace,
   openFreshUser,
@@ -19,11 +20,16 @@ test.beforeEach(async ({ context, page }) => {
   await createWorkspace(page, `Branch navigation ${Date.now()}`);
 });
 
-async function chooseProvider(page: Page, label: string) {
+async function chooseProvider(page: Page, label: "Claude" | "Codex", model: string) {
   await page.getByTestId("provider-trigger").click();
-  await page
+  const option = page
     .getByTestId("provider-menu")
-    .getByRole("menuitem", { name: new RegExp(`^${label}`, "u") })
+    .getByRole("menuitem", { name: new RegExp(`^${label}`, "u") });
+  await option.hover();
+  const provider = label === "Claude" ? "anthropic" : "codex";
+  await page
+    .getByTestId(`provider-models-${provider}`)
+    .getByRole("menuitem", { name: new RegExp(model, "iu") })
     .click();
 }
 
@@ -52,7 +58,7 @@ test("sibling branches never display each other's turns", async ({ page }) => {
   await sendMessage(page, "Sibling B only", "Stub response: Sibling B only");
   await expect(userMessage(page, "Sibling A only")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Sibling A seed", exact: true }).click();
+  await childBranchRow(page, "Sibling A seed").click();
   await expect(userMessage(page, "Sibling A only")).toBeVisible();
   await expect(userMessage(page, "Sibling B only")).toHaveCount(0);
 });
@@ -84,22 +90,21 @@ test("reload restores the active chat safely and invalid branch state falls back
 });
 
 test("parent and child can continue with independent providers", async ({ page }) => {
-  await chooseProvider(page, "Ollama");
-  await sendMessage(page, "Parent on Ollama", "Stub response: Parent on Ollama");
+  await chooseProvider(page, "Codex", "e2e-codex");
+  await sendMessage(page, "Parent on Codex", "Stub response: Parent on Codex");
   await createPromptBranch(page, "Provider-independent child");
-  await chooseProvider(page, "OpenRouter");
-  await sendMessage(page, "Child on OpenRouter", "Stub response: Child on OpenRouter");
+  await chooseProvider(page, "Claude", "e2e-claude");
+  await sendMessage(page, "Child on Claude", "Stub response: Child on Claude");
 
   const relevant = conversationRequests(runtime).filter(({ messages }) =>
     messages.some(
-      ({ content }) =>
-        content.includes("Parent on Ollama") || content.includes("Child on OpenRouter"),
+      ({ content }) => content.includes("Parent on Codex") || content.includes("Child on Claude"),
     ),
   );
-  expect(relevant.some(({ provider }) => provider === "ollama")).toBe(true);
-  expect(relevant.some(({ provider }) => provider === "openrouter")).toBe(true);
+  expect(relevant.some(({ provider }) => provider === "codex")).toBe(true);
+  expect(relevant.some(({ provider }) => provider === "anthropic")).toBe(true);
   await page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]').click();
-  await expect(userMessage(page, "Parent on Ollama")).toBeVisible();
-  await expect(assistantMessage(page, "Stub response: Parent on Ollama")).toBeVisible();
-  await expect(userMessage(page, "Child on OpenRouter")).toHaveCount(0);
+  await expect(userMessage(page, "Parent on Codex")).toBeVisible();
+  await expect(assistantMessage(page, "Stub response: Parent on Codex")).toBeVisible();
+  await expect(userMessage(page, "Child on Claude")).toHaveCount(0);
 });

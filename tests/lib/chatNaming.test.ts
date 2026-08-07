@@ -32,6 +32,8 @@ describe("chat naming", () => {
       normalizeGeneratedChatTitle('Title: "Plan a focused product launch this quarter please"'),
     ).toBe("Plan a focused product launch this quarter");
     expect(normalizeGeneratedChatTitle("```\nRank US schools\n```")).toBe("Rank US schools");
+    expect(normalizeGeneratedChatTitle("“Plan a launch”")).toBe("Plan a launch");
+    expect(normalizeGeneratedChatTitle("‘Compare providers’")).toBe("Compare providers");
     expect(normalizeGeneratedChatTitle("   ")).toBeUndefined();
   });
 });

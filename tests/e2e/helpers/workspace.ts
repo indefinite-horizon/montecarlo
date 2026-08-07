@@ -112,13 +112,19 @@ export function assistantMessage(page: Page, text: string) {
   return page.locator('[role="document"]').filter({ hasText: text });
 }
 
+export function childBranchRow(page: Page, title: string) {
+  return page
+    .locator('[data-testid="branch-map-row"]:not([data-branch-depth="0"])')
+    .filter({ hasText: title });
+}
+
 export async function createPromptBranch(page: Page, prompt: string) {
   await page.getByRole("button", { name: "New branch" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Branch this conversation" });
   await dialog.getByLabel("What should this branch explore?").fill(prompt);
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(dialog).toBeHidden();
-  const branch = page.getByRole("button", { name: prompt, exact: true });
+  const branch = childBranchRow(page, prompt);
   await expect(branch).toBeVisible();
   await expect(branch).toHaveAttribute("aria-current", "true");
 }

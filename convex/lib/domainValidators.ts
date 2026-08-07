@@ -59,6 +59,7 @@ export const providerIdValidator = v.union(
   v.literal("ollama"),
   v.literal("anthropic"),
 );
+export type ProviderId = Infer<typeof providerIdValidator>;
 
 export const reasoningEffortValidator = v.union(
   v.literal("none"),

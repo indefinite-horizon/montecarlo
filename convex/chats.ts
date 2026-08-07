@@ -9,6 +9,7 @@ import { createPublicId, normalizeLimit, optionalText, requireText } from "./lib
 import {
   branchAnchorTypeValidator,
   branchSelectionValidator,
+  type ProviderId,
   providerIdValidator,
 } from "./lib/domainValidators";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
@@ -48,9 +49,13 @@ const branchNodeValidator = v.object({
 const autoTitleClaimValidator = v.object({
   inputMessageId: v.id("messages"),
   intent: v.string(),
-  provider: v.string(),
+  provider: providerIdValidator,
   model: v.string(),
 });
+
+function isProviderId(value: string | undefined): value is ProviderId {
+  return value === "codex" || value === "openrouter" || value === "ollama" || value === "anthropic";
+}
 
 function toBranchNode(branch: Doc<"chat_branches">) {
   return {
@@ -307,13 +312,12 @@ export const claimAutoTitle = mutation({
         .first();
     }
     if (!firstMessage) return null;
-    const provider =
-      chat.autoTitleProvider ??
-      optionalText(
-        args.provider,
-        "Auto-title provider",
-        convexConfig.domain.limits.providerNameLength,
-      );
+    const storedProvider = optionalText(
+      chat.autoTitleProvider,
+      "Auto-title provider",
+      convexConfig.domain.limits.providerNameLength,
+    );
+    const provider = isProviderId(storedProvider) ? storedProvider : args.provider;
     const model =
       chat.autoTitleModel ??
       optionalText(args.model, "Auto-title model", convexConfig.domain.limits.modelNameLength);

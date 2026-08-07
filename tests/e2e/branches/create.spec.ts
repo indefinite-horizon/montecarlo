@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import { conversationRequests, installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
 import {
   assistantMessage,
+  childBranchRow,
   createPromptBranch,
   createWorkspace,
   openFreshUser,
@@ -94,8 +95,8 @@ test("stale selected text is cleared when the transcript scrolls", async ({ page
 test("nested branching creates one child per action at the expected depth", async ({ page }) => {
   await createPromptBranch(page, "First-level branch");
   await createPromptBranch(page, "Second-level branch");
-  const first = page.getByRole("button", { name: "First-level branch", exact: true });
-  const second = page.getByRole("button", { name: "Second-level branch", exact: true });
+  const first = childBranchRow(page, "First-level branch");
+  const second = childBranchRow(page, "Second-level branch");
   await expect(first).toHaveCount(1);
   await expect(second).toHaveCount(1);
   const firstMargin = await first.evaluate(
