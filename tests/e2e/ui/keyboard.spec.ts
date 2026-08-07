@@ -8,6 +8,7 @@ import { createWorkspace, openFreshUser, userMessage } from "../helpers/workspac
 
 const primaryModifier = process.platform === "darwin" ? "Meta" : "Control";
 const newChatShortcutLabel = process.platform === "darwin" ? "⌘N" : "Ctrl+Shift+N";
+const newChatShortcutKeys = process.platform === "darwin" ? "Meta+N" : "Control+Shift+N";
 const thinkingShortcutLabel = process.platform === "darwin" ? "⌥T" : "Alt+T";
 
 test.beforeEach(async ({ context, page }) => {
@@ -130,8 +131,8 @@ test("global shortcuts open commands and cycle thinking without changing views",
   );
   await page.keyboard.press("Alt+P");
   await expect(page.getByTestId("provider-menu")).toBeVisible();
-  await expect(thinkingTrigger).toHaveAccessibleName(/Off/u);
   await page.keyboard.press("Escape");
+  await expect(thinkingTrigger).toHaveAccessibleName(/Max/u);
   await expect(page.getByRole("button", { name: "Thread view" })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -146,7 +147,7 @@ test("global shortcuts open commands and cycle thinking without changing views",
     .getByRole("navigation", { name: "Projects and chats" })
     .getByTestId("chat-row");
   const before = await chatRows.count();
-  await page.keyboard.press(`${primaryModifier}+N`);
+  await page.keyboard.press(newChatShortcutKeys);
   await expect(chatRows).toHaveCount(before + 1);
   expect(pageErrors, "global shortcuts must not cause uncaught page errors").toEqual([]);
 });

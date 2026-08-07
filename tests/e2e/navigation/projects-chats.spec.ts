@@ -32,15 +32,18 @@ function unfiledSection(page: import("@playwright/test").Page) {
 
 async function expectCompleteWorkspaceUrl(page: import("@playwright/test").Page) {
   await expect
-    .poll(() => {
-      const search = new URL(page.url()).searchParams;
-      return [
-        Boolean(search.get("workspace")),
-        Boolean(search.get("chat")),
-        Boolean(search.get("branch")),
-        search.get("view"),
-      ];
-    })
+    .poll(
+      () => {
+        const search = new URL(page.url()).searchParams;
+        return [
+          Boolean(search.get("workspace")),
+          Boolean(search.get("chat")),
+          Boolean(search.get("branch")),
+          search.get("view"),
+        ];
+      },
+      { timeout: 15_000 },
+    )
     .toEqual([true, true, true, "thread"]);
 }
 

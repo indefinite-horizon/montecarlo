@@ -118,7 +118,9 @@ export async function createPromptBranch(page: Page, prompt: string) {
   await dialog.getByLabel("What should this branch explore?").fill(prompt);
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("heading", { name: prompt, exact: true })).toBeVisible();
+  const branch = page.getByRole("button", { name: prompt, exact: true });
+  await expect(branch).toBeVisible();
+  await expect(branch).toHaveAttribute("aria-current", "true");
 }
 
 export async function selectAssistantText(page: Page, text: string) {

@@ -53,6 +53,13 @@ export type MessageRole = Infer<typeof messageRoleValidator>;
 
 export const runRuntimeValidator = v.union(v.literal("model"), v.literal("harness"));
 
+export const providerIdValidator = v.union(
+  v.literal("codex"),
+  v.literal("openrouter"),
+  v.literal("ollama"),
+  v.literal("anthropic"),
+);
+
 export const reasoningEffortValidator = v.union(
   v.literal("none"),
   v.literal("minimal"),

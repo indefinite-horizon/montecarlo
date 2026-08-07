@@ -6,7 +6,11 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import { convexConfig } from "./config";
 import { createPublicId, normalizeLimit, optionalText, requireText } from "./lib/domainValidation";
-import { branchAnchorTypeValidator, branchSelectionValidator } from "./lib/domainValidators";
+import {
+  branchAnchorTypeValidator,
+  branchSelectionValidator,
+  providerIdValidator,
+} from "./lib/domainValidators";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
 
 const chatSummaryValidator = v.object({
@@ -263,7 +267,7 @@ export const claimAutoTitle = mutation({
     workspaceId: v.id("workspaces"),
     chatId: v.id("chats"),
     claimToken: v.string(),
-    provider: v.optional(v.string()),
+    provider: v.optional(providerIdValidator),
     model: v.optional(v.string()),
   },
   returns: v.union(autoTitleClaimValidator, v.null()),
