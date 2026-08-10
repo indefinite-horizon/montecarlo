@@ -1,25 +1,7 @@
 /** Composes the three-pane chat workspace, branching controls, and provider boundary. */
 
 import { useSearch } from "@tanstack/react-router";
-import {
-  Archive,
-  Boxes,
-  Brain,
-  ChevronRight,
-  Folder,
-  FolderPlus,
-  GitBranch,
-  MessageSquarePlus,
-  MessageSquareText,
-  Moon,
-  PanelLeft,
-  PanelRight,
-  Settings,
-  Sparkles,
-  Sun,
-  Workflow,
-} from "lucide-react";
-import { memo, Suspense, useCallback, useMemo, useRef, useState } from "react";
+import { memo, Suspense, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useClearCollapsedTextSelection } from "@/hooks/useClearCollapsedTextSelection";
@@ -27,7 +9,6 @@ import { useConversationController } from "@/hooks/useConversationController";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { useProviderDiscovery } from "@/hooks/useProviderDiscovery";
-import { useTheme } from "@/hooks/useTheme";
 import { useWorkspaceRouteSync, type WorkspaceView } from "@/hooks/useWorkspaceRouteSync";
 import { useWorkspaceShortcuts } from "@/hooks/useWorkspaceShortcuts";
 import { randomFoodChatName } from "@/lib/chatNaming";
@@ -37,23 +18,21 @@ import {
   type SelectionAnchor,
 } from "@/lib/conversation";
 import { appShortcutLabel } from "@/lib/keyboardShortcuts";
-import { ActionTooltip } from "./ActionTooltip";
 import { BranchComposer, SelectionBranchAction } from "./BranchComposer";
 import { BranchMap } from "./BranchMap";
 import { ChatComposer } from "./ChatComposer";
 import { ChatRenameDialog } from "./ChatRenameDialog";
-import { CommandPalette, type CommandPaletteAction } from "./CommandPalette";
 import { LazyConversationCanvas } from "./LazyConversationCanvas";
 import { ModelEditDialog } from "./ModelEditDialog";
 import { ProjectCreateDialog } from "./ProjectCreateDialog";
 import { ProviderSettings } from "./ProviderSettings";
-import { Button } from "./ui/button";
+import { WorkspaceCommandPalette } from "./WorkspaceCommandPalette";
+import { WorkspaceHeader } from "./WorkspaceHeader";
 import { WorkspaceSetup } from "./WorkspaceSetup";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { WorkspaceThread } from "./WorkspaceThread";
 export const WorkspaceApp = memo(function WorkspaceApp() {
   const { t } = useTranslation();
-  const { theme, setTheme } = useTheme();
   const routeSearch = useSearch({ from: "/_authenticated/" });
   const [view, setView] = useState<WorkspaceView>(routeSearch.view);
   const [initialChatTitle] = useState(randomFoodChatName);
@@ -404,133 +383,6 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     setProviderMenuOpen,
   });
 
-  const commandActions = useMemo<CommandPaletteAction[]>(
-    () => [
-      {
-        id: "new-chat",
-        label: t("sidebar.newChat"),
-        icon: <MessageSquarePlus />,
-        shortcut: newChatShortcut,
-        disabled: controller.loading || !controller.workspaceId,
-        dataTestId: "command-new-chat",
-        onSelect: () => void createNewChat(),
-      },
-      {
-        id: "archive-chat",
-        label: t("commandPalette.archiveChat"),
-        icon: <Archive />,
-        shortcut: archiveChatShortcut,
-        disabled: controller.loading || !controller.activeChatId,
-        dataTestId: "command-archive-chat",
-        onSelect: () => void archiveFocusedChat(),
-      },
-      {
-        id: "select-provider",
-        label: t("commandPalette.selectProvider"),
-        icon: <Sparkles />,
-        shortcut: providerShortcut,
-        dataTestId: "command-select-provider",
-        onSelect: openProviderSelection,
-      },
-      {
-        id: "adjust-thinking",
-        label: t("commandPalette.adjustThinking"),
-        icon: <Brain />,
-        shortcut: thinkingShortcut,
-        dataTestId: "command-adjust-thinking",
-        onSelect: cycleThinkingLevel,
-      },
-      {
-        id: "new-project",
-        label: t("commandPalette.newProject"),
-        icon: <FolderPlus />,
-        shortcut: newProjectShortcut,
-        disabled: controller.loading || !controller.workspaceId,
-        dataTestId: "command-new-project",
-        onSelect: () => setProjectCreateOpen(true),
-      },
-      {
-        id: "new-workspace",
-        label: t("commandPalette.newWorkspace"),
-        icon: <Boxes />,
-        dataTestId: "command-new-workspace",
-        onSelect: () => setWorkspaceSetupOpen(true),
-      },
-      {
-        id: "provider-settings",
-        label: t("commandPalette.providerSettings"),
-        icon: <Settings />,
-        onSelect: () => setSettingsOpen(true),
-      },
-      {
-        id: "thread-view",
-        label: t("commandPalette.threadView"),
-        icon: <MessageSquareText />,
-        disabled: view === "thread",
-        onSelect: () => setWorkspaceView("thread"),
-      },
-      {
-        id: "canvas-view",
-        label: t("commandPalette.canvasView"),
-        icon: <Workflow />,
-        disabled: view === "canvas",
-        onSelect: () => setWorkspaceView("canvas"),
-      },
-      {
-        id: "new-branch",
-        label: t("commandPalette.newBranch"),
-        icon: <GitBranch />,
-        disabled: !activeBranch || isStreaming,
-        onSelect: () => {
-          setWorkspaceView("thread");
-          openPromptBranch();
-        },
-      },
-      ...controller.chats
-        .filter((chat) => chat.id !== controller.activeChatId)
-        .map((chat) => ({
-          id: `chat-${chat.id}`,
-          label: t("commandPalette.openChat", { title: chat.title }),
-          icon: <MessageSquareText />,
-          keywords: [chat.title, t("sidebar.newChat")],
-          onSelect: () => selectChat(chat.id),
-        })),
-      ...controller.workspaces
-        .filter((workspace) => String(workspace.id) !== controller.workspaceId)
-        .map((workspace) => ({
-          id: `workspace-${workspace.id}`,
-          label: t("commandPalette.switchWorkspace", { name: workspace.name }),
-          icon: <Boxes />,
-          keywords: [workspace.name, t("workspace.switcherLabel")],
-          onSelect: () => selectWorkspace(String(workspace.id)),
-        })),
-    ],
-    [
-      activeBranch,
-      archiveChatShortcut,
-      archiveFocusedChat,
-      controller.activeChatId,
-      controller.chats,
-      controller.loading,
-      controller.workspaceId,
-      controller.workspaces,
-      createNewChat,
-      isStreaming,
-      newChatShortcut,
-      newProjectShortcut,
-      openPromptBranch,
-      openProviderSelection,
-      cycleThinkingLevel,
-      providerShortcut,
-      selectChat,
-      selectWorkspace,
-      setWorkspaceView,
-      t,
-      thinkingShortcut,
-      view,
-    ],
-  );
-
   return (
     <main
       data-testid="workspace-app"
@@ -564,111 +416,17 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
       />
 
       <section className="relative flex min-w-0 flex-1 flex-col">
-        <header className="z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:px-5">
-          <ActionTooltip label={t("sidebar.open")} side="bottom">
-            <Button
-              className={sidebarOpen ? "md:hidden" : "-translate-y-1 sm:-ml-2"}
-              size="icon"
-              variant="ghost"
-              aria-label={t("sidebar.open")}
-              aria-expanded={sidebarOpen}
-              onClick={() => setSidebarOpen(true)}
-            >
-              <PanelLeft />
-            </Button>
-          </ActionTooltip>
-          <div
-            className="flex min-w-0 flex-1 items-center gap-2 sm:min-w-24"
-            data-testid="chat-breadcrumb"
-          >
-            {controller.activeProjectName ? (
-              <>
-                <span
-                  className="flex min-w-0 items-center gap-2 text-sm font-medium text-muted-foreground"
-                  data-testid="chat-breadcrumb-project"
-                >
-                  <Folder className="size-4 shrink-0" />
-                  <span className="truncate">{controller.activeProjectName}</span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground/70" />
-              </>
-            ) : null}
-            <h1
-              className="truncate font-display text-[17px] font-semibold tracking-[-0.015em]"
-              data-testid="chat-breadcrumb-title"
-            >
-              {controller.activeChatTitle}
-            </h1>
-          </div>
-
-          <fieldset className="flex h-10 items-center rounded-lg border border-border bg-secondary/45 p-px">
-            <legend className="sr-only">{t("canvas.viewMode")}</legend>
-            <ActionTooltip label={t("canvas.threadView")} side="bottom">
-              <Button
-                className="h-9 px-2.5"
-                size="sm"
-                variant={view === "thread" ? "secondary" : "ghost"}
-                aria-pressed={view === "thread"}
-                aria-label={t("canvas.threadView")}
-                onClick={() => setWorkspaceView("thread")}
-              >
-                <MessageSquareText />
-                <span className="hidden lg:inline">{t("canvas.thread")}</span>
-              </Button>
-            </ActionTooltip>
-            <ActionTooltip label={t("canvas.canvasView")} side="bottom">
-              <Button
-                className="h-9 px-2.5"
-                size="sm"
-                variant={view === "canvas" ? "secondary" : "ghost"}
-                aria-pressed={view === "canvas"}
-                aria-label={t("canvas.canvasView")}
-                onClick={() => setWorkspaceView("canvas")}
-              >
-                <Workflow />
-                <span className="hidden lg:inline">{t("canvas.canvas")}</span>
-              </Button>
-            </ActionTooltip>
-          </fieldset>
-
-          <ActionTooltip
-            label={theme === "dark" ? t("home.lightTheme") : t("home.darkTheme")}
-            side="bottom"
-          >
-            <Button
-              className="hidden sm:inline-flex"
-              size="icon"
-              variant="ghost"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label={theme === "dark" ? t("home.lightTheme") : t("home.darkTheme")}
-            >
-              {theme === "dark" ? <Sun /> : <Moon />}
-            </Button>
-          </ActionTooltip>
-          <ActionTooltip label={t("settings.open")} side="bottom">
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setSettingsOpen(true)}
-              aria-label={t("settings.open")}
-            >
-              <Settings />
-            </Button>
-          </ActionTooltip>
-          {view === "thread" && !branchMapOpen ? (
-            <ActionTooltip label={t("branch.mapTitle")} side="bottom">
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={t("branch.mapTitle")}
-                aria-expanded={false}
-                onClick={() => setBranchMapOpen(true)}
-              >
-                <PanelRight />
-              </Button>
-            </ActionTooltip>
-          ) : null}
-        </header>
+        <WorkspaceHeader
+          activeChatTitle={controller.activeChatTitle}
+          activeProjectName={controller.activeProjectName}
+          branchMapOpen={branchMapOpen}
+          onOpenBranchMap={() => setBranchMapOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          onViewChange={setWorkspaceView}
+          sidebarOpen={sidebarOpen}
+          view={view}
+        />
 
         {view === "canvas" ? (
           <Suspense
@@ -836,13 +594,31 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         onOpenChange={setModelEditorOpen}
         onSave={controller.setModel}
       />
-      <CommandPalette
+      <WorkspaceCommandPalette
+        activeBranch={activeBranch}
+        controller={controller}
+        isStreaming={isStreaming}
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
-        actions={commandActions}
-        dialogLabel={t("commandPalette.label")}
-        searchPlaceholder={t("commandPalette.placeholder")}
-        emptyMessage={t("commandPalette.empty")}
+        onArchiveFocusedChat={() => void archiveFocusedChat()}
+        onCreateChat={() => void createNewChat()}
+        onCycleThinking={cycleThinkingLevel}
+        onOpenBranch={openPromptBranch}
+        onOpenProjectCreate={() => setProjectCreateOpen(true)}
+        onOpenProvider={openProviderSelection}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenWorkspaceCreate={() => setWorkspaceSetupOpen(true)}
+        onSelectChat={selectChat}
+        onSelectWorkspace={(workspaceId) => void selectWorkspace(workspaceId)}
+        onViewChange={setWorkspaceView}
+        shortcuts={{
+          archiveChat: archiveChatShortcut,
+          newChat: newChatShortcut,
+          newProject: newProjectShortcut,
+          provider: providerShortcut,
+          thinking: thinkingShortcut,
+        }}
+        view={view}
       />
     </main>
   );

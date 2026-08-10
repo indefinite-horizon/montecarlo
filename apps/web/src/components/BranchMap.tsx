@@ -165,6 +165,12 @@ export const BranchMap = memo(function BranchMap({
                       className="absolute right-3 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-primary"
                       data-testid="branch-response-spinner"
                     />
+                  ) : unread ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute right-3 top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary"
+                      data-testid="branch-unread-indicator"
+                    />
                   ) : null}
                 </button>
               </div>

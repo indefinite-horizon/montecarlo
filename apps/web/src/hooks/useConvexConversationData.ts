@@ -6,13 +6,17 @@ import { toast } from "sonner";
 import {
   type BranchAnchor,
   type ChatBranch,
-  type ChatMessage,
   type ChatSummary,
   isThreadOpeningContentReady,
-  type ProjectSummary,
   type ProviderId,
   type ReasoningEffort,
 } from "@/lib/conversation";
+import {
+  lineageIds,
+  messageFromEnvelope,
+  projectsFromItems,
+  titleForBranch,
+} from "@/lib/convexConversationMapping";
 import {
   domainApi,
   type MessageItem,
@@ -28,74 +32,7 @@ import {
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { sharedConfig } from "../../../../lib/config";
-import { messageHydrationKey, useMessageContentHydration } from "./useMessageContentHydration";
-
-const PROJECT_COLORS = ["terracotta", "blue", "gold", "green"] as const;
-
-function titleForBranch(
-  branch: {
-    title?: string;
-    anchorPrompt?: string;
-    anchorSelection?: { quote: string; displayText?: string };
-    contextPreview?: string;
-    depth: number;
-  },
-  chatTitle: string,
-): string {
-  if (branch.depth === 0) return chatTitle;
-  if (branch.title) return branch.title;
-  const value =
-    branch.anchorSelection?.displayText ??
-    branch.anchorSelection?.quote ??
-    branch.anchorPrompt ??
-    branch.contextPreview;
-  if (!value) return chatTitle;
-  return value.length > 38 ? `${value.slice(0, 37).trim()}…` : value;
-}
-
-function lineageIds(
-  branches: Array<{ id: Id<"chat_branches">; parentBranchId?: Id<"chat_branches"> }>,
-  requestedBranchId: string,
-  rootBranchId: Id<"chat_branches">,
-): Id<"chat_branches">[] {
-  const byId = new Map(branches.map((branch) => [String(branch.id), branch]));
-  const requested = byId.get(requestedBranchId) ?? byId.get(String(rootBranchId));
-  const lineage: Id<"chat_branches">[] = [];
-  const seen = new Set<string>();
-  let cursor = requested;
-
-  while (cursor) {
-    const id = String(cursor.id);
-    if (seen.has(id)) break;
-    seen.add(id);
-    lineage.unshift(cursor.id);
-    cursor = cursor.parentBranchId ? byId.get(String(cursor.parentBranchId)) : undefined;
-  }
-  return lineage;
-}
-
-function messageFromEnvelope(
-  message: MessagePage["items"][number],
-  hydratedContent: Record<string, string>,
-  contentReady: boolean,
-): ChatMessage {
-  const hydrated = hydratedContent[messageHydrationKey(message)];
-  const provider = ["codex", "anthropic", "ollama", "openrouter"].includes(message.provider ?? "")
-    ? (message.provider as ProviderId)
-    : undefined;
-  return {
-    id: String(message.id),
-    publicId: message.publicId,
-    branchId: String(message.branchId),
-    role: message.role === "tool" ? "system" : message.role,
-    content: hydrated ?? message.contentPreview,
-    contentReady,
-    createdAt: message.createdAt,
-    provider,
-    model: message.model,
-    runStatus: message.runStatus,
-  };
-}
+import { useMessageContentHydration } from "./useMessageContentHydration";
 
 export function useConvexConversationData(
   requestedBranchId: string,
@@ -224,16 +161,7 @@ export function useConvexConversationData(
     }
     return [activeProjectRecord, ...items];
   }, [activeProjectRecord, projectPage]);
-  const projects = useMemo<ProjectSummary[]>(
-    () =>
-      projectItems.map((project, index) => ({
-        id: String(project.id),
-        publicId: project.publicId,
-        name: project.name,
-        color: PROJECT_COLORS[index % PROJECT_COLORS.length] ?? "terracotta",
-      })),
-    [projectItems],
-  );
+  const projects = useMemo(() => projectsFromItems(projectItems), [projectItems]);
   const chats = useMemo<ChatSummary[]>(
     () =>
       chatItems.map((item) => ({

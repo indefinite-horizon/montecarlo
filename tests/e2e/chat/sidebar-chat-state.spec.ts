@@ -46,13 +46,15 @@ test("keeps a chat unread until its completed branch message enters the viewport
   const prompt = `Hidden ${controlledStream.marker}`;
   await createPromptBranch(page, prompt);
   await controlledStream.waitForRequest(page);
+  const childBranch = childBranchRow(page, prompt);
+  await expect(childBranch.getByTestId("branch-response-spinner")).toBeVisible();
+  await expect(childBranch.getByTestId("branch-unread-indicator")).toHaveCount(0);
 
   await page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]').click();
   await controlledStream.releaseText(page, "Only the child branch can show this completion.");
   await controlledStream.finish(page);
   const row = chatRow(page, chatId);
   const rootBranch = page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]');
-  const childBranch = childBranchRow(page, prompt);
   await expect(row).toHaveAttribute("data-unread", "true");
   await expect(rootBranch).toHaveAttribute("data-unread", "false");
   await expect(rootBranch.getByTestId("branch-map-title")).toHaveClass(/font-normal/u);
@@ -60,6 +62,8 @@ test("keeps a chat unread until its completed branch message enters the viewport
   await expect(childBranch).toHaveAttribute("data-unread", "true");
   await expect(childBranch.getByTestId("branch-map-title")).toHaveClass(/font-semibold/u);
   await expect(childBranch.getByTestId("branch-map-title")).toHaveClass(/text-foreground/u);
+  await expect(childBranch.getByTestId("branch-response-spinner")).toHaveCount(0);
+  await expect(childBranch.getByTestId("branch-unread-indicator")).toBeVisible();
   await expect(
     assistantMessage(page, "Only the child branch can show this completion."),
   ).toHaveCount(0);
@@ -72,6 +76,7 @@ test("keeps a chat unread until its completed branch message enters the viewport
   await expect(childBranch).toHaveAttribute("data-unread", "false");
   await expect(childBranch.getByTestId("branch-map-title")).toHaveClass(/font-normal/u);
   await expect(childBranch.getByTestId("branch-map-title")).toHaveClass(/text-muted-foreground/u);
+  await expect(childBranch.getByTestId("branch-unread-indicator")).toHaveCount(0);
 });
 
 for (const storageMode of ["local", "cloud"] as const) {

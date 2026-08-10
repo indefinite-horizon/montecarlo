@@ -31,6 +31,7 @@ import type * as init from "../init.js";
 import type * as lib_analytics_enqueue from "../lib/analytics/enqueue.js";
 import type * as lib_analytics_events from "../lib/analytics/events.js";
 import type * as lib_authSecurity from "../lib/authSecurity.js";
+import type * as lib_chatHelpers from "../lib/chatHelpers.js";
 import type * as lib_devToolsGate from "../lib/devToolsGate.js";
 import type * as lib_domainValidation from "../lib/domainValidation.js";
 import type * as lib_domainValidators from "../lib/domainValidators.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "lib/analytics/enqueue": typeof lib_analytics_enqueue;
   "lib/analytics/events": typeof lib_analytics_events;
   "lib/authSecurity": typeof lib_authSecurity;
+  "lib/chatHelpers": typeof lib_chatHelpers;
   "lib/devToolsGate": typeof lib_devToolsGate;
   "lib/domainValidation": typeof lib_domainValidation;
   "lib/domainValidators": typeof lib_domainValidators;

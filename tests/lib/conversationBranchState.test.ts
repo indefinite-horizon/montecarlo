@@ -1,3 +1,5 @@
+/** Covers branch title derivation for selected text and follow-up prompts. */
+
 import { describe, expect, it } from "vitest";
 import { branchTitle } from "../../apps/web/src/lib/conversationBranchState";
 

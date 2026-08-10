@@ -1,5 +1,4 @@
 /** Combines durable Convex conversations with bounded optimistic rendering. */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { startAutomaticChatTitle } from "@/lib/autoChatTitle";
@@ -11,33 +10,22 @@ import {
   type ReasoningEffort,
   visibleMessages,
 } from "@/lib/conversation";
-import {
-  appendToBranch,
-  branchTitle,
-  contextSnapshot,
-  updateBranchMessage,
-  updateBranchTitle,
-} from "@/lib/conversationBranchState";
+import { branchTitle, contextSnapshot, updateBranchTitle } from "@/lib/conversationBranchState";
 import type { MessageItem } from "@/lib/convexDomainApi";
-import { demoBranches, demoChats, demoProjects, demoWorkspace } from "@/lib/demoConversation";
+import { demoChats, demoProjects, demoWorkspace } from "@/lib/demoConversation";
 import { initialProviderModels, saveSelectedProviderModel } from "@/lib/providerConfig";
 import { streamRuntimeChat } from "@/lib/runtimeClient";
 import { buildRuntimeContext } from "@/lib/runtimeContext";
 import { useAutomaticChatTitle } from "./useAutomaticChatTitle";
+import {
+  demoMode,
+  type PendingBranchTurn,
+  type ReplayContext,
+  useAddSessionBranch,
+  useConversationSessionState,
+} from "./useConversationSessionState";
+import { useConversationWorkspaceActions } from "./useConversationWorkspaceActions";
 import { useConvexConversationData } from "./useConvexConversationData";
-
-const demoMode = import.meta.env.VITE_DEMO_MODE === "true";
-
-type SessionBranch = {
-  chatId: string;
-  persisted: boolean;
-  branch: ChatBranch;
-};
-type ReplayContext = {
-  branchId: string;
-  contextMessages: ChatMessage[];
-  anchor?: BranchAnchor;
-};
 export function useConversationController(
   runtimeOfflineMessage: string,
   persistenceErrorMessage: string,
@@ -48,17 +36,9 @@ export function useConversationController(
   requestedChatPublicId?: string,
   requestedBranchPublicId?: string,
 ) {
-  const [fallbackBranches, setFallbackBranches] = useState<ChatBranch[]>(demoBranches);
   const [demoActiveChatId, setDemoActiveChatId] = useState(demoChats[0]?.id ?? "");
   const [requestedBranchId, setRequestedBranchId] = useState("branch-root");
-  const [sessionBranches, setSessionBranches] = useState<SessionBranch[]>([]);
-  const [sessionMessages, setSessionMessages] = useState<Record<string, ChatMessage[]>>({});
-  const [runningChatIds, setRunningChatIds] = useState<ReadonlySet<string>>(() => new Set());
-  const runningChatRequestIdsRef = useRef(new Map<string, Set<string>>());
-  const [pendingBranchTurn, setPendingBranchTurn] = useState<{
-    branchId: string;
-    prompt: string;
-  }>();
+  const [pendingBranchTurn, setPendingBranchTurn] = useState<PendingBranchTurn>();
   const [provider, setProvider] = useState<ProviderId>("codex");
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("medium");
   const [fastMode, setFastMode] = useState(false);
@@ -100,63 +80,23 @@ export function useConversationController(
     complete: domain.completeAutoTitle,
     release: domain.releaseAutoTitle,
   });
-  const activeSessionBranches = useMemo(
-    () => sessionBranches.filter((entry) => entry.chatId === activeChatId),
-    [activeChatId, sessionBranches],
-  );
-  const branches = useMemo(() => {
-    if (!durable) {
-      if (!demoMode) return [];
-      if (activeChatId === demoChats[0]?.id) return fallbackBranches;
-      const activeDemoChat = demoChats.find((chat) => chat.id === activeChatId);
-      return activeDemoChat
-        ? [
-            {
-              id: `branch-root-${activeDemoChat.id}`,
-              publicId: activeDemoChat.rootBranchPublicId,
-              contextMessageIds: [],
-              title: activeDemoChat.title,
-              depth: 0,
-              createdAt: activeDemoChat.updatedAt,
-              messages: [],
-            },
-          ]
-        : [];
-    }
-    const durableIds = new Set(domain.branches.map((branch) => branch.id));
-    const sessionBranchById = new Map(
-      activeSessionBranches.map((entry) => [entry.branch.id, entry.branch]),
-    );
-    const combined = [
-      ...domain.branches,
-      ...activeSessionBranches
-        .filter((entry) => !durableIds.has(entry.branch.id))
-        .map((entry) => entry.branch),
-    ];
-    return combined.map((branch) => {
-      const session = sessionMessages[branch.id] ?? [];
-      const sessionById = new Map(session.map((message) => [message.id, message]));
-      const persisted = branch.messages.map((message) => {
-        const optimistic = sessionById.get(message.id);
-        if (!optimistic) return message;
-        sessionById.delete(message.id);
-        return { ...message, ...optimistic, id: message.id, branchId: message.branchId };
-      });
-      return {
-        ...branch,
-        openingContentReady:
-          sessionBranchById.get(branch.id)?.openingContentReady ?? branch.openingContentReady,
-        messages: [...persisted, ...session.filter((message) => sessionById.has(message.id))],
-      };
-    });
-  }, [
-    activeChatId,
+  const {
+    appendMessages,
     activeSessionBranches,
-    domain.branches,
+    branches,
+    chats,
+    removeMessages,
+    setChatRunning,
+    setFallbackBranches,
+    setSessionBranches,
+    setSessionMessages,
+    updateMessage,
+  } = useConversationSessionState({
+    activeChatId,
+    domainBranches: domain.branches,
+    domainChats: domain.chats,
     durable,
-    fallbackBranches,
-    sessionMessages,
-  ]);
+  });
   const activeBranchId =
     branches.find((branch) => branch.id === requestedBranchId)?.id ??
     domain.activeBranchId ??
@@ -166,125 +106,12 @@ export function useConversationController(
     () => visibleMessages(branches, activeBranchId),
     [activeBranchId, branches],
   );
-  const chats = useMemo(
-    () =>
-      (demoMode ? demoChats : domain.chats).map((chat) => ({
-        ...chat,
-        hasOngoingResponse: runningChatIds.has(chat.id),
-      })),
-    [domain.chats, runningChatIds],
-  );
-
-  const setChatRunning = useCallback((chatId: string, requestId: string, running: boolean) => {
-    const requests = new Set(runningChatRequestIdsRef.current.get(chatId) ?? []);
-    if (running) requests.add(requestId);
-    else requests.delete(requestId);
-    if (requests.size > 0) runningChatRequestIdsRef.current.set(chatId, requests);
-    else runningChatRequestIdsRef.current.delete(chatId);
-    const chatRunning = requests.size > 0;
-
-    setRunningChatIds((current) => {
-      if (current.has(chatId) === chatRunning) return current;
-      const next = new Set(current);
-      if (chatRunning) next.add(chatId);
-      else next.delete(chatId);
-      return next;
-    });
-  }, []);
-
-  const appendMessages = useCallback(
-    (branchId: string, additions: ChatMessage[]) => {
-      if (!durable) {
-        if (demoMode) {
-          setFallbackBranches((current) => appendToBranch(current, branchId, additions));
-        }
-        return;
-      }
-      setSessionMessages((current) => ({
-        ...current,
-        [branchId]: [...(current[branchId] ?? []), ...additions],
-      }));
-    },
-    [durable],
-  );
-
-  const updateMessage = useCallback(
-    (branchId: string, messageId: string, update: (message: ChatMessage) => ChatMessage) => {
-      if (!durable) {
-        if (demoMode) {
-          setFallbackBranches((current) =>
-            updateBranchMessage(current, branchId, messageId, update),
-          );
-        }
-        return;
-      }
-      setSessionMessages((current) => ({
-        ...current,
-        [branchId]: (current[branchId] ?? []).map((message) =>
-          message.id === messageId ? update(message) : message,
-        ),
-      }));
-    },
-    [durable],
-  );
-
-  const removeMessages = useCallback(
-    (branchId: string, messageIds: Array<string | undefined>) => {
-      const removed = new Set(messageIds.filter((id): id is string => Boolean(id)));
-      if (!durable) {
-        if (demoMode) {
-          setFallbackBranches((current) =>
-            current.map((branch) =>
-              branch.id === branchId
-                ? {
-                    ...branch,
-                    messages: branch.messages.filter((message) => !removed.has(message.id)),
-                  }
-                : branch,
-            ),
-          );
-        }
-        return;
-      }
-      setSessionMessages((current) => ({
-        ...current,
-        [branchId]: (current[branchId] ?? []).filter((message) => !removed.has(message.id)),
-      }));
-    },
-    [durable],
-  );
-
-  const addSessionBranch = useCallback(
-    (
-      anchor: BranchAnchor,
-      parent: ChatBranch,
-      id: string,
-      publicId: string,
-      persisted: boolean,
-      depth?: number,
-      contextMessageIds?: string[],
-    ) => {
-      const createdAt = Date.now();
-      const next: ChatBranch = {
-        id,
-        publicId,
-        parentBranchId: parent.id,
-        contextMessageIds: contextMessageIds ?? contextSnapshot(messages, anchor.sourceMessageId),
-        title: branchTitle(anchor),
-        depth: depth ?? parent.depth + 1,
-        createdAt,
-        anchor,
-        messages: [],
-        openingContentReady: true,
-      };
-      setSessionBranches((current) => [
-        ...current.filter((entry) => entry.branch.id !== id),
-        { chatId: activeChatId, persisted, branch: next },
-      ]);
-      setRequestedBranchId(id);
-    },
-    [activeChatId, messages],
-  );
+  const addSessionBranch = useAddSessionBranch({
+    activeChatId,
+    messages,
+    setRequestedBranchId,
+    setSessionBranches,
+  });
 
   const createBranch = useCallback(
     async (anchor: BranchAnchor, parentBranchId = activeBranchId) => {
@@ -408,6 +235,7 @@ export function useConversationController(
       persistenceErrorMessage,
       provider,
       providerModels,
+      setFallbackBranches,
     ],
   );
 
@@ -662,6 +490,7 @@ export function useConversationController(
       removeMessages,
       runtimeOfflineMessage,
       setChatRunning,
+      setSessionMessages,
       updateMessage,
     ],
   );
@@ -749,12 +578,20 @@ export function useConversationController(
       });
       return true;
     },
-    [branches, domain, durable, loading, messages, persistenceErrorMessage, sendMessage],
+    [
+      branches,
+      domain,
+      durable,
+      loading,
+      messages,
+      persistenceErrorMessage,
+      sendMessage,
+      setFallbackBranches,
+      setSessionBranches,
+      setSessionMessages,
+    ],
   );
-  const editMessage = useCallback(
-    (source: ChatMessage, content: string) => retryMessage(source, content),
-    [retryMessage],
-  );
+  const editMessage = retryMessage;
 
   // lint-allow: no-direct-use-effect — a created branch must render before its first turn targets it.
   useEffect(() => {
@@ -765,167 +602,25 @@ export function useConversationController(
     void sendMessage(pendingBranchTurn.prompt);
   }, [activeBranchId, loading, pendingBranchTurn, sendMessage]);
 
-  const createWorkspace = useCallback(
-    async (input: { name: string; storageMode: "local" | "cloud"; initialChatTitle: string }) => {
-      if (loading) return false;
-      if (!domain.authenticated) return true;
-      try {
-        const created = await domain.createWorkspace(input);
-        if (!created) return false;
-        return {
-          workspaceId: String(created.workspace.id),
-          workspacePublicId: created.workspace.publicId,
-          chatId: String(created.chat.id),
-          chatPublicId: created.chat.publicId,
-          branchPublicId: created.chat.rootBranchPublicId,
-        };
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [domain, loading, persistenceErrorMessage],
-  );
-
-  const createProject = useCallback(
-    async (name: string) => {
-      if (!domain.hasWorkspace) return false;
-      try {
-        return Boolean(await domain.createProject(name));
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [domain, persistenceErrorMessage],
-  );
-
-  const createChat = useCallback(
-    async (title: string, projectId?: string) => {
-      if (!domain.hasWorkspace) return false;
-      try {
-        const created = await domain.createChat(title, projectId);
-        if (!created) return false;
-        setRequestedBranchId("");
-        return {
-          id: String(created.id),
-          publicId: created.publicId,
-          rootBranchPublicId: created.rootBranchPublicId,
-        };
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [domain, persistenceErrorMessage],
-  );
-
-  const archiveChat = useCallback(
-    async (chatId: string, replacementTitle: string) => {
-      const chat = domain.chats.find((candidate) => candidate.id === chatId);
-      if (!chat?.publicId) return false;
-      try {
-        const result = await domain.archiveChat(chat.publicId, replacementTitle);
-        if (!result) return false;
-        if (chatId === activeChatId) setRequestedBranchId("");
-        return { ...result, archivedChatPublicId: chat.publicId };
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [activeChatId, domain, persistenceErrorMessage],
-  );
-
-  const restoreChat = useCallback(
-    async (chatPublicId: string) => {
-      try {
-        return await domain.restoreChat(chatPublicId);
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [domain, persistenceErrorMessage],
-  );
-
-  const renameChat = useCallback(
-    async (chatId: string, title: string) => {
-      const chat = domain.chats.find((candidate) => candidate.id === chatId);
-      if (!chat?.publicId) return false;
-      try {
-        return await domain.renameChat(chat.publicId, title);
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [domain, persistenceErrorMessage],
-  );
-
-  const setChatPinned = useCallback(
-    async (chatId: string, pinned: boolean) => {
-      const chat = domain.chats.find((candidate) => candidate.id === chatId);
-      if (!chat?.publicId) return false;
-      try {
-        return await domain.setChatPinned(chat.publicId, pinned);
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [domain, persistenceErrorMessage],
-  );
-
-  const markChatUnread = useCallback(
-    async (chatId: string) => {
-      const chat = domain.chats.find((candidate) => candidate.id === chatId);
-      if (!chat?.publicId) return false;
-      if (chat.isUnread) return true;
-      try {
-        return await domain.markChatUnread(chat.publicId);
-      } catch {
-        toast.error(persistenceErrorMessage);
-        return false;
-      }
-    },
-    [domain, persistenceErrorMessage],
-  );
-
-  const markChatRead = useCallback(
-    async (chatId: string, messagePublicId: string) => {
-      const chat = domain.chats.find((candidate) => candidate.id === chatId);
-      if (!chat?.publicId || chat.latestCompletedMessagePublicId !== messagePublicId) return false;
-      if (!chat.isUnread) return true;
-      try {
-        return await domain.markChatRead(chat.publicId, messagePublicId);
-      } catch {
-        return false;
-      }
-    },
-    [domain],
-  );
-
-  const selectWorkspace = useCallback(
-    async (workspaceId: string) => {
-      if (demoMode) {
-        if (workspaceId !== demoWorkspace.id) return null;
-        const activeChat = demoChats.find((chat) => chat.id === demoActiveChatId) ?? demoChats[0];
-        setRequestedBranchId("");
-        return activeChat
-          ? {
-              workspacePublicId: demoWorkspace.publicId,
-              chatPublicId: activeChat.publicId ?? activeChat.id,
-              branchPublicId: activeChat.rootBranchPublicId ?? activeChat.id,
-            }
-          : null;
-      }
-      const selected = await domain.selectWorkspace(workspaceId);
-      setRequestedBranchId("");
-      return selected;
-    },
-    [demoActiveChatId, domain.selectWorkspace],
-  );
+  const {
+    archiveChat,
+    createChat,
+    createProject,
+    createWorkspace,
+    markChatRead,
+    markChatUnread,
+    renameChat,
+    restoreChat,
+    selectWorkspace,
+    setChatPinned,
+  } = useConversationWorkspaceActions({
+    activeChatId,
+    demoActiveChatId,
+    domain,
+    loading,
+    persistenceErrorMessage,
+    setRequestedBranchId,
+  });
 
   return {
     activeBranchId,
