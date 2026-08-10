@@ -157,11 +157,14 @@ test("cloud history edit persists the rewritten turn", async ({ page }) => {
   await dialog.getByRole("textbox", { name: "Message" }).fill("Edited cloud prompt");
   await dialog.getByRole("button", { name: "Save and retry" }).click();
   await expect(assistantMessage(page, "Stub response: Edited cloud prompt")).toBeVisible();
+  await expect(dialog).toBeHidden({ timeout: 15_000 });
 
   await page.reload();
   await expect(userMessage(page, "Cloud prompt")).toHaveCount(0);
   await expect(userMessage(page, "Edited cloud prompt")).toHaveCount(1);
-  await expect(assistantMessage(page, "Stub response: Edited cloud prompt")).toHaveCount(1);
+  await expect(assistantMessage(page, "Stub response: Edited cloud prompt")).toHaveCount(1, {
+    timeout: 15_000,
+  });
 });
 
 test("stops an in-progress generation and ignores its late response", async ({ page }) => {

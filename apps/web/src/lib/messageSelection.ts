@@ -224,7 +224,7 @@ function displayTextFromRange(range: Range): string {
   return chunks
     .join("")
     .replace(/[ \t]+\n/gu, "\n")
-    .replace(/\n{3,}/gu, "\n\n")
+    .replace(/\n{2,}/gu, "\n")
     .trim();
 }
 

@@ -88,8 +88,8 @@ Raw <strong onclick="globalThis.markdownUnsafe = true">HTML</strong> stays inert
   await expect(response.locator("strong")).toHaveText("fragment");
   await expect(response.locator("em")).toHaveText("emphasis");
   await expect(response.locator("del")).toHaveText("old copy");
-  await expect(response.getByRole("list")).toHaveCount(3);
-  await expect(response.getByRole("listitem").filter({ hasText: "Nested bullet" })).toBeVisible();
+  await expect(response.getByRole("list")).toHaveCount(4);
+  await expect(response.getByRole("listitem").filter({ hasText: /^Nested bullet$/ })).toBeVisible();
   await expect(response.getByRole("checkbox")).toHaveCount(2);
   await expect(response.getByRole("checkbox").first()).toBeChecked();
   await expect(response.getByRole("checkbox").first()).toBeDisabled();

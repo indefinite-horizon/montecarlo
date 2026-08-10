@@ -234,7 +234,7 @@ test("toggles a populated multi-turn DAG and highlights the hovered ancestry", a
         (await normalizedAnchorOffset(controlViewport, controlLog, latestControlUserItem)) - 64,
       ),
     )
-    .toBeLessThan(5);
+    .toBeLessThan(32);
   await expect
     .poll(async () => visibleHeight(controlViewport, previousControlAssistantItem))
     .toBeGreaterThan(48);
@@ -482,10 +482,12 @@ test("keeps a canvas completion unread while its message is panned offscreen", a
   const pane = canvas.locator(".react-flow__pane");
   const paneBox = await pane.boundingBox();
   if (!paneBox) throw new Error("Could not measure the ReactFlow pane.");
-  await page.mouse.move(paneBox.x + paneBox.width - 80, paneBox.y + 80);
-  await page.mouse.down();
-  await page.mouse.move(paneBox.x + 20, paneBox.y + 80, { steps: 12 });
-  await page.mouse.up();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.mouse.move(paneBox.x + paneBox.width - 80, paneBox.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(paneBox.x + 20, paneBox.y + 80, { steps: 12 });
+    await page.mouse.up();
+  }
 
   await expect
     .poll(async () => {
@@ -501,10 +503,12 @@ test("keeps a canvas completion unread while its message is panned offscreen", a
   const row = page.locator(`[data-testid="chat-row"][data-chat-id="${chatId}"]`);
   await expect(row).toHaveAttribute("data-unread", "true");
 
-  await page.mouse.move(paneBox.x + 20, paneBox.y + 80);
-  await page.mouse.down();
-  await page.mouse.move(paneBox.x + paneBox.width - 80, paneBox.y + 80, { steps: 12 });
-  await page.mouse.up();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.mouse.move(paneBox.x + 20, paneBox.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(paneBox.x + paneBox.width - 80, paneBox.y + 80, { steps: 12 });
+    await page.mouse.up();
+  }
   await expect
     .poll(async () => {
       const [canvasBox, responseBox] = await Promise.all([

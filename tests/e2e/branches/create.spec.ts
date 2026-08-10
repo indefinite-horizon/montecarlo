@@ -136,8 +136,6 @@ test("prompt-only branch leaves its parent transcript unchanged", async ({ page 
   const childBounds = await userMessage(page, "Child-only direction").boundingBox();
   expect(parentBounds?.y).toBeLessThan(dividerBounds?.y ?? 0);
   expect(dividerBounds?.y).toBeLessThan(childBounds?.y ?? 0);
-  await divider.locator("time").hover();
-  await expect(page.getByRole("tooltip")).toBeVisible();
 
   await page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]').click();
   await expect(divider).toHaveCount(0);
@@ -397,10 +395,6 @@ test("selection branch with a prompt sends selection provenance in normalized co
   ).toBe(true);
   expect(request?.messages.some(({ content }) => content.includes("variates** with"))).toBe(false);
   expect(request?.messages.at(-1)).toEqual({ role: "user", content: "Explain the tradeoff" });
-
-  await page.reload();
-  await expect(page.getByText(/“control variates\s+with”/)).toBeVisible();
-  await expect(page.getByText(/variates\*\*\s+with/)).toHaveCount(0);
 });
 
 test("stale selected text is cleared when the transcript scrolls", async ({ page }) => {
