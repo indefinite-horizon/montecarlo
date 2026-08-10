@@ -82,7 +82,8 @@ jobs:
       - run: bun run validate:i18n
 
   e2e-core:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # Convex, two Vite servers, and two Chromium workers run concurrently.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2

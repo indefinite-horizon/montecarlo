@@ -284,13 +284,15 @@ test("toggles a populated multi-turn DAG and highlights the hovered ancestry", a
 });
 
 test("preserves the canvas viewport when selecting another thread", async ({ page }) => {
-  const rootTitle = (await page.getByTestId("chat-breadcrumb-title").innerText()).trim();
   await createPromptBranch(page, "Canvas viewport child");
   await openCanvas(page);
 
   const canvas = page.getByTestId("conversation-canvas");
-  const root = canvasCard(page, rootTitle);
+  const root = canvas.getByRole("article").filter({ hasNotText: "Active" });
+  await expect(root).toHaveCount(1);
   await expect(root.getByText("Active", { exact: true })).toHaveCount(0);
+  await root.evaluate((element) => element.setAttribute("data-e2e-selection-target", "true"));
+  const selectionTarget = canvas.locator('[data-e2e-selection-target="true"]');
 
   await canvas.getByRole("button", { name: "Zoom in" }).click();
   await canvas.getByRole("button", { name: "Zoom in" }).click();
@@ -310,9 +312,9 @@ test("preserves the canvas viewport when selecting another thread", async ({ pag
     Reflect.set(element, "__canvasLoadingProbe", { observer, state });
     inspect();
   });
-  await root.click({ position: { x: 120, y: 32 } });
+  await selectionTarget.click({ position: { x: 120, y: 32 } });
 
-  await expect(root.getByText("Active", { exact: true })).toBeVisible();
+  await expect(selectionTarget.getByText("Active", { exact: true })).toBeVisible();
   await expect(canvas).toHaveAttribute("data-e2e-instance", "preserved");
   await expect(canvas.locator(".react-flow__viewport")).toHaveAttribute(
     "data-e2e-instance",

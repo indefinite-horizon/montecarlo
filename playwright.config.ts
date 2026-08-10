@@ -38,7 +38,7 @@ export default defineConfig({
     timeout: expectTimeout,
   },
   outputDir: "test-results",
-  reporter: [["html", { outputFolder: "playwright-report" }]],
+  reporter: process.env.CI ? [["line"]] : [["html", { outputFolder: "playwright-report" }]],
   use: {
     baseURL,
     screenshot: "only-on-failure",
