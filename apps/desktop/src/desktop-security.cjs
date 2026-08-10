@@ -71,7 +71,11 @@ function resolveDevelopmentRendererUrl(rawValue) {
 function isAllowedExternalUrl(target) {
   try {
     const url = new URL(target);
-    return url.protocol === "https:" && url.username === "" && url.password === "";
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.username === "" &&
+      url.password === ""
+    );
   } catch {
     return false;
   }

@@ -25,6 +25,7 @@ export const workspacePermissionValidator = v.union(
   v.literal("workspace:manage"),
   v.literal("members:manage"),
   v.literal("content:read"),
+  v.literal("content:personalize"),
   v.literal("content:write"),
   v.literal("runs:execute"),
 );

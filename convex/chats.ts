@@ -257,7 +257,7 @@ export const setPinned = mutation({
   },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:personalize");
     const chatPublicId = createPublicId("chat", args.chatPublicId);
     const chat = await ctx.db
       .query("chats")
@@ -305,7 +305,7 @@ export const markUnread = mutation({
   },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:personalize");
     const chatPublicId = createPublicId("chat", args.chatPublicId);
     const chat = await ctx.db
       .query("chats")
@@ -342,7 +342,7 @@ export const markRead = mutation({
   },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:personalize");
     const chatPublicId = createPublicId("chat", args.chatPublicId);
     const messagePublicId = createPublicId("message", args.messagePublicId);
     const chat = await ctx.db
