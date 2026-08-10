@@ -3,14 +3,15 @@
 import { useMutation, useQueries, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type {
-  BranchAnchor,
-  ChatBranch,
-  ChatMessage,
-  ChatSummary,
-  ProjectSummary,
-  ProviderId,
-  ReasoningEffort,
+import {
+  type BranchAnchor,
+  type ChatBranch,
+  type ChatMessage,
+  type ChatSummary,
+  isThreadOpeningContentReady,
+  type ProjectSummary,
+  type ProviderId,
+  type ReasoningEffort,
 } from "@/lib/conversation";
 import {
   domainApi,
@@ -21,28 +22,33 @@ import {
 } from "@/lib/convexDomainApi";
 import {
   encodeMessageEnvelope,
-  getRuntimeMessageContent,
   MESSAGE_ENVELOPE_CONTENT_TYPE,
   putRuntimeBlob,
 } from "@/lib/runtimeClient";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { sharedConfig } from "../../../../lib/config";
+import { messageHydrationKey, useMessageContentHydration } from "./useMessageContentHydration";
 
 const PROJECT_COLORS = ["terracotta", "blue", "gold", "green"] as const;
-const MAX_HYDRATED_MESSAGES = 256;
 
 function titleForBranch(
   branch: {
+    title?: string;
     anchorPrompt?: string;
-    anchorSelection?: { quote: string };
+    anchorSelection?: { quote: string; displayText?: string };
     contextPreview?: string;
     depth: number;
   },
   chatTitle: string,
 ): string {
   if (branch.depth === 0) return chatTitle;
-  const value = branch.anchorPrompt ?? branch.anchorSelection?.quote ?? branch.contextPreview;
+  if (branch.title) return branch.title;
+  const value =
+    branch.anchorSelection?.displayText ??
+    branch.anchorSelection?.quote ??
+    branch.anchorPrompt ??
+    branch.contextPreview;
   if (!value) return chatTitle;
   return value.length > 38 ? `${value.slice(0, 37).trim()}…` : value;
 }
@@ -68,20 +74,26 @@ function lineageIds(
   return lineage;
 }
 
-function hydrationKey(message: MessageItem): string {
-  return `${message.objectKey}:${message.sha256}`;
-}
-
 function messageFromEnvelope(
   message: MessagePage["items"][number],
   hydratedContent: Record<string, string>,
+  contentReady: boolean,
 ): ChatMessage {
+  const hydrated = hydratedContent[messageHydrationKey(message)];
+  const provider = ["codex", "anthropic", "ollama", "openrouter"].includes(message.provider ?? "")
+    ? (message.provider as ProviderId)
+    : undefined;
   return {
     id: String(message.id),
+    publicId: message.publicId,
     branchId: String(message.branchId),
     role: message.role === "tool" ? "system" : message.role,
-    content: hydratedContent[hydrationKey(message)] ?? message.contentPreview,
+    content: hydrated ?? message.contentPreview,
+    contentReady,
     createdAt: message.createdAt,
+    provider,
+    model: message.model,
+    runStatus: message.runStatus,
   };
 }
 
@@ -163,7 +175,7 @@ export function useConvexConversationData(
           workspaceId: workspace.id,
           chatId: chat.id,
           limit: 500,
-          targetBranchPublicId: requestedBranchPublicId,
+          targetBranchPublicId: hydrateAllBranches ? undefined : requestedBranchPublicId,
         }
       : "skip",
   );
@@ -203,58 +215,7 @@ export function useConvexConversationData(
       ),
     [messageResults],
   );
-  const [hydratedContent, setHydratedContent] = useState<Record<string, string>>({});
-  const hydratedContentRef = useRef<Record<string, string>>({});
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const seen = new Set<string>();
-    const targets = [...messageSummaries]
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .slice(-MAX_HYDRATED_MESSAGES)
-      .filter((message) => {
-        const key = hydrationKey(message);
-        if (seen.has(key) || hydratedContentRef.current[key] !== undefined) return false;
-        seen.add(key);
-        return true;
-      });
-    let cursor = 0;
-
-    const hydrateNext = async () => {
-      while (!controller.signal.aborted) {
-        const message = targets[cursor];
-        cursor += 1;
-        if (!message) return;
-        try {
-          const content = await getRuntimeMessageContent({
-            objectKey: message.objectKey,
-            backend: message.backend,
-            envelopeVersion: message.envelopeVersion,
-            byteLength: message.byteLength,
-            sha256: message.sha256,
-            signal: controller.signal,
-          });
-          if (!controller.signal.aborted) {
-            setHydratedContent((current) => {
-              const next = { ...current, [hydrationKey(message)]: content };
-              const excess = Object.keys(next).length - MAX_HYDRATED_MESSAGES;
-              if (excess > 0) {
-                for (const key of Object.keys(next).slice(0, excess)) delete next[key];
-              }
-              hydratedContentRef.current = next;
-              return next;
-            });
-          }
-        } catch {
-          // The Convex preview remains visible when the local runtime or blob is unavailable.
-        }
-      }
-    };
-
-    const workerCount = Math.min(4, targets.length);
-    void Promise.all(Array.from({ length: workerCount }, () => hydrateNext()));
-    return () => controller.abort();
-  }, [messageSummaries]);
+  const { hydratedContent, isMessageContentReady } = useMessageContentHydration(messageSummaries);
 
   const projectItems = useMemo(() => {
     const items = projectPage?.items ?? [];
@@ -282,7 +243,13 @@ export function useConvexConversationData(
         projectId: item.projectId ? String(item.projectId) : undefined,
         title: item.title,
         updatedAt: item.updatedAt,
+        lastUserMessageAt: item.lastUserMessageAt,
         branchCount: item.id === chat?.id && tree ? tree.branches.length : 1,
+        latestCompletedMessagePublicId: item.latestCompletedMessagePublicId,
+        isUnread: item.isUnread,
+        isPinned: item.isPinned,
+        pinnedAt: item.pinnedAt,
+        hasOngoingResponse: false,
       })),
     [chat?.id, chatItems, tree],
   );
@@ -292,7 +259,9 @@ export function useConvexConversationData(
       const result = messageResults[String(branch.id)];
       const page = result && !(result instanceof Error) ? (result as MessagePage) : undefined;
       const messages =
-        page?.items.map((message) => messageFromEnvelope(message, hydratedContent)) ?? [];
+        page?.items.map((message) =>
+          messageFromEnvelope(message, hydratedContent, isMessageContentReady(message)),
+        ) ?? [];
       return {
         id: String(branch.id),
         publicId: branch.publicId,
@@ -309,34 +278,49 @@ export function useConvexConversationData(
                   ? String(branch.anchorSourceMessageId)
                   : undefined,
                 selectedText: branch.anchorSelection?.quote,
+                displayText: branch.anchorSelection?.displayText,
                 selectionStart: branch.anchorSelection?.start,
                 selectionEnd: branch.anchorSelection?.end,
                 prompt: branch.anchorPrompt ?? "",
               },
         messages,
+        openingContentReady:
+          result !== undefined &&
+          (result instanceof Error || isThreadOpeningContentReady(messages)),
       };
     });
-  }, [hydratedContent, messageResults, tree]);
+  }, [hydratedContent, isMessageContentReady, messageResults, tree]);
 
   const createWorkspaceMutation = useMutation(domainApi.workspaces.create);
   const createProjectMutation = useMutation(domainApi.projects.create);
   const createChatMutation = useMutation(domainApi.chats.create);
+  const archiveChatMutation = useMutation(domainApi.chats.archive);
+  const restoreChatMutation = useMutation(domainApi.chats.restore);
+  const renameChatMutation = useMutation(domainApi.chats.rename);
+  const setChatPinnedMutation = useMutation(domainApi.chats.setPinned);
+  const markChatUnreadMutation = useMutation(domainApi.chats.markUnread);
+  const markChatReadMutation = useMutation(domainApi.chats.markRead);
   const claimAutoTitleMutation = useMutation(domainApi.chats.claimAutoTitle);
   const releaseAutoTitleMutation = useMutation(domainApi.chats.releaseAutoTitle);
   const completeAutoTitleMutation = useMutation(domainApi.chats.completeAutoTitle);
   const ensureInitialChatMutation = useMutation(domainApi.chats.ensureInitial);
   const createBranchMutation = useMutation(domainApi.branches.create);
+  const completeBranchAutoTitleMutation = useMutation(domainApi.branches.completeAutoTitle);
   const reserveBlobMutation = useMutation(domainApi.blobManifests.reserve);
   const markBlobAvailableMutation = useMutation(domainApi.blobManifests.markAvailable);
   const appendMessageMutation = useMutation(domainApi.messages.append);
+  const truncateFromUserMessageMutation = useMutation(
+    domainApi.messageHistory.truncateFromUserMessage,
+  );
   const createRunMutation = useMutation(domainApi.runs.create);
   const completeRunMutation = useMutation(domainApi.runs.complete);
   const bootstrapAttemptsRef = useRef(new Set<string>());
   const bootstrapFailuresRef = useRef(new Map<string, number>());
   const bootstrapRetryTimersRef = useRef(new Map<string, number>());
-  const activeWorkspaceIdRef = useRef<string>();
+  const activeWorkspaceIdRef = useRef<string | undefined>(undefined);
   const [bootstrappingWorkspaceId, setBootstrappingWorkspaceId] = useState<string>();
   const [bootstrapRetryNonce, setBootstrapRetryNonce] = useState(0);
+  const markReadRequestsRef = useRef(new Map<string, Promise<boolean>>());
   activeWorkspaceIdRef.current = workspace ? String(workspace.id) : undefined;
 
   const selectWorkspace = useCallback(
@@ -462,6 +446,69 @@ export function useConvexConversationData(
     [createChatMutation, workspace],
   );
 
+  const archiveChat = useCallback(
+    async (chatPublicId: string, replacementTitle: string) => {
+      if (!workspace) return null;
+      return archiveChatMutation({
+        workspaceId: workspace.id,
+        chatPublicId,
+        replacementTitle,
+      });
+    },
+    [archiveChatMutation, workspace],
+  );
+
+  const restoreChat = useCallback(
+    async (chatPublicId: string) => {
+      if (!workspace) return false;
+      return restoreChatMutation({ workspaceId: workspace.id, chatPublicId });
+    },
+    [restoreChatMutation, workspace],
+  );
+
+  const renameChat = useCallback(
+    async (chatPublicId: string, title: string) => {
+      if (!workspace) return false;
+      return renameChatMutation({ workspaceId: workspace.id, chatPublicId, title });
+    },
+    [renameChatMutation, workspace],
+  );
+
+  const setChatPinned = useCallback(
+    async (chatPublicId: string, pinned: boolean) => {
+      if (!workspace) return false;
+      return setChatPinnedMutation({ workspaceId: workspace.id, chatPublicId, pinned });
+    },
+    [setChatPinnedMutation, workspace],
+  );
+
+  const markChatUnread = useCallback(
+    async (chatPublicId: string) => {
+      if (!workspace) return false;
+      return markChatUnreadMutation({ workspaceId: workspace.id, chatPublicId });
+    },
+    [markChatUnreadMutation, workspace],
+  );
+
+  const markChatRead = useCallback(
+    (chatPublicId: string, messagePublicId: string): Promise<boolean> => {
+      if (!workspace) return Promise.resolve(false);
+      const key = `${workspace.id}:${chatPublicId}:${messagePublicId}`;
+      const pending = markReadRequestsRef.current.get(key);
+      if (pending) return pending;
+      const request = markChatReadMutation({
+        workspaceId: workspace.id,
+        chatPublicId,
+        messagePublicId,
+      }).finally(() => {
+        markReadRequestsRef.current.delete(key);
+      });
+      markReadRequestsRef.current.set(key, request);
+      return request;
+    },
+    [markChatReadMutation, workspace],
+  );
+
   const createBranch = useCallback(
     async (anchor: BranchAnchor, parentBranchId: string) => {
       if (!workspace || !chat) return null;
@@ -480,12 +527,25 @@ export function useConvexConversationData(
                 start: anchor.selectionStart,
                 end: anchor.selectionEnd,
                 quote: anchor.selectedText,
+                displayText: anchor.displayText,
               }
             : undefined,
         prompt: anchor.prompt || undefined,
       });
     },
     [chat, createBranchMutation, workspace],
+  );
+
+  const completeBranchAutoTitle = useCallback(
+    async (branchId: string, title: string) => {
+      if (!workspace) return false;
+      return completeBranchAutoTitleMutation({
+        workspaceId: workspace.id,
+        branchId: branchId as Id<"chat_branches">,
+        title,
+      });
+    },
+    [completeBranchAutoTitleMutation, workspace],
   );
 
   const claimAutoTitle = useCallback(
@@ -626,6 +686,18 @@ export function useConvexConversationData(
     [completeRunMutation, workspace],
   );
 
+  const truncateFromUserMessage = useCallback(
+    async (messagePublicId: string) => {
+      if (!workspace || !chat) return null;
+      return truncateFromUserMessageMutation({
+        workspaceId: workspace.id,
+        chatId: chat.id,
+        messagePublicId,
+      });
+    },
+    [chat, truncateFromUserMessageMutation, workspace],
+  );
+
   const activeBranchId = tree
     ? String(
         tree.branches.some((branch) => String(branch.id) === requestedBranchId)
@@ -654,9 +726,11 @@ export function useConvexConversationData(
     activeChat: chat,
     activeProject: projectItems.find((project) => project.id === chat?.projectId),
     authenticated,
+    archiveChat,
     branches,
     claimAutoTitle,
     completeAutoTitle,
+    completeBranchAutoTitle,
     chats,
     completeRun,
     createBranch,
@@ -680,7 +754,13 @@ export function useConvexConversationData(
       messagePagesLoading,
     persistMessage,
     projects,
+    markChatUnread,
+    markChatRead,
+    renameChat,
     releaseAutoTitle,
+    restoreChat,
+    setChatPinned,
+    truncateFromUserMessage,
     selectChat: setSelectedChatId,
     selectWorkspace,
     workspace: workspace as WorkspaceItem | undefined,

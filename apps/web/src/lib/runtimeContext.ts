@@ -29,7 +29,7 @@ function selectionMessage(
   anchor: BranchAnchor | undefined,
   limit: number,
 ): ChatMessage | undefined {
-  const selection = anchor?.selectedText?.trim();
+  const selection = (anchor?.displayText ?? anchor?.selectedText)?.trim();
   if (!selection) return undefined;
   const content = [
     "This branch follows a passage highlighted by the user. Treat it as the branch's explicit focus:",

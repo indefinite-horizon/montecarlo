@@ -172,7 +172,9 @@ async function ensureInitialChat(
 ): Promise<{ chat: Doc<"chats">; rootBranch: Doc<"chat_branches"> }> {
   let chat = await ctx.db
     .query("chats")
-    .withIndex("by_workspace_updated_at", (query) => query.eq("workspaceId", workspaceId))
+    .withIndex("by_workspace_archived_last_user_message_at", (query) =>
+      query.eq("workspaceId", workspaceId).eq("archivedAt", undefined),
+    )
     .order("desc")
     .first();
   if (!chat) {
@@ -183,6 +185,7 @@ async function ensureInitialChat(
       title: bootstrapConfig.chatTitle,
       autoTitleStatus: "pending",
       rootBranchPublicId: bootstrapConfig.rootBranchPublicId,
+      lastUserMessageAt: now,
       createdByUserId: userId,
       createdAt: now,
       updatedAt: now,

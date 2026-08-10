@@ -90,11 +90,14 @@ function makeMockCtx() {
         build(queryBuilder);
         let direction: "asc" | "desc" = "asc";
         const sortField =
-          indexName === "by_workspace_updated_at"
-            ? "updatedAt"
-            : indexName === "by_workspace_chat_created_at"
-              ? "createdAt"
-              : "_creationTime";
+          indexName === "by_workspace_archived_last_user_message_at"
+            ? "lastUserMessageAt"
+            : indexName === "by_workspace_updated_at" ||
+                indexName === "by_workspace_archived_updated_at"
+              ? "updatedAt"
+              : indexName === "by_workspace_chat_created_at"
+                ? "createdAt"
+                : "_creationTime";
         const selectedRows = () =>
           storeFor(table)
             .all()

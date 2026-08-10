@@ -134,6 +134,12 @@ export default defineSchema({
     autoTitleModel: v.optional(v.string()),
     rootBranchId: v.optional(v.id("chat_branches")),
     rootBranchPublicId: v.optional(v.string()),
+    latestCompletedMessageId: v.optional(v.id("messages")),
+    latestCompletedMessagePublicId: v.optional(v.string()),
+    latestCompletedAt: v.optional(v.number()),
+    // Optional for legacy rows; every newly-created chat initializes this to
+    // createdAt and user messages advance it.
+    lastUserMessageAt: v.optional(v.number()),
     createdByUserId: v.id("users"),
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -141,7 +147,39 @@ export default defineSchema({
   })
     .index("by_workspace_public_id", ["workspaceId", "publicId"])
     .index("by_workspace_updated_at", ["workspaceId", "updatedAt"])
-    .index("by_workspace_project_updated_at", ["workspaceId", "projectId", "updatedAt"]),
+    .index("by_workspace_project_updated_at", ["workspaceId", "projectId", "updatedAt"])
+    .index("by_workspace_archived_updated_at", ["workspaceId", "archivedAt", "updatedAt"])
+    .index("by_workspace_archived_last_user_message_at", [
+      "workspaceId",
+      "archivedAt",
+      "lastUserMessageAt",
+    ])
+    .index("by_workspace_project_archived_updated_at", [
+      "workspaceId",
+      "projectId",
+      "archivedAt",
+      "updatedAt",
+    ])
+    .index("by_workspace_project_archived_last_user_message_at", [
+      "workspaceId",
+      "projectId",
+      "archivedAt",
+      "lastUserMessageAt",
+    ]),
+
+  chat_user_states: defineTable({
+    publicId: v.string(),
+    workspaceId: v.id("workspaces"),
+    chatId: v.id("chats"),
+    userId: v.id("users"),
+    lastReadMessageId: v.optional(v.id("messages")),
+    lastReadMessagePublicId: v.optional(v.string()),
+    pinnedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_workspace_user_chat", ["workspaceId", "userId", "chatId"])
+    .index("by_workspace_chat", ["workspaceId", "chatId"]),
 
   chat_branches: defineTable({
     publicId: v.string(),
@@ -153,6 +191,7 @@ export default defineSchema({
     anchorSourceMessageId: v.optional(v.id("messages")),
     anchorSelection: v.optional(branchSelectionValidator),
     anchorPrompt: v.optional(v.string()),
+    title: v.optional(v.string()),
     contextMessageIds: v.array(v.id("messages")),
     contextPreview: v.optional(v.string()),
     depth: v.number(),
@@ -177,6 +216,8 @@ export default defineSchema({
     sha256: v.string(),
     replyToMessageId: v.optional(v.id("messages")),
     runId: v.optional(v.id("agent_runs")),
+    provider: v.optional(v.string()),
+    model: v.optional(v.string()),
     createdByUserId: v.id("users"),
     createdAt: v.number(),
   })
@@ -205,7 +246,9 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_workspace_public_id", ["workspaceId", "publicId"]),
+  })
+    .index("by_workspace_public_id", ["workspaceId", "publicId"])
+    .index("by_workspace_chat_updated_at", ["workspaceId", "chatId", "updatedAt"]),
 
   blob_manifests: defineTable({
     publicId: v.string(),

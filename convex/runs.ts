@@ -1,6 +1,7 @@
 /** Provider-agnostic model and agent-harness run lifecycle. */
 
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 import { convexConfig } from "./config";
 import { createPublicId, optionalText, requireText } from "./lib/domainValidation";
@@ -150,6 +151,7 @@ export const complete = mutation({
     if (!run || run.workspaceId !== args.workspaceId) {
       throw new Error("Run not found in this workspace.");
     }
+    let completedOutputMessage: Doc<"messages"> | null = null;
     if (args.outputMessageId) {
       const outputMessage = await ctx.db.get(args.outputMessageId);
       if (
@@ -157,10 +159,12 @@ export const complete = mutation({
         outputMessage.workspaceId !== args.workspaceId ||
         outputMessage.chatId !== run.chatId ||
         outputMessage.branchId !== run.branchId ||
-        outputMessage.runId !== run._id
+        outputMessage.runId !== run._id ||
+        (outputMessage.role !== "assistant" && outputMessage.role !== "tool")
       ) {
         throw new Error("Output message does not belong to this run.");
       }
+      completedOutputMessage = outputMessage;
     }
 
     const errorCode =
@@ -217,6 +221,14 @@ export const complete = mutation({
       completedAt,
       updatedAt: completedAt,
     });
+    if (args.status === "succeeded" && completedOutputMessage) {
+      await ctx.db.patch(run.chatId, {
+        latestCompletedMessageId: completedOutputMessage._id,
+        latestCompletedMessagePublicId: completedOutputMessage.publicId,
+        latestCompletedAt: completedAt,
+        updatedAt: completedAt,
+      });
+    }
     return {
       id: run._id,
       publicId: run.publicId,

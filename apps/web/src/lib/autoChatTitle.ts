@@ -1,4 +1,4 @@
-/** Runs the non-blocking model request that replaces a chat's food placeholder. */
+/** Runs the non-blocking model request that replaces an initial conversation title. */
 
 import { chatTitlePrompt, normalizeGeneratedChatTitle } from "./chatNaming";
 import type { ProviderId } from "./conversation";

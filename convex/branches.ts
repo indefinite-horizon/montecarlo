@@ -1,6 +1,7 @@
 /** Creates immutable chat branches with source and selection anchors. */
 
 import { v } from "convex/values";
+import { sharedConfig } from "../lib/config";
 import type { Doc } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 import { convexConfig } from "./config";
@@ -9,6 +10,7 @@ import {
   optionalText,
   requireNonNegativeInteger,
   requireText,
+  selectionMatchesStoredMessage,
 } from "./lib/domainValidation";
 import { branchAnchorTypeValidator, branchSelectionValidator } from "./lib/domainValidators";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
@@ -24,6 +26,7 @@ const branchNodeValidator = v.object({
   anchorSourceMessageId: v.optional(v.id("messages")),
   anchorSelection: v.optional(branchSelectionValidator),
   anchorPrompt: v.optional(v.string()),
+  title: v.string(),
   contextMessageIds: v.array(v.id("messages")),
   contextPreview: v.optional(v.string()),
   depth: v.number(),
@@ -64,7 +67,7 @@ export const create = mutation({
       throw new Error("A prompt is required when branching without a selection.");
     }
 
-    let selection: { start: number; end: number; quote: string } | undefined;
+    let selection: { start: number; end: number; quote: string; displayText?: string } | undefined;
     if (args.selection) {
       const start = requireNonNegativeInteger(args.selection.start, "Selection start");
       const end = requireNonNegativeInteger(args.selection.end, "Selection end");
@@ -80,6 +83,11 @@ export const create = mutation({
         quote: requireText(
           args.selection.quote,
           "Selection quote",
+          convexConfig.domain.limits.selectionQuoteLength,
+        ),
+        displayText: optionalText(
+          args.selection.displayText,
+          "Selection display text",
           convexConfig.domain.limits.selectionQuoteLength,
         ),
       };
@@ -114,11 +122,7 @@ export const create = mutation({
       if (!lineageBranchIds.has(String(sourceMessage.branchId))) {
         throw new Error("Source message is not part of the parent branch lineage.");
       }
-      if (
-        selection &&
-        (selection.end > sourceMessage.contentPreview.length ||
-          sourceMessage.contentPreview.slice(selection.start, selection.end) !== selection.quote)
-      ) {
+      if (selection && !selectionMatchesStoredMessage(selection, sourceMessage)) {
         throw new Error("Selection does not match the stored source content.");
       }
     }
@@ -156,8 +160,18 @@ export const create = mutation({
       .map((message) => message.contentPreview)
       .join("\n\n");
     const previewSource =
-      selection?.quote ?? (recentContextPreview || sourceMessage?.contentPreview);
+      selection?.displayText ??
+      selection?.quote ??
+      (recentContextPreview || sourceMessage?.contentPreview);
     const contextPreview = previewSource?.slice(0, convexConfig.domain.limits.contentPreviewLength);
+    const title = requireText(
+      (selection?.displayText ?? selection?.quote ?? prompt ?? "New branch").slice(
+        0,
+        convexConfig.domain.limits.chatTitleLength,
+      ),
+      "Branch title",
+      convexConfig.domain.limits.chatTitleLength,
+    );
     const now = Date.now();
     const branchId = await ctx.db.insert("chat_branches", {
       publicId,
@@ -169,6 +183,7 @@ export const create = mutation({
       anchorSourceMessageId: sourceMessage?._id,
       anchorSelection: selection,
       anchorPrompt: prompt,
+      title,
       contextMessageIds,
       contextPreview,
       depth: parent.depth + 1,
@@ -189,10 +204,39 @@ export const create = mutation({
       anchorSourceMessageId: sourceMessage?._id,
       anchorSelection: selection,
       anchorPrompt: prompt,
+      title,
       contextMessageIds,
       contextPreview,
       depth: parent.depth + 1,
       createdAt: now,
     };
+  },
+});
+
+export const completeAutoTitle = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    branchId: v.id("chat_branches"),
+    title: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.workspaceId, "content:write");
+    const branch = await ctx.db.get(args.branchId);
+    if (!branch || branch.workspaceId !== args.workspaceId || !branch.parentBranchId) {
+      throw new Error("Child branch not found in this workspace.");
+    }
+    const title = requireText(
+      args.title,
+      "Branch title",
+      convexConfig.domain.limits.chatTitleLength,
+    );
+    if (title.split(/\s+/u).length > sharedConfig.chatNaming.maxGeneratedWords) {
+      throw new Error(
+        `Branch title must contain at most ${sharedConfig.chatNaming.maxGeneratedWords} words.`,
+      );
+    }
+    await ctx.db.patch(branch._id, { title });
+    return true;
   },
 });

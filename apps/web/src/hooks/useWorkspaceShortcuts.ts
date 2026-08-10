@@ -10,6 +10,7 @@ export function useWorkspaceShortcuts({
   loading,
   workspaceId,
   createNewChat,
+  archiveFocusedChat,
   openProviderSelection,
   cycleThinkingLevel,
   setCommandPaletteOpen,
@@ -20,6 +21,7 @@ export function useWorkspaceShortcuts({
   loading: boolean;
   workspaceId?: string;
   createNewChat: () => Promise<boolean>;
+  archiveFocusedChat: () => Promise<void>;
   openProviderSelection: () => void;
   cycleThinkingLevel: () => void;
   setCommandPaletteOpen: BooleanSetter;
@@ -49,6 +51,13 @@ export function useWorkspaceShortcuts({
         if (!loading && workspaceId) setProjectCreateOpen(true);
         return;
       }
+      if (matchesAppShortcut(event, "archiveChat")) {
+        event.preventDefault();
+        setCommandPaletteOpen(false);
+        setProviderMenuOpen(false);
+        if (!loading && workspaceId) void archiveFocusedChat();
+        return;
+      }
       if (matchesAppShortcut(event, "providerSelection")) {
         event.preventDefault();
         setCommandPaletteOpen(false);
@@ -66,6 +75,7 @@ export function useWorkspaceShortcuts({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     blockingDialogOpen,
+    archiveFocusedChat,
     createNewChat,
     cycleThinkingLevel,
     loading,

@@ -77,12 +77,14 @@ describe("desktop security helpers", () => {
     assert.equal(isAllowedRendererUrl("http://127.0.0.1:5174/projects", true, origin), false);
   });
 
-  it("opens external links only for explicitly trusted HTTPS origins", () => {
+  it("opens credential-free HTTPS links in the system browser", () => {
     assert.equal(isAllowedExternalUrl("https://auth.openai.com/device"), true);
     assert.equal(isAllowedExternalUrl("https://platform.openai.com/docs"), true);
-    assert.equal(isAllowedExternalUrl("https://example.com/phishing"), false);
+    assert.equal(isAllowedExternalUrl("https://example.com/docs"), true);
     assert.equal(isAllowedExternalUrl("https://user@auth.openai.com/device"), false);
     assert.equal(isAllowedExternalUrl("http://auth.openai.com/device"), false);
+    assert.equal(isAllowedExternalUrl("javascript:alert(1)"), false);
+    assert.equal(isAllowedExternalUrl("file:///tmp/example"), false);
   });
 
   it("allows only the canonical packaged renderer host", () => {

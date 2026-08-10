@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ChatBranch,
   type ChatMessage,
+  isThreadOpeningContentReady,
   nextReasoningEffort,
   visibleMessages,
 } from "../../apps/web/src/lib/conversation";
@@ -80,5 +81,28 @@ describe("reasoning effort cycling", () => {
     expect(nextReasoningEffort("high", sparseOptions)).toBe("none");
     expect(nextReasoningEffort("medium", sparseOptions)).toBe("none");
     expect(nextReasoningEffort("medium", [])).toBe("medium");
+  });
+});
+
+describe("thread opening content", () => {
+  it("waits for the latest anchored turn without blocking on older messages", () => {
+    const messages = [
+      { ...message("old-user", "root", 1), contentReady: false },
+      {
+        ...message("old-assistant", "root", 2),
+        role: "assistant" as const,
+        contentReady: false,
+      },
+      { ...message("latest-user", "root", 3), contentReady: true },
+      {
+        ...message("latest-assistant", "root", 4),
+        role: "assistant" as const,
+        contentReady: true,
+      },
+    ];
+
+    expect(isThreadOpeningContentReady(messages)).toBe(true);
+    messages[3] = { ...messages[3], contentReady: false };
+    expect(isThreadOpeningContentReady(messages)).toBe(false);
   });
 });

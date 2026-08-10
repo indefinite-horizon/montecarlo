@@ -2,6 +2,7 @@
 
 import { useSearch } from "@tanstack/react-router";
 import {
+  Archive,
   Boxes,
   Brain,
   ChevronRight,
@@ -20,20 +21,27 @@ import {
 } from "lucide-react";
 import { memo, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import { useClearCollapsedTextSelection } from "@/hooks/useClearCollapsedTextSelection";
 import { useConversationController } from "@/hooks/useConversationController";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { useProviderDiscovery } from "@/hooks/useProviderDiscovery";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspaceRouteSync, type WorkspaceView } from "@/hooks/useWorkspaceRouteSync";
 import { useWorkspaceShortcuts } from "@/hooks/useWorkspaceShortcuts";
 import { randomFoodChatName } from "@/lib/chatNaming";
-import { nextReasoningEffort, type SelectionAnchor } from "@/lib/conversation";
+import {
+  isThreadOpeningContentReady,
+  nextReasoningEffort,
+  type SelectionAnchor,
+} from "@/lib/conversation";
 import { appShortcutLabel } from "@/lib/keyboardShortcuts";
 import { ActionTooltip } from "./ActionTooltip";
 import { BranchComposer, SelectionBranchAction } from "./BranchComposer";
 import { BranchMap } from "./BranchMap";
 import { ChatComposer } from "./ChatComposer";
-import { ChatTranscript } from "./ChatTranscript";
+import { ChatRenameDialog } from "./ChatRenameDialog";
 import { CommandPalette, type CommandPaletteAction } from "./CommandPalette";
 import { LazyConversationCanvas } from "./LazyConversationCanvas";
 import { ModelEditDialog } from "./ModelEditDialog";
@@ -42,7 +50,7 @@ import { ProviderSettings } from "./ProviderSettings";
 import { Button } from "./ui/button";
 import { WorkspaceSetup } from "./WorkspaceSetup";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
-
+import { WorkspaceThread } from "./WorkspaceThread";
 export const WorkspaceApp = memo(function WorkspaceApp() {
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
@@ -55,6 +63,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     t("workspace.persistenceError"),
     view === "canvas",
     initialChatTitle,
+    t("branch.defaultPrompt"),
     routeSearch.workspace,
     routeSearch.chat,
     routeSearch.branch,
@@ -84,20 +93,41 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   });
   const [selection, setSelection] = useState<SelectionAnchor>();
   const [branchComposerOpen, setBranchComposerOpen] = useState(false);
+  useClearCollapsedTextSelection(setSelection, !branchComposerOpen);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workspaceSetupOpen, setWorkspaceSetupOpen] = useState(false);
   const [projectCreateOpen, setProjectCreateOpen] = useState(false);
+  const [renameChatId, setRenameChatId] = useState<string>();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
   const [modelEditorOpen, setModelEditorOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [branchMapOpen, setBranchMapOpen] = useState(() => window.innerWidth >= 1280);
+  const sidebarOverlaysWorkspace = useMediaQuery("(max-width: 767px)");
+  const branchMapOverlaysWorkspace = useMediaQuery("(max-width: 1279px)");
   const activeBranch = controller.branches.find(
     (branch) => branch.id === controller.activeBranchId,
   );
   const isStreaming = controller.branches.some((branch) =>
     branch.messages.some((message) => message.isStreaming),
   );
+  const transcriptStreaming = controller.messages.some((message) => message.isStreaming);
+  const transcriptContentReady =
+    !controller.loading && isThreadOpeningContentReady(controller.messages);
+  const activeChat = controller.chats.find((chat) => chat.id === controller.activeChatId);
+  const latestCompletedMessagePublicId = activeChat?.latestCompletedMessagePublicId;
+  const latestCompletedMessage = latestCompletedMessagePublicId
+    ? controller.branches
+        .flatMap((branch) => branch.messages)
+        .find((message) => message.publicId === latestCompletedMessagePublicId)
+    : undefined;
+  const readMessagePublicId =
+    activeChat?.isUnread &&
+    latestCompletedMessage &&
+    !latestCompletedMessage.isStreaming &&
+    latestCompletedMessage.contentReady !== false
+      ? latestCompletedMessagePublicId
+      : undefined;
   const openPromptBranch = useCallback(() => {
     setSelection(undefined);
     setBranchComposerOpen(true);
@@ -179,6 +209,105 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     [controller.chats, controller.selectChat, controller.workspacePublicId, navigateToRoute, view],
   );
 
+  const archiveChat = useCallback(
+    async (chatId: string) => {
+      const chat = controller.chats.find((candidate) => candidate.id === chatId);
+      if (!chat) return;
+      const wasActive = chatId === controller.activeChatId;
+      const result = await controller.archiveChat(chatId, randomFoodChatName());
+      if (!result) return;
+      if (wasActive) {
+        navigateToRoute(
+          {
+            workspace: controller.workspacePublicId,
+            chat: result.nextChatPublicId,
+            branch: result.nextRootBranchPublicId,
+            view,
+          },
+          true,
+        );
+      }
+      toast.success(t("sidebar.archiveSuccess", { title: chat.title }), {
+        action: {
+          label: t("common.undo"),
+          onClick: () => void controller.restoreChat(result.archivedChatPublicId),
+        },
+      });
+    },
+    [
+      controller.activeChatId,
+      controller.archiveChat,
+      controller.chats,
+      controller.restoreChat,
+      controller.workspacePublicId,
+      navigateToRoute,
+      t,
+      view,
+    ],
+  );
+
+  const archiveFocusedChat = useCallback(async () => {
+    if (!controller.activeChatId) return;
+    await archiveChat(controller.activeChatId);
+  }, [archiveChat, controller.activeChatId]);
+
+  const markChatUnread = useCallback(
+    async (chatId: string) => {
+      const marked = await controller.markChatUnread(chatId);
+      if (marked) toast.success(t("sidebar.markUnreadSuccess"));
+    },
+    [controller.markChatUnread, t],
+  );
+
+  const setChatPinned = useCallback(
+    async (chatId: string, pinned: boolean) => {
+      const changed = await controller.setChatPinned(chatId, pinned);
+      if (changed) toast.success(t(pinned ? "sidebar.pinSuccess" : "sidebar.unpinSuccess"));
+    },
+    [controller.setChatPinned, t],
+  );
+
+  const renameChat = controller.chats.find((chat) => chat.id === renameChatId);
+  const submitChatRename = useCallback(
+    async (title: string) => {
+      if (!renameChatId) return false;
+      const renamed = await controller.renameChat(renameChatId, title);
+      if (renamed) toast.success(t("sidebar.renameSuccess"));
+      return renamed;
+    },
+    [controller.renameChat, renameChatId, t],
+  );
+
+  const copyChatLink = useCallback(
+    async (chatId: string) => {
+      const chat = controller.chats.find((candidate) => candidate.id === chatId);
+      if (!controller.workspacePublicId || !chat?.publicId || !chat.rootBranchPublicId) {
+        toast.error(t("sidebar.copyLinkError"));
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.search = new URLSearchParams({
+        workspace: controller.workspacePublicId,
+        chat: chat.publicId,
+        branch: chat.rootBranchPublicId,
+        view,
+      }).toString();
+      url.hash = "";
+      try {
+        await navigator.clipboard.writeText(url.toString());
+        toast.success(t("sidebar.copyLinkSuccess"));
+      } catch {
+        toast.error(t("sidebar.copyLinkError"));
+      }
+    },
+    [controller.chats, controller.workspacePublicId, t, view],
+  );
+
+  const markLatestMessageRead = useCallback(
+    (messagePublicId: string) => controller.markChatRead(controller.activeChatId, messagePublicId),
+    [controller.activeChatId, controller.markChatRead],
+  );
+
   const selectWorkspace = useCallback(
     async (workspaceId: string) => {
       const requestId = workspaceSelectionRequestRef.current + 1;
@@ -245,6 +374,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   );
 
   const newChatShortcut = appShortcutLabel("newChat");
+  const archiveChatShortcut = appShortcutLabel("archiveChat");
   const providerShortcut = appShortcutLabel("providerSelection");
   const thinkingShortcut = appShortcutLabel("thinkingLevel");
   const newProjectShortcut = appShortcutLabel("newProject");
@@ -252,14 +382,21 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     settingsOpen ||
     workspaceSetupOpen ||
     projectCreateOpen ||
+    Boolean(renameChat) ||
     modelEditorOpen ||
     branchComposerOpen;
+  const workspaceOccluded =
+    (sidebarOpen && sidebarOverlaysWorkspace) ||
+    (view === "thread" && branchMapOpen && branchMapOverlaysWorkspace);
+  const readTrackingEnabled =
+    !blockingDialogOpen && !commandPaletteOpen && !providerMenuOpen && !workspaceOccluded;
 
   useWorkspaceShortcuts({
     blockingDialogOpen,
     loading: controller.loading,
     workspaceId: controller.workspaceId,
     createNewChat,
+    archiveFocusedChat,
     openProviderSelection,
     cycleThinkingLevel,
     setCommandPaletteOpen,
@@ -277,6 +414,15 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         disabled: controller.loading || !controller.workspaceId,
         dataTestId: "command-new-chat",
         onSelect: () => void createNewChat(),
+      },
+      {
+        id: "archive-chat",
+        label: t("commandPalette.archiveChat"),
+        icon: <Archive />,
+        shortcut: archiveChatShortcut,
+        disabled: controller.loading || !controller.activeChatId,
+        dataTestId: "command-archive-chat",
+        onSelect: () => void archiveFocusedChat(),
       },
       {
         id: "select-provider",
@@ -361,6 +507,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     ],
     [
       activeBranch,
+      archiveChatShortcut,
+      archiveFocusedChat,
       controller.activeChatId,
       controller.chats,
       controller.loading,
@@ -397,6 +545,11 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         workspaceMode={controller.workspaceMode}
         workspaces={controller.workspaces}
         onCreateChat={createNewChat}
+        onArchiveChat={(chatId) => void archiveChat(chatId)}
+        onCopyChatLink={(chatId) => void copyChatLink(chatId)}
+        onMarkChatUnread={(chatId) => void markChatUnread(chatId)}
+        onRenameChat={setRenameChatId}
+        onSetChatPinned={(chatId, pinned) => void setChatPinned(chatId, pinned)}
         onSelectChat={selectChat}
         onSelectWorkspace={selectWorkspace}
         onCreateWorkspace={() => setWorkspaceSetupOpen(true)}
@@ -532,32 +685,32 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
               branches={controller.branches}
               activeBranchId={controller.activeBranchId}
               loading={controller.loading}
+              readMessageId={readMessagePublicId}
+              readTrackingEnabled={readTrackingEnabled}
+              onReadMessage={markLatestMessageRead}
               onSelectBranch={selectBranch}
               onOpenThread={() => setWorkspaceView("thread")}
+              onEditMessage={controller.editMessage}
+              onRetryMessage={controller.retryMessage}
               onCreateBranch={createBranch}
             />
           </Suspense>
         ) : (
           <>
-            <div
-              data-testid="transcript-scroller"
-              className="min-h-0 flex-1 overflow-y-auto"
-              onScroll={() => setSelection(undefined)}
-            >
-              {activeBranch?.anchor?.selectedText ? (
-                <div className="mx-auto mt-6 max-w-3xl px-5 sm:px-8">
-                  <div className="rounded-lg border border-primary/20 bg-accent/45 px-4 py-3">
-                    <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
-                      {t("branch.following")}
-                    </p>
-                    <p className="mt-1 line-clamp-2 font-display text-xs italic text-foreground/70">
-                      “{activeBranch.anchor.selectedText}”
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-              <ChatTranscript messages={controller.messages} onSelectText={setSelection} />
-            </div>
+            <WorkspaceThread
+              activeBranch={activeBranch}
+              contentReady={transcriptContentReady}
+              messages={controller.messages}
+              onEditMessage={controller.editMessage}
+              onClearSelection={() => setSelection(undefined)}
+              onSelectText={setSelection}
+              onReadMessage={markLatestMessageRead}
+              onRetryMessage={controller.retryMessage}
+              readMessageId={readMessagePublicId}
+              readTrackingEnabled={readTrackingEnabled}
+              streaming={transcriptStreaming}
+              threadId={`${controller.activeChatId}:${controller.activeBranchId}`}
+            />
 
             <ChatComposer
               disabled={controller.loading || isStreaming}
@@ -652,6 +805,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
       <BranchMap
         branches={controller.branches}
         activeBranchId={controller.activeBranchId}
+        unreadBranchId={activeChat?.isUnread ? latestCompletedMessage?.branchId : undefined}
         onSelect={selectBranch}
         onCreate={openPromptBranch}
         open={view === "thread" && branchMapOpen}
@@ -662,6 +816,17 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         onOpenChange={setProjectCreateOpen}
         onCreate={controller.createProject}
       />
+      {renameChat ? (
+        <ChatRenameDialog
+          key={renameChat.id}
+          initialTitle={renameChat.title}
+          open
+          onOpenChange={(open) => {
+            if (!open) setRenameChatId(undefined);
+          }}
+          onRename={submitChatRename}
+        />
+      ) : null}
       <ModelEditDialog
         open={modelEditorOpen}
         provider={controller.provider}

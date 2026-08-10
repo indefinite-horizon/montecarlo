@@ -48,9 +48,9 @@ export function useWorkspaceRouteSync({
 }) {
   const navigate = useNavigate({ from: "/" });
   const routeKey = workspaceRouteKey(routeSearch);
-  const handledRouteKeyRef = useRef<string>();
-  const pendingRouteKeyRef = useRef<string>();
-  const lastRouteKeyRef = useRef<string>();
+  const handledRouteKeyRef = useRef<string | undefined>(undefined);
+  const pendingRouteKeyRef = useRef<string | undefined>(undefined);
+  const lastRouteKeyRef = useRef<string | undefined>(undefined);
   const expectedRouteKeysRef = useRef<string[]>([]);
   const [appRouteHistory, setAppRouteHistory] = useState(() =>
     createWorkspaceRouteHistory(routeSearch),

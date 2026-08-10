@@ -17,13 +17,18 @@ import {
 
 let runtime: RuntimeMock;
 
-test.beforeEach(async ({ context, page }) => {
+test.beforeEach(async ({ context, page }, testInfo) => {
   runtime = await installRuntimeMock(context);
   await openFreshUser(page, "conversation");
-  await createWorkspace(page, `Conversation workspace ${Date.now()}`);
+  await createWorkspace(
+    page,
+    `Conversation workspace ${Date.now()}`,
+    testInfo.title === "cloud history edit persists the rewritten turn" ? "cloud" : "local",
+  );
 });
 
 test("sends a message, consumes normalized stream events, and persists both turns", async ({
+  context,
   page,
 }) => {
   await sendMessage(
@@ -31,8 +36,44 @@ test("sends a message, consumes normalized stream events, and persists both turn
     "Explain deterministic sampling",
     "Stub response: Explain deterministic sampling",
   );
+  const userTurn = userMessage(page, "Explain deterministic sampling");
+  const assistantTurn = page
+    .getByRole("article", { name: "Monte Carlo", exact: true })
+    .filter({ has: assistantMessage(page, "Stub response: Explain deterministic sampling") });
+  await expect(userTurn.getByText("You", { exact: true })).toHaveCount(0);
+  await expect(assistantTurn.getByText("Monte Carlo", { exact: true })).toHaveCount(0);
+
+  const userActions = userTurn.getByTestId("message-output-actions");
+  await expect(userActions).toHaveCSS("opacity", "0");
+  await userTurn.hover();
+  await expect(userActions).toHaveCSS("opacity", "1");
+  await expect(userTurn.locator("time")).toContainText(/now|ago/u);
+  await expect(userTurn.getByRole("button", { name: "Edit message" })).toBeVisible();
+  await expect(userTurn.getByRole("button", { name: "Retry" })).toBeVisible();
+
   await expect.poll(() => titleRequests(runtime).length).toBe(1);
   expect(conversationRequests(runtime)).toHaveLength(1);
+  const requestedModel = conversationRequests(runtime)[0]?.model;
+  if (!requestedModel) throw new Error("The runtime request did not include a model.");
+  const outputActions = assistantTurn.getByTestId("message-output-actions");
+  await expect(outputActions).toHaveCSS("opacity", "0");
+  const copyOutput = assistantTurn.getByRole("button", { name: "Copy output" });
+  await assistantTurn.hover();
+  await expect(outputActions).toHaveCSS("opacity", "1");
+  const modelMetadata = outputActions.getByTestId("message-model");
+  await expect(modelMetadata).toContainText(requestedModel);
+  await expect(modelMetadata.locator("svg")).toHaveCount(1);
+  await expect(assistantTurn.locator("time")).toContainText(/now|ago/u);
+  await assistantTurn.locator("time").hover();
+  await expect(page.getByRole("tooltip")).toContainText(
+    /^[A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2} [AP]M$/u,
+  );
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await copyOutput.click();
+  await expect(page.getByText("Output copied.", { exact: true })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("Stub response: Explain deterministic sampling");
   expect(conversationRequests(runtime)[0]?.messages.at(-1)).toEqual({
     role: "user",
     content: "Explain deterministic sampling",
@@ -51,6 +92,76 @@ test("sends a message, consumes normalized stream events, and persists both turn
   await expect(
     assistantMessage(page, "Stub response: Explain deterministic sampling"),
   ).toBeVisible();
+  await page.mouse.move(0, 0);
+  const reloadedAssistantTurn = page
+    .getByRole("article", { name: "Monte Carlo", exact: true })
+    .filter({ has: assistantMessage(page, "Stub response: Explain deterministic sampling") });
+  const reloadedOutputActions = reloadedAssistantTurn.getByTestId("message-output-actions");
+  await expect(reloadedOutputActions).toHaveCSS("opacity", "0");
+  await reloadedAssistantTurn.hover();
+  await expect(reloadedOutputActions).toHaveCSS("opacity", "1");
+  await expect(reloadedOutputActions.getByTestId("message-model")).toContainText(requestedModel);
+  await expect(reloadedOutputActions.getByTestId("message-model").locator("svg")).toHaveCount(1);
+});
+
+test("retry and edit replace a completed turn and truncate subsequent history", async ({
+  page,
+}) => {
+  await sendMessage(page, "First prompt", "Stub response: First prompt");
+  await sendMessage(page, "Later prompt", "Stub response: Later prompt");
+
+  const firstTurn = userMessage(page, "First prompt");
+  await firstTurn.hover();
+  await firstTurn.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => conversationRequests(runtime).length).toBe(3);
+  await expect(assistantMessage(page, "Stub response: First prompt")).toBeVisible();
+  await expect(userMessage(page, "Later prompt")).toHaveCount(0);
+  await expect(assistantMessage(page, "Stub response: Later prompt")).toHaveCount(0);
+  await expect(userMessage(page, "First prompt")).toHaveCount(1);
+  expect(conversationRequests(runtime)[2]?.messages).toEqual([
+    { role: "user", content: "First prompt" },
+  ]);
+
+  const retriedTurn = userMessage(page, "First prompt");
+  await retriedTurn.hover();
+  await retriedTurn.getByRole("button", { name: "Edit message" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit message" });
+  await dialog.getByRole("textbox", { name: "Message" }).fill("Edited prompt");
+  await dialog.getByRole("button", { name: "Save and retry" }).click();
+  await expect.poll(() => conversationRequests(runtime).length).toBe(4);
+  await expect(userMessage(page, "First prompt")).toHaveCount(0);
+  await expect(userMessage(page, "Edited prompt")).toHaveCount(1);
+  await expect(assistantMessage(page, "Stub response: Edited prompt")).toBeVisible();
+
+  const editedResponse = page
+    .getByRole("article", { name: "Monte Carlo", exact: true })
+    .filter({ has: assistantMessage(page, "Stub response: Edited prompt") });
+  await editedResponse.hover();
+  await editedResponse.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => conversationRequests(runtime).length).toBe(5);
+  await expect(userMessage(page, "Edited prompt")).toHaveCount(1);
+  await expect(assistantMessage(page, "Stub response: Edited prompt")).toHaveCount(1);
+
+  await page.reload();
+  await expect(userMessage(page, "Edited prompt")).toHaveCount(1);
+  await expect(assistantMessage(page, "Stub response: Edited prompt")).toHaveCount(1);
+  await expect(userMessage(page, "Later prompt")).toHaveCount(0);
+});
+
+test("cloud history edit persists the rewritten turn", async ({ page }) => {
+  await sendMessage(page, "Cloud prompt", "Stub response: Cloud prompt");
+  const turn = userMessage(page, "Cloud prompt");
+  await turn.hover();
+  await turn.getByRole("button", { name: "Edit message" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit message" });
+  await dialog.getByRole("textbox", { name: "Message" }).fill("Edited cloud prompt");
+  await dialog.getByRole("button", { name: "Save and retry" }).click();
+  await expect(assistantMessage(page, "Stub response: Edited cloud prompt")).toBeVisible();
+
+  await page.reload();
+  await expect(userMessage(page, "Cloud prompt")).toHaveCount(0);
+  await expect(userMessage(page, "Edited cloud prompt")).toHaveCount(1);
+  await expect(assistantMessage(page, "Stub response: Edited cloud prompt")).toHaveCount(1);
 });
 
 test("stops an in-progress generation and ignores its late response", async ({ page }) => {

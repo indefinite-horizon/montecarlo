@@ -27,6 +27,11 @@ const chatSummaryValidator = v.object({
   autoTitleReady: v.optional(v.boolean()),
   rootBranchId: v.id("chat_branches"),
   rootBranchPublicId: v.string(),
+  latestCompletedMessagePublicId: v.optional(v.string()),
+  lastUserMessageAt: v.number(),
+  isUnread: v.boolean(),
+  isPinned: v.boolean(),
+  pinnedAt: v.optional(v.number()),
   archivedAt: v.optional(v.number()),
   createdAt: v.number(),
   updatedAt: v.number(),
@@ -41,6 +46,7 @@ const branchNodeValidator = v.object({
   anchorSourceMessageId: v.optional(v.id("messages")),
   anchorSelection: v.optional(branchSelectionValidator),
   anchorPrompt: v.optional(v.string()),
+  title: v.optional(v.string()),
   contextMessageIds: v.array(v.id("messages")),
   contextPreview: v.optional(v.string()),
   depth: v.number(),
@@ -52,6 +58,12 @@ const autoTitleClaimValidator = v.object({
   intent: v.string(),
   provider: providerIdValidator,
   model: v.string(),
+});
+
+const archiveResultValidator = v.object({
+  archived: v.boolean(),
+  nextChatPublicId: v.string(),
+  nextRootBranchPublicId: v.string(),
 });
 
 function isProviderId(value: string | undefined): value is ProviderId {
@@ -68,6 +80,7 @@ function toBranchNode(branch: Doc<"chat_branches">) {
     anchorSourceMessageId: branch.anchorSourceMessageId,
     anchorSelection: branch.anchorSelection,
     anchorPrompt: branch.anchorPrompt,
+    title: branch.title,
     contextMessageIds: branch.contextMessageIds,
     contextPreview: branch.contextPreview,
     depth: branch.depth,
@@ -75,7 +88,42 @@ function toBranchNode(branch: Doc<"chat_branches">) {
   };
 }
 
-async function toChatSummary(ctx: QueryCtx | MutationCtx, chat: Doc<"chats">) {
+function chatActivityAt(chat: Doc<"chats">): number {
+  return chat.lastUserMessageAt ?? chat.createdAt;
+}
+
+async function mostRecentActiveChat(
+  ctx: QueryCtx | MutationCtx,
+  workspaceId: Id<"workspaces">,
+): Promise<Doc<"chats"> | null> {
+  const [currentChat, legacyChat] = await Promise.all([
+    ctx.db
+      .query("chats")
+      .withIndex("by_workspace_archived_last_user_message_at", (index) =>
+        index
+          .eq("workspaceId", workspaceId)
+          .eq("archivedAt", undefined)
+          .gt("lastUserMessageAt", undefined),
+      )
+      .order("desc")
+      .first(),
+    ctx.db
+      .query("chats")
+      .withIndex("by_workspace_archived_last_user_message_at", (index) =>
+        index
+          .eq("workspaceId", workspaceId)
+          .eq("archivedAt", undefined)
+          .eq("lastUserMessageAt", undefined),
+      )
+      .order("desc")
+      .first(),
+  ]);
+  if (!currentChat) return legacyChat;
+  if (!legacyChat) return currentChat;
+  return chatActivityAt(currentChat) >= chatActivityAt(legacyChat) ? currentChat : legacyChat;
+}
+
+async function toChatSummary(ctx: QueryCtx | MutationCtx, chat: Doc<"chats">, userId: Id<"users">) {
   if (!chat.rootBranchId) {
     throw new Error("Chat is missing its root branch.");
   }
@@ -91,6 +139,12 @@ async function toChatSummary(ctx: QueryCtx | MutationCtx, chat: Doc<"chats">) {
     }
     rootBranchPublicId = rootBranch.publicId;
   }
+  const userState = await ctx.db
+    .query("chat_user_states")
+    .withIndex("by_workspace_user_chat", (index) =>
+      index.eq("workspaceId", chat.workspaceId).eq("userId", userId).eq("chatId", chat._id),
+    )
+    .unique();
   return {
     id: chat._id,
     publicId: chat.publicId,
@@ -101,6 +155,14 @@ async function toChatSummary(ctx: QueryCtx | MutationCtx, chat: Doc<"chats">) {
     autoTitleReady: chat.autoTitleInputMessageId !== undefined,
     rootBranchId: chat.rootBranchId,
     rootBranchPublicId,
+    latestCompletedMessagePublicId: chat.latestCompletedMessagePublicId,
+    lastUserMessageAt: chat.lastUserMessageAt ?? chat.createdAt,
+    isUnread: Boolean(
+      chat.latestCompletedMessageId &&
+        userState?.lastReadMessageId !== chat.latestCompletedMessageId,
+    ),
+    isPinned: userState?.pinnedAt !== undefined,
+    pinnedAt: userState?.pinnedAt,
     archivedAt: chat.archivedAt,
     createdAt: chat.createdAt,
     updatedAt: chat.updatedAt,
@@ -149,6 +211,7 @@ async function insertChat(
     title,
     ...(input.autoTitle ? { autoTitleStatus: "pending" as const } : {}),
     rootBranchPublicId,
+    lastUserMessageAt: now,
     createdByUserId: input.createdByUserId,
     createdAt: now,
     updatedAt: now,
@@ -175,6 +238,9 @@ async function insertChat(
     autoTitleStatus: input.autoTitle ? ("pending" as const) : undefined,
     rootBranchId,
     rootBranchPublicId,
+    lastUserMessageAt: now,
+    isUnread: false,
+    isPinned: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -191,7 +257,7 @@ export const list = query({
     hasMore: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
     const limit = normalizeLimit(args.limit);
 
     if (args.projectId) {
@@ -199,26 +265,70 @@ export const list = query({
       if (!project || project.workspaceId !== args.workspaceId) {
         throw new Error("Project not found in this workspace.");
       }
-      const chats = await ctx.db
-        .query("chats")
-        .withIndex("by_workspace_project_updated_at", (index) =>
-          index.eq("workspaceId", args.workspaceId).eq("projectId", args.projectId),
-        )
-        .order("desc")
-        .take(limit + 1);
+      const [currentChats, legacyChats] = await Promise.all([
+        ctx.db
+          .query("chats")
+          .withIndex("by_workspace_project_archived_last_user_message_at", (index) =>
+            index
+              .eq("workspaceId", args.workspaceId)
+              .eq("projectId", args.projectId)
+              .eq("archivedAt", undefined)
+              .gt("lastUserMessageAt", undefined),
+          )
+          .order("desc")
+          .take(limit + 1),
+        ctx.db
+          .query("chats")
+          .withIndex("by_workspace_project_archived_last_user_message_at", (index) =>
+            index
+              .eq("workspaceId", args.workspaceId)
+              .eq("projectId", args.projectId)
+              .eq("archivedAt", undefined)
+              .eq("lastUserMessageAt", undefined),
+          )
+          .order("desc")
+          .take(limit + 1),
+      ]);
+      const chats = [...currentChats, ...legacyChats].sort(
+        (left, right) => chatActivityAt(right) - chatActivityAt(left),
+      );
       return {
-        items: await Promise.all(chats.slice(0, limit).map((chat) => toChatSummary(ctx, chat))),
+        items: await Promise.all(
+          chats.slice(0, limit).map((chat) => toChatSummary(ctx, chat, user._id)),
+        ),
         hasMore: chats.length > limit,
       };
     }
 
-    const chats = await ctx.db
-      .query("chats")
-      .withIndex("by_workspace_updated_at", (index) => index.eq("workspaceId", args.workspaceId))
-      .order("desc")
-      .take(limit + 1);
+    const [currentChats, legacyChats] = await Promise.all([
+      ctx.db
+        .query("chats")
+        .withIndex("by_workspace_archived_last_user_message_at", (index) =>
+          index
+            .eq("workspaceId", args.workspaceId)
+            .eq("archivedAt", undefined)
+            .gt("lastUserMessageAt", undefined),
+        )
+        .order("desc")
+        .take(limit + 1),
+      ctx.db
+        .query("chats")
+        .withIndex("by_workspace_archived_last_user_message_at", (index) =>
+          index
+            .eq("workspaceId", args.workspaceId)
+            .eq("archivedAt", undefined)
+            .eq("lastUserMessageAt", undefined),
+        )
+        .order("desc")
+        .take(limit + 1),
+    ]);
+    const chats = [...currentChats, ...legacyChats].sort(
+      (left, right) => chatActivityAt(right) - chatActivityAt(left),
+    );
     return {
-      items: await Promise.all(chats.slice(0, limit).map((chat) => toChatSummary(ctx, chat))),
+      items: await Promise.all(
+        chats.slice(0, limit).map((chat) => toChatSummary(ctx, chat, user._id)),
+      ),
       hasMore: chats.length > limit,
     };
   },
@@ -231,14 +341,14 @@ export const getByPublicId = query({
   },
   returns: v.union(chatSummaryValidator, v.null()),
   handler: async (ctx, args) => {
-    await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
     const chat = await ctx.db
       .query("chats")
       .withIndex("by_workspace_public_id", (index) =>
         index.eq("workspaceId", args.workspaceId).eq("publicId", args.publicId),
       )
       .unique();
-    return chat ? toChatSummary(ctx, chat) : null;
+    return chat && chat.archivedAt === undefined ? toChatSummary(ctx, chat, user._id) : null;
   },
 });
 
@@ -265,6 +375,250 @@ export const create = mutation({
       ...args,
       createdByUserId: user._id,
     });
+  },
+});
+
+export const rename = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    chatPublicId: v.string(),
+    title: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.workspaceId, "content:write");
+    const chatPublicId = createPublicId("chat", args.chatPublicId);
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_workspace_public_id", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("publicId", chatPublicId),
+      )
+      .unique();
+    if (!chat || chat.archivedAt !== undefined) return false;
+    const title = requireText(args.title, "Chat title", convexConfig.domain.limits.chatTitleLength);
+    await ctx.db.patch(chat._id, {
+      title,
+      autoTitleStatus: "generated",
+      autoTitleInputMessageId: undefined,
+      autoTitleClaimToken: undefined,
+      autoTitleClaimedAt: undefined,
+      autoTitleProvider: undefined,
+      autoTitleModel: undefined,
+      updatedAt: Date.now(),
+    });
+    return true;
+  },
+});
+
+export const archive = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    chatPublicId: v.string(),
+    replacementTitle: v.string(),
+  },
+  returns: archiveResultValidator,
+  handler: async (ctx, args) => {
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:write");
+    const chatPublicId = createPublicId("chat", args.chatPublicId);
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_workspace_public_id", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("publicId", chatPublicId),
+      )
+      .unique();
+    if (!chat) throw new Error("Chat not found in this workspace.");
+
+    const archived = chat.archivedAt === undefined;
+    if (archived) {
+      const now = Date.now();
+      await ctx.db.patch(chat._id, { archivedAt: now, updatedAt: now });
+    }
+
+    const nextChat = await mostRecentActiveChat(ctx, args.workspaceId);
+    const nextSummary = nextChat
+      ? await toChatSummary(ctx, nextChat, user._id)
+      : await insertChat(ctx, {
+          workspaceId: args.workspaceId,
+          title: args.replacementTitle,
+          autoTitle: true,
+          createdByUserId: user._id,
+        });
+
+    return {
+      archived,
+      nextChatPublicId: nextSummary.publicId,
+      nextRootBranchPublicId: nextSummary.rootBranchPublicId,
+    };
+  },
+});
+
+export const restore = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    chatPublicId: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.workspaceId, "content:write");
+    const chatPublicId = createPublicId("chat", args.chatPublicId);
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_workspace_public_id", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("publicId", chatPublicId),
+      )
+      .unique();
+    if (!chat) throw new Error("Chat not found in this workspace.");
+    if (chat.archivedAt === undefined) return true;
+    await ctx.db.patch(chat._id, { archivedAt: undefined, updatedAt: Date.now() });
+    return true;
+  },
+});
+
+export const setPinned = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    chatPublicId: v.string(),
+    pinned: v.boolean(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const chatPublicId = createPublicId("chat", args.chatPublicId);
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_workspace_public_id", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("publicId", chatPublicId),
+      )
+      .unique();
+    if (!chat || chat.archivedAt !== undefined) return false;
+
+    const current = await ctx.db
+      .query("chat_user_states")
+      .withIndex("by_workspace_user_chat", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("userId", user._id).eq("chatId", chat._id),
+      )
+      .unique();
+    if (!args.pinned && !current) return true;
+    if (args.pinned && current?.pinnedAt !== undefined) return true;
+    if (!args.pinned && current?.pinnedAt === undefined) return true;
+
+    const now = Date.now();
+    if (current) {
+      await ctx.db.patch(current._id, {
+        pinnedAt: args.pinned ? now : undefined,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("chat_user_states", {
+        publicId: createPublicId("chatstate"),
+        workspaceId: args.workspaceId,
+        chatId: chat._id,
+        userId: user._id,
+        pinnedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    return true;
+  },
+});
+
+export const markUnread = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    chatPublicId: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const chatPublicId = createPublicId("chat", args.chatPublicId);
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_workspace_public_id", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("publicId", chatPublicId),
+      )
+      .unique();
+    if (!chat || chat.archivedAt !== undefined) return false;
+
+    const current = await ctx.db
+      .query("chat_user_states")
+      .withIndex("by_workspace_user_chat", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("userId", user._id).eq("chatId", chat._id),
+      )
+      .unique();
+    if (!current) return true;
+    if (current.lastReadMessageId === undefined && current.lastReadMessagePublicId === undefined) {
+      return true;
+    }
+    await ctx.db.patch(current._id, {
+      lastReadMessageId: undefined,
+      lastReadMessagePublicId: undefined,
+      updatedAt: Date.now(),
+    });
+    return true;
+  },
+});
+
+export const markRead = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    chatPublicId: v.string(),
+    messagePublicId: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const chatPublicId = createPublicId("chat", args.chatPublicId);
+    const messagePublicId = createPublicId("message", args.messagePublicId);
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_workspace_public_id", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("publicId", chatPublicId),
+      )
+      .unique();
+    if (!chat || chat.archivedAt !== undefined) return false;
+    const message = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_public_id", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("publicId", messagePublicId),
+      )
+      .unique();
+    if (
+      !message ||
+      message.chatId !== chat._id ||
+      chat.latestCompletedMessageId !== message._id ||
+      chat.latestCompletedMessagePublicId !== message.publicId
+    ) {
+      return false;
+    }
+
+    const current = await ctx.db
+      .query("chat_user_states")
+      .withIndex("by_workspace_user_chat", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("userId", user._id).eq("chatId", chat._id),
+      )
+      .unique();
+    if (current?.lastReadMessageId === message._id) return true;
+    const now = Date.now();
+    if (current) {
+      await ctx.db.patch(current._id, {
+        lastReadMessageId: message._id,
+        lastReadMessagePublicId: message.publicId,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.insert("chat_user_states", {
+        publicId: createPublicId("chatstate"),
+        workspaceId: args.workspaceId,
+        chatId: chat._id,
+        userId: user._id,
+        lastReadMessageId: message._id,
+        lastReadMessagePublicId: message.publicId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    return true;
   },
 });
 
@@ -423,12 +777,8 @@ async function ensureInitialChat(
     createdByUserId: Id<"users">;
   },
 ) {
-  const existing = await ctx.db
-    .query("chats")
-    .withIndex("by_workspace_updated_at", (index) => index.eq("workspaceId", input.workspaceId))
-    .order("desc")
-    .first();
-  if (existing) return toChatSummary(ctx, existing);
+  const existing = await mostRecentActiveChat(ctx, input.workspaceId);
+  if (existing) return toChatSummary(ctx, existing, input.createdByUserId);
 
   return insertChat(ctx, input);
 }
@@ -462,7 +812,7 @@ export const getTree = query({
     truncated: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
+    const { user } = await requireWorkspacePermission(ctx, args.workspaceId, "content:read");
     const chat = await ctx.db.get(args.chatId);
     if (!chat || chat.workspaceId !== args.workspaceId) {
       throw new Error("Chat not found in this workspace.");
@@ -512,7 +862,7 @@ export const getTree = query({
     }
 
     return {
-      chat: await toChatSummary(ctx, chat),
+      chat: await toChatSummary(ctx, chat, user._id),
       branches: selectedBranches.map(toBranchNode),
       truncated: branches.length > limit,
     };

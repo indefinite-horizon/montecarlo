@@ -65,19 +65,22 @@ export async function createProject(page: Page, name: string) {
 
 export async function createChat(page: Page, projectName?: string) {
   const navigation = page.getByRole("navigation", { name: "Projects and chats" });
-  const section = navigation
-    .locator("section")
-    .filter({ hasText: projectName ?? "Without a project" });
-  const rows = section.getByTestId("chat-row");
-  const before = await rows.count();
+  const section = projectName
+    ? navigation.getByTestId("project-section").filter({ hasText: projectName })
+    : navigation.getByTestId("projectless-chats");
+  const activeRow = section.locator(
+    '[data-testid="chat-row"]:is([aria-current="page"], :has(button[aria-current="page"]))',
+  );
+  const previousActiveChatId = (await activeRow.count())
+    ? await activeRow.getAttribute("data-chat-id")
+    : null;
   if (projectName) {
     await page.getByRole("button", { name: `New chat — ${projectName}` }).click();
   } else {
     await page.getByRole("button", { name: "New chat", exact: true }).click();
   }
-  await expect(rows).toHaveCount(before + 1);
-  const activeRow = section.locator('button[aria-current="page"]');
   await expect(activeRow).toBeVisible();
+  await expect.poll(() => activeRow.getAttribute("data-chat-id")).not.toBe(previousActiveChatId);
   const title = (await activeRow.innerText()).trim();
   expect(foodChatNames).toContain(title);
   return title;
@@ -86,7 +89,9 @@ export async function createChat(page: Page, projectName?: string) {
 export function activeChatRow(page: Page) {
   return page
     .getByRole("navigation", { name: "Projects and chats" })
-    .locator('button[aria-current="page"]');
+    .locator(
+      '[data-testid="chat-row"]:is([aria-current="page"], :has(button[aria-current="page"]))',
+    );
 }
 
 export async function sendMessage(page: Page, prompt: string, reply?: string) {
@@ -102,10 +107,7 @@ export async function sendMessage(page: Page, prompt: string, reply?: string) {
 }
 
 export function userMessage(page: Page, text: string) {
-  return page
-    .getByRole("article")
-    .filter({ has: page.getByText("You", { exact: true }) })
-    .filter({ hasText: text });
+  return page.getByRole("article", { name: "You", exact: true }).filter({ hasText: text });
 }
 
 export function assistantMessage(page: Page, text: string) {
@@ -133,23 +135,44 @@ export async function selectAssistantText(page: Page, text: string) {
   const document = page.locator('[role="document"]').filter({ hasText: text }).last();
   await document.evaluate((element, selectedText) => {
     const walker = window.document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    let node = walker.nextNode();
-    while (node) {
-      const value = node.textContent ?? "";
-      const start = value.indexOf(selectedText);
-      if (start >= 0) {
+    const nodes: Text[] = [];
+    let current = walker.nextNode();
+    while (current) {
+      nodes.push(current as Text);
+      current = walker.nextNode();
+    }
+    const combined = nodes.map((node) => node.data).join("");
+    const selectionStart = combined.indexOf(selectedText);
+    if (selectionStart >= 0) {
+      const selectionEnd = selectionStart + selectedText.length;
+      let consumed = 0;
+      let startBoundary: { node: Text; offset: number } | undefined;
+      let endBoundary: { node: Text; offset: number } | undefined;
+      for (const node of nodes) {
+        const nextConsumed = consumed + node.length;
+        if (!startBoundary && selectionStart <= nextConsumed) {
+          startBoundary = { node, offset: selectionStart - consumed };
+        }
+        if (selectionEnd <= nextConsumed) {
+          endBoundary = { node, offset: selectionEnd - consumed };
+          break;
+        }
+        consumed = nextConsumed;
+      }
+      if (startBoundary && endBoundary) {
         const range = window.document.createRange();
-        range.setStart(node, start);
-        range.setEnd(node, start + selectedText.length);
+        range.setStart(startBoundary.node, startBoundary.offset);
+        range.setEnd(endBoundary.node, endBoundary.offset);
         const selection = window.getSelection();
         selection?.removeAllRanges();
         selection?.addRange(range);
         element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
         return;
       }
-      node = walker.nextNode();
     }
     throw new Error(`Could not select text: ${selectedText}`);
   }, text);
-  await expect(page.getByRole("button", { name: "Follow this thread" })).toBeVisible();
+  const action = page.getByTestId("selection-follow-up-action");
+  await expect(action).toBeVisible();
+  await expect(action).toHaveAccessibleName("Ask Follow-up");
 }

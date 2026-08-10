@@ -23,12 +23,14 @@ export const SelectionBranchAction = memo(function SelectionBranchAction({
   return (
     <button
       type="button"
+      data-testid="selection-follow-up-action"
       className="fixed z-[70] inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[11px] font-semibold text-background shadow-lg transition-transform hover:-translate-y-px"
       style={{ left, top }}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onOpen}
     >
       <GitBranch className="size-3.5 text-primary" />
-      {t("branch.followSelection")}
+      {t("branch.askFollowUp")}
     </button>
   );
 });
@@ -53,7 +55,8 @@ export const BranchComposer = memo(function BranchComposer({
     try {
       const created = await onCreate({
         sourceMessageId: selection?.messageId,
-        selectedText: selection?.text,
+        selectedText: selection?.sourceText ?? selection?.text,
+        displayText: selection?.text,
         selectionStart: selection?.start,
         selectionEnd: selection?.end,
         prompt: prompt.trim(),
@@ -86,7 +89,7 @@ export const BranchComposer = memo(function BranchComposer({
             <GitBranch className="size-4" />
           </span>
           <h2 id="branch-composer-title" className="min-w-0 flex-1 font-display text-lg font-bold">
-            {selection ? t("branch.selectionTitle") : t("branch.promptTitle")}
+            {selection ? t("branch.askFollowUp") : t("branch.promptTitle")}
           </h2>
           <ActionTooltip label={t("common.close")} side="left">
             <Button size="icon" variant="ghost" onClick={onClose} aria-label={t("common.close")}>

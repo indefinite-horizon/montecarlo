@@ -21,6 +21,12 @@ adds blue/gold only when another hue improves path recognition.
 - Keep forms narrow enough to scan.
 - Keep app pages dense but calm; avoid oversized hero treatment in product surfaces.
 - Set stable dimensions for toolbars, buttons, tiles, and fixed-format controls.
+- Align trailing sidebar actions on one shared vertical axis. Project creation,
+  project-level chat creation, and chat archival use the same action slot, and
+  project-level chat creation stays visible while its project is expanded or collapsed.
+- Keep secondary sidebar affordances visually quiet and consistent. Icon actions,
+  hover-revealed project toggles, and shortcut hints use `text-muted-foreground`
+  at rest, on hover, and on focus instead of brightening to foreground text.
 
 ## Navigation And Context
 
@@ -34,6 +40,11 @@ adds blue/gold only when another hue improves path recognition.
   allowing an unexpected exit.
 - Keep frequent global actions visible with short verb labels; use a searchable
   command surface for broader action discovery.
+
+## Typography
+
+- Keep titles and headings in sentence case by default. Do not uppercase them
+  unless the user or product specification explicitly calls for uppercase.
 
 ## Interaction Hierarchy
 
@@ -104,6 +115,9 @@ adds blue/gold only when another hue improves path recognition.
 - Acknowledge user actions immediately. Use toasts for ephemeral success, error,
   and completion feedback; use inline notices only when the state must remain
   visible or needs an in-context action.
+- For simple, low-stakes actions such as copying a text block, do not show a
+  toast. Momentarily replace the copy icon with a checkmark while preserving the
+  button's styling, size, and position.
 - Scope loading and disabled states as narrowly as possible. Background startup,
   discovery, or refresh work should not make unrelated controls appear broken.
 - Only present options that the current context supports. When an unavailable

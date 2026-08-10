@@ -52,6 +52,11 @@ type ChatItem = {
   autoTitleReady?: boolean;
   rootBranchId: Id<"chat_branches">;
   rootBranchPublicId: string;
+  latestCompletedMessagePublicId?: string;
+  lastUserMessageAt: number;
+  isUnread: boolean;
+  isPinned: boolean;
+  pinnedAt?: number;
   archivedAt?: number;
   createdAt: number;
   updatedAt: number;
@@ -66,8 +71,9 @@ type BranchItem = {
   anchorType: "root" | "prompt" | "message" | "selection";
   anchorSourceBranchId?: Id<"chat_branches">;
   anchorSourceMessageId?: Id<"messages">;
-  anchorSelection?: { start: number; end: number; quote: string };
+  anchorSelection?: { start: number; end: number; quote: string; displayText?: string };
   anchorPrompt?: string;
+  title?: string;
   contextMessageIds: Id<"messages">[];
   contextPreview?: string;
   depth: number;
@@ -92,6 +98,9 @@ export type MessageItem = {
   sha256: string;
   replyToMessageId?: Id<"messages">;
   runId?: Id<"agent_runs">;
+  provider?: string;
+  model?: string;
+  runStatus?: "running" | "succeeded" | "failed" | "canceled";
   createdAt: number;
 };
 
@@ -192,6 +201,36 @@ type DomainApi = {
       },
       ChatItem
     >;
+    archive: PublicMutation<
+      {
+        workspaceId: Id<"workspaces">;
+        chatPublicId: string;
+        replacementTitle: string;
+      },
+      {
+        archived: boolean;
+        nextChatPublicId: string;
+        nextRootBranchPublicId: string;
+      }
+    >;
+    restore: PublicMutation<{ workspaceId: Id<"workspaces">; chatPublicId: string }, boolean>;
+    rename: PublicMutation<
+      { workspaceId: Id<"workspaces">; chatPublicId: string; title: string },
+      boolean
+    >;
+    setPinned: PublicMutation<
+      { workspaceId: Id<"workspaces">; chatPublicId: string; pinned: boolean },
+      boolean
+    >;
+    markUnread: PublicMutation<{ workspaceId: Id<"workspaces">; chatPublicId: string }, boolean>;
+    markRead: PublicMutation<
+      {
+        workspaceId: Id<"workspaces">;
+        chatPublicId: string;
+        messagePublicId: string;
+      },
+      boolean
+    >;
     claimAutoTitle: PublicMutation<
       {
         workspaceId: Id<"workspaces">;
@@ -237,7 +276,7 @@ type DomainApi = {
         parentBranchId: Id<"chat_branches">;
         publicId?: string;
         sourceMessageId?: Id<"messages">;
-        selection?: { start: number; end: number; quote: string };
+        selection?: { start: number; end: number; quote: string; displayText?: string };
         prompt?: string;
       },
       BranchItem & {
@@ -246,6 +285,10 @@ type DomainApi = {
         parentBranchId: Id<"chat_branches">;
         anchorSourceBranchId: Id<"chat_branches">;
       }
+    >;
+    completeAutoTitle: PublicMutation<
+      { workspaceId: Id<"workspaces">; branchId: Id<"chat_branches">; title: string },
+      boolean
     >;
   };
   messages: {
@@ -271,6 +314,21 @@ type DomainApi = {
         runId?: Id<"agent_runs">;
       },
       MessageItem
+    >;
+  };
+  messageHistory: {
+    truncateFromUserMessage: PublicMutation<
+      {
+        workspaceId: Id<"workspaces">;
+        chatId: Id<"chats">;
+        messagePublicId: string;
+      },
+      {
+        branchId: Id<"chat_branches">;
+        branchPublicId: string;
+        removedBranchIds: Id<"chat_branches">[];
+        removedMessagePublicIds: string[];
+      }
     >;
   };
   blobManifests: {

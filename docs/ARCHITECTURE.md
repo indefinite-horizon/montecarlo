@@ -20,7 +20,7 @@ type RuntimeEvent =
   | { type: "error"; code: string; message: string };
 ```
 
-Codex runs through the official SDK and its own credential cache. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction: their current bridge implementations require a network sandbox, which is the wrong execution location for local subscription credentials.
+Codex runs through the official CLI app-server and its own credential cache. Its token-level app-server notifications are normalized into the same runtime event stream as every other provider. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction: their current bridge implementations require a network sandbox, which is the wrong execution location for local subscription credentials.
 
 ## Chat execution
 
@@ -32,7 +32,7 @@ sequenceDiagram
     participant UI as React / Electron renderer
     participant Data as Convex + object store
     participant Runtime as Authenticated local companion
-    participant Harness as Codex SDK / Claude CLI
+    participant Harness as Codex app-server / Claude CLI
     participant AISDK as AI SDK 7
     participant Endpoint as OpenRouter / local Ollama
 
@@ -44,7 +44,7 @@ sequenceDiagram
     Runtime->>Runtime: Validate bearer, origin, request, and endpoint policy
 
     alt Codex or Claude subscription
-        Runtime->>Harness: Start SDK thread or spawn CLI with full context
+        Runtime->>Harness: Start app-server thread or spawn CLI with full context
         Note over Harness: Official tooling owns login and credential access
         Harness-->>Runtime: Native streamed events and optional session/thread ID
     else OpenRouter or Ollama model
@@ -62,6 +62,8 @@ sequenceDiagram
     UI->>Data: Persist assistant message and complete run
     Note over UI,Data: The app-owned DAG remains authoritative; provider session IDs are optional and discardable
 ```
+
+Streaming text stays transient in the initiating renderer and is persisted once, as the final message body. Convex live queries remain the source of truth for durable metadata, but are not an intermediate token journal: that would duplicate the direct SSE path and place plaintext message bodies outside the object-storage boundary.
 
 ## Chat graph
 

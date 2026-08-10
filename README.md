@@ -9,7 +9,7 @@ The repository starts from [`richardwu/convex-project-template`](https://github.
 - React/Vite SPA with project/chat creation, editable model and compatible-endpoint selection, message composition, selection-to-branch, prompt-only branching, and an interactive branch map.
 - Electron 43 shell with a sandboxed renderer, navigation guards, denied browser permissions, narrow IPC, and an authenticated loopback runtime on a child-attested ephemeral port.
 - Provider-neutral local runtime with streamed events for Codex, Claude, OpenRouter, and Ollama.
-- Codex uses the official local SDK and the user's existing Codex/ChatGPT login. Credentials remain owned by Codex and never enter the renderer, Convex, or object storage.
+- Codex uses the official local CLI app-server and the user's existing Codex/ChatGPT login. Credentials remain owned by Codex and never enter the renderer, Convex, or object storage.
 - Claude uses the official local CLI and the user's existing Claude Pro/Max login. Credentials remain owned by Claude Code and never enter the renderer, Convex, or object storage.
 - Multi-tenant Convex schema for workspaces, memberships, projects, chats, branches, message metadata, blob manifests, and model runs.
 - Versioned portable domain envelopes and validators. No workspace transfer workflow is exposed yet.
@@ -24,7 +24,7 @@ React SPA / Electron renderer
         │             message/blob metadata and runs
         │
         └── authenticated loopback runtime (Electron or companion)
-                  ├── Codex SDK ── existing local ChatGPT-plan login
+                  ├── Codex app-server ── existing local ChatGPT-plan login
                   ├── Claude CLI ── existing local Pro/Max login
                   ├── AI SDK 7 ─── OpenRouter
                   └── AI SDK 7 ─── Ollama's OpenAI-compatible endpoint

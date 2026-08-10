@@ -1,86 +1,133 @@
 /** Renders the active branch lineage and turns text selections into branch anchors. */
 
-import { UserRound } from "lucide-react";
-import { memo } from "react";
+import { Fragment, memo } from "react";
 import { useTranslation } from "react-i18next";
-import type { ChatMessage, SelectionAnchor } from "@/lib/conversation";
+import { type ChatMessage, messageScrollId, type SelectionAnchor } from "@/lib/conversation";
+import { retrySourceForMessage } from "@/lib/messageRetry";
 import { selectionAnchorFromMessage } from "@/lib/messageSelection";
 import { cn } from "@/lib/utils";
-import { MonteCarloBrand } from "./MonteCarloBrand";
+import { BranchOriginDivider } from "./BranchOriginDivider";
+import { MarkdownMessage } from "./MarkdownMessage";
+import { MessageOutputActions } from "./MessageOutputActions";
+import { MessageScrollerItem } from "./ui/message-scroller";
 
 export const ChatTranscript = memo(function ChatTranscript({
+  branchOrigin,
   messages,
+  onEditMessage,
+  onRetryMessage,
   onSelectText,
 }: {
+  branchOrigin?: { branchId: string; createdAt: number };
   messages: ChatMessage[];
-  onSelectText: (anchor: SelectionAnchor) => void;
+  onEditMessage: (message: ChatMessage, content: string) => Promise<boolean>;
+  onRetryMessage: (message: ChatMessage) => Promise<boolean>;
+  onSelectText: (anchor?: SelectionAnchor) => void;
 }) {
+  const branchOriginIndex = branchOrigin
+    ? messages.findIndex((message) => message.branchId === branchOrigin.branchId)
+    : -1;
+  const dividerIndex = branchOrigin
+    ? branchOriginIndex < 0
+      ? messages.length
+      : branchOriginIndex
+    : -1;
+
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 pb-40 pt-8 sm:px-8">
-      {messages.map((message) => (
-        <Message key={message.id} message={message} onSelectText={onSelectText} />
+    <>
+      {messages.map((message, index) => (
+        <Fragment key={messageScrollId(message)}>
+          {branchOrigin && index === dividerIndex ? (
+            <BranchOriginDivider createdAt={branchOrigin.createdAt} />
+          ) : null}
+          <MessageScrollerItem
+            className={cn(
+              "mx-auto w-full max-w-3xl px-5 sm:px-8",
+              message.isStreaming && "[overflow-anchor:none]",
+            )}
+            messageId={messageScrollId(message)}
+            scrollAnchor={message.role === "user"}
+          >
+            <Message
+              message={message}
+              onEditMessage={onEditMessage}
+              onRetryMessage={onRetryMessage}
+              onSelectText={onSelectText}
+              retrySource={retrySourceForMessage(messages, index)}
+            />
+          </MessageScrollerItem>
+        </Fragment>
       ))}
-    </div>
+      {branchOrigin && dividerIndex === messages.length ? (
+        <BranchOriginDivider createdAt={branchOrigin.createdAt} />
+      ) : null}
+    </>
   );
 });
 
 const Message = memo(function Message({
   message,
+  onEditMessage,
+  onRetryMessage,
   onSelectText,
+  retrySource,
 }: {
   message: ChatMessage;
-  onSelectText: (anchor: SelectionAnchor) => void;
+  onEditMessage: (message: ChatMessage, content: string) => Promise<boolean>;
+  onRetryMessage: (message: ChatMessage) => Promise<boolean>;
+  onSelectText: (anchor?: SelectionAnchor) => void;
+  retrySource?: ChatMessage;
 }) {
   const { t } = useTranslation();
 
   if (message.role === "user") {
     return (
-      <article className="mb-8 flex justify-end">
-        <div className="max-w-[84%] rounded-2xl rounded-br-md bg-secondary px-4 py-3 text-[15px] leading-6 shadow-sm">
-          <div className="mb-1 flex items-center justify-end gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            {t("chat.you")}
-            <UserRound className="size-3" />
-          </div>
+      <article aria-label={t("chat.you")} className="group/output mb-8 flex flex-col items-end">
+        <div
+          className="markdown-message max-w-[84%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-secondary px-4 py-3 text-[15px] leading-6 shadow-sm"
+          data-ph-mask
+        >
           {message.content}
         </div>
+        <MessageOutputActions
+          className="justify-end"
+          message={message}
+          onEdit={(content) => onEditMessage(message, content)}
+          onRetry={retrySource ? () => onRetryMessage(retrySource) : undefined}
+        />
       </article>
     );
   }
 
   if (message.role === "system" || message.isError) {
     return (
-      <div className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm text-foreground/80">
+      <div
+        className="markdown-message mb-8 whitespace-pre-wrap rounded-lg border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm text-foreground/80"
+        data-ph-mask
+      >
         {message.content}
       </div>
     );
   }
 
   return (
-    <article className="group mb-10 grid grid-cols-[32px_minmax(0,1fr)] gap-3">
-      <MonteCarloBrand compact />
-      <div className="min-w-0">
-        <div className="mb-2 flex min-h-6 items-center gap-2">
-          <span className="text-xs font-semibold">{t("chat.assistant")}</span>
-          {message.model ? (
-            <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[9px] text-muted-foreground">
-              {message.model}
-            </span>
-          ) : null}
-        </div>
-        <div
-          role="document"
-          className={cn(
-            "message-copy whitespace-pre-wrap select-text text-[15px] leading-[1.72] text-foreground/92",
-            message.isStreaming && "streaming-caret",
-          )}
-          onMouseUp={(event) => {
-            const anchor = selectionAnchorFromMessage(event.currentTarget, message);
-            if (anchor) onSelectText(anchor);
-          }}
-        >
-          {message.content}
-        </div>
-      </div>
+    <article aria-label={t("chat.assistant")} className="group/output mb-10 min-w-0">
+      <MarkdownMessage
+        content={message.content}
+        streaming={message.isStreaming}
+        role="document"
+        className={cn(
+          "select-text text-[15px] leading-[1.72] text-foreground/92",
+          message.isStreaming && "streaming-caret",
+        )}
+        onMouseUp={(event) =>
+          onSelectText(selectionAnchorFromMessage(event.currentTarget, message))
+        }
+      />
+      <MessageOutputActions
+        message={message}
+        onRetry={retrySource ? () => onRetryMessage(retrySource) : undefined}
+      />
     </article>
   );
 });

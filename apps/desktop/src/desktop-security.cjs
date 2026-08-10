@@ -5,7 +5,6 @@ const path = require("node:path");
 
 const desktopOrigin = "app://monte-carlo";
 const defaultDevelopmentRendererUrl = "http://localhost:5173/";
-const allowedExternalOrigins = new Set(["https://auth.openai.com", "https://platform.openai.com"]);
 // Keep aligned with runtimeDefaults.port in apps/runtime/src/config.ts.
 const runtimeDefaultPort = 43_127;
 
@@ -72,12 +71,7 @@ function resolveDevelopmentRendererUrl(rawValue) {
 function isAllowedExternalUrl(target) {
   try {
     const url = new URL(target);
-    return (
-      url.protocol === "https:" &&
-      url.username === "" &&
-      url.password === "" &&
-      allowedExternalOrigins.has(url.origin)
-    );
+    return url.protocol === "https:" && url.username === "" && url.password === "";
   } catch {
     return false;
   }

@@ -1,7 +1,7 @@
 /** Deterministic loopback-runtime replacement for browser E2E tests. */
 
 import { createPrivateKey, sign } from "node:crypto";
-import type { BrowserContext, Request, Route } from "@playwright/test";
+import type { BrowserContext, Page, Request, Route } from "@playwright/test";
 
 export type RuntimeChatRequest = {
   provider: "codex" | "anthropic" | "ollama" | "openrouter";
@@ -21,8 +21,16 @@ export type RuntimeMock = {
   blobReads: Array<{ objectKey: string; backend: "filesystem" | "r2" }>;
 };
 
+export type ControlledRuntimeStream = {
+  marker: string;
+  waitForRequest: (page: Page) => Promise<void>;
+  releaseText: (page: Page, delta: string) => Promise<void>;
+  finish: (page: Page, finishReason?: string) => Promise<void>;
+};
+
 const runtimeOrigin = new URL(process.env.VITE_RUNTIME_URL ?? "http://127.0.0.1:4242").origin;
 const runtimePattern = `${runtimeOrigin}/**`;
+const controlledStreamStateKey = "__monteCarloControlledRuntimeStream";
 const envelopeContentType = "application/json";
 const e2eBlobAttestationPrivateKey =
   "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7h5Hg/B7z8jrBZYTmh0eS56pB+NXXpmNi1CMAU8+cSihRANCAAQ9vrH0LB1nEP/VPXJHSQ3qiFxK4u2MQgVG42RWgiEUpLLWJADAcSqdPVswzW1QeMTLYdekVAmkeEHrnr4Maa/l";
@@ -76,6 +84,154 @@ export function conversationRequests(state: RuntimeMock): RuntimeChatRequest[] {
 
 export function titleRequests(state: RuntimeMock): RuntimeChatRequest[] {
   return state.chatRequests.filter((request) => isChatTitlePrompt(latestPrompt(request)));
+}
+
+/**
+ * Installs a browser-local chat response whose SSE chunks are released by the test.
+ * Playwright buffers Route.fulfill bodies, so a browser ReadableStream is required to
+ * exercise layout changes between individual text-delta events.
+ */
+export async function installControlledRuntimeStream(
+  context: BrowserContext,
+  marker = "[e2e:controlled-stream]",
+): Promise<ControlledRuntimeStream> {
+  await context.addInitScript(
+    ({ requestMarker, stateKey }) => {
+      const originalFetch = window.fetch.bind(window);
+      const state: {
+        closed: boolean;
+        requestCount: number;
+        requestStarted: boolean;
+        writer?: WritableStreamDefaultWriter<Uint8Array>;
+      } = {
+        closed: false,
+        requestCount: 0,
+        requestStarted: false,
+      };
+      Reflect.set(window, stateKey, state);
+
+      window.fetch = async (input, init) => {
+        const url =
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const body =
+          typeof init?.body === "string"
+            ? init.body
+            : input instanceof Request
+              ? await input.clone().text()
+              : "";
+        if (new URL(url, window.location.href).pathname !== "/v1/chat") {
+          return originalFetch(input, init);
+        }
+
+        const request = JSON.parse(body) as {
+          messages?: Array<{ content?: string; role?: string }>;
+          provider?: string;
+        };
+        const prompt = [...(request.messages ?? [])]
+          .reverse()
+          .find((message) => message.role === "user")?.content;
+        if (!prompt?.includes(requestMarker) || prompt.startsWith("Create a concise chat name")) {
+          return originalFetch(input, init);
+        }
+        const encodeEvent = (event: unknown) =>
+          new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+        const stream = new TransformStream<Uint8Array, Uint8Array>();
+        const writer = stream.writable.getWriter();
+        state.writer = writer;
+        state.closed = false;
+        state.requestCount += 1;
+        state.requestStarted = true;
+        void writer
+          .write(
+            encodeEvent({
+              type: "start",
+              runId: "run-controlled",
+              provider: request.provider ?? "codex",
+            }),
+          )
+          .catch(() => undefined);
+        const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+        const abortStream = () => {
+          state.closed = true;
+          void state.writer?.abort(new DOMException("The operation was aborted.", "AbortError"));
+          state.writer = undefined;
+        };
+        if (signal?.aborted) abortStream();
+        else signal?.addEventListener("abort", abortStream, { once: true });
+        return new Response(stream.readable, {
+          status: 200,
+          headers: {
+            "access-control-allow-origin": "*",
+            "content-type": "text/event-stream",
+          },
+        });
+      };
+    },
+    { requestMarker: marker, stateKey: controlledStreamStateKey },
+  );
+
+  const waitForRequest = async (page: Page) => {
+    await page.waitForFunction((stateKey) => {
+      const state = Reflect.get(window, stateKey) as { requestStarted?: boolean } | undefined;
+      return state?.requestStarted === true;
+    }, controlledStreamStateKey);
+  };
+
+  const releaseText = async (page: Page, delta: string) => {
+    await page.evaluate(
+      async ({ stateKey, text }) => {
+        const state = Reflect.get(window, stateKey) as
+          | {
+              closed: boolean;
+              requestCount: number;
+              writer?: WritableStreamDefaultWriter<Uint8Array>;
+            }
+          | undefined;
+        if (!state?.writer || state.closed) {
+          throw new Error("The controlled runtime stream is not open.");
+        }
+        if (state.requestCount !== 1) {
+          throw new Error(
+            `Expected one controlled runtime request, received ${state.requestCount}.`,
+          );
+        }
+        await state.writer.write(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ type: "text-delta", delta: text })}\n\n`,
+          ),
+        );
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+      },
+      { stateKey: controlledStreamStateKey, text: delta },
+    );
+  };
+
+  const finish = async (page: Page, finishReason = "stop") => {
+    await page.evaluate(
+      async ({ stateKey, reason }) => {
+        const state = Reflect.get(window, stateKey) as
+          | {
+              closed: boolean;
+              writer?: WritableStreamDefaultWriter<Uint8Array>;
+            }
+          | undefined;
+        if (!state?.writer || state.closed) {
+          throw new Error("The controlled runtime stream is not open.");
+        }
+        await state.writer.write(
+          new TextEncoder().encode(
+            `data: ${JSON.stringify({ type: "finish", finishReason: reason })}\n\n`,
+          ),
+        );
+        await state.writer.close();
+        state.closed = true;
+        state.writer = undefined;
+      },
+      { stateKey: controlledStreamStateKey, reason: finishReason },
+    );
+  };
+
+  return { marker, waitForRequest, releaseText, finish };
 }
 
 async function handleChat(route: Route, request: Request, state: RuntimeMock) {

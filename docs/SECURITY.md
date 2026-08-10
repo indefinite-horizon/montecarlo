@@ -15,7 +15,7 @@ provider credentials must cross none of them except the runtime that uses them.
 - CI runs audit, lint, typecheck, tests, build, codegen freshness, i18n validation, and Playwright projects.
 - Every tenant read and write resolves the Better Auth caller and active workspace membership.
 - The local companion accepts only loopback Host headers, exact configured origins, bounded bodies, and a bearer token outside explicit development mode.
-- Electron uses a sandboxed, context-isolated renderer, denies permissions and new windows, and exposes narrow typed IPC only.
+- Electron uses a sandboxed, context-isolated renderer, denies permissions and new windows, opens only credential-free HTTPS links in the system browser, and exposes narrow typed IPC only.
 - The trusted client verifies the runtime upload receipt, hash, and byte length before requesting manifest availability. This is a local-mode integrity check, not server-side attestation for a future multi-tenant gateway.
 
 ## Sensitive Data
@@ -43,8 +43,12 @@ flag on a shared or cloud deployment.
 
 ## Provider Boundary
 
-- Codex authentication remains in the official CLI/SDK credential store. Monte
+- Codex authentication remains in the official CLI credential store. Monte
   Carlo may invoke `codex login --device-auth`, but does not read the auth cache.
+- Codex app-server children receive an allowlisted environment and an empty,
+  temporary working directory. Shell, patch, web, app, plugin, browser, and
+  computer tools are disabled. Configured MCP capabilities are disabled per
+  thread and verified absent before a user prompt is sent.
 - OpenRouter keys come from Electron's encrypted store or an explicitly trusted
   local runtime environment.
 - A managed OpenRouter key is used only with the configured managed endpoint;

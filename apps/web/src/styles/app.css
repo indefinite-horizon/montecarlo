@@ -142,8 +142,147 @@ button,
   background-clip: padding-box;
 }
 
-.message-copy p + p {
-  margin-top: 0.9rem;
+.message-copy {
+  overflow-wrap: anywhere;
+}
+
+.message-copy > :first-child,
+.message-copy blockquote > :first-child,
+.message-copy li > :first-child {
+  margin-top: 0;
+}
+
+.message-copy > :last-child,
+.message-copy blockquote > :last-child,
+.message-copy li > :last-child {
+  margin-bottom: 0;
+}
+
+.message-copy p,
+.message-copy blockquote,
+.message-copy pre,
+.message-copy ul,
+.message-copy ol,
+.message-copy .markdown-table-scroll,
+.message-copy hr {
+  margin-block: 0.85em;
+}
+
+.message-copy h1,
+.message-copy h2,
+.message-copy h3,
+.message-copy h4,
+.message-copy h5,
+.message-copy h6 {
+  margin-block: 1.35em 0.55em;
+  color: hsl(var(--foreground));
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, ui-serif, serif;
+  font-weight: 700;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.message-copy h1 {
+  font-size: 1.55em;
+}
+
+.message-copy h2 {
+  padding-bottom: 0.18em;
+  border-bottom: 1px solid hsl(var(--border) / 0.7);
+  font-size: 1.35em;
+}
+
+.message-copy h3 {
+  font-size: 1.18em;
+}
+
+.message-copy h4,
+.message-copy h5,
+.message-copy h6 {
+  font-size: 1em;
+}
+
+.message-copy h5,
+.message-copy h6 {
+  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.025em;
+}
+
+.message-copy h6 {
+  text-transform: uppercase;
+}
+
+.message-copy strong {
+  color: hsl(var(--foreground));
+  font-weight: 700;
+}
+
+.message-copy a {
+  color: hsl(var(--primary));
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: hsl(var(--primary) / 0.38);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.16em;
+}
+
+.message-copy a:hover {
+  text-decoration-color: currentColor;
+}
+
+.message-copy ul,
+.message-copy ol {
+  padding-inline-start: 1.45em;
+}
+
+.message-copy ul {
+  list-style: disc;
+}
+
+.message-copy ol {
+  list-style: decimal;
+}
+
+.message-copy li + li {
+  margin-top: 0.3em;
+}
+
+.message-copy li::marker {
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+
+.message-copy li > ul,
+.message-copy li > ol {
+  margin-block: 0.3em;
+}
+
+.message-copy ul.contains-task-list {
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.message-copy .task-list-item {
+  padding-inline-start: 1.55em;
+}
+
+.message-copy .task-list-item > input:first-child {
+  width: 0.95em;
+  height: 0.95em;
+  margin: 0 0.6em 0 -1.55em;
+  vertical-align: -0.08em;
+  accent-color: hsl(var(--primary));
+}
+
+.message-copy blockquote {
+  padding: 0.08em 0 0.08em 1em;
+  border-left: 3px solid hsl(var(--primary) / 0.48);
+  color: hsl(var(--muted-foreground));
+}
+
+.message-copy hr {
+  border: 0;
+  border-top: 1px solid hsl(var(--border));
 }
 
 .message-copy code {
@@ -153,6 +292,105 @@ button,
   padding: 0.08rem 0.32rem;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.88em;
+}
+
+.message-copy pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.55rem;
+  background: hsl(var(--secondary) / 0.52);
+  padding: 0.85em 1em;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.message-copy pre code {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.86em;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.message-copy .markdown-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.55rem;
+}
+
+.message-copy table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.message-copy th,
+.message-copy td {
+  min-width: 8em;
+  padding: 0.55em 0.75em;
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+  vertical-align: top;
+}
+
+.message-copy th {
+  background: hsl(var(--secondary) / 0.62);
+  color: hsl(var(--foreground));
+  font-weight: 700;
+}
+
+.message-copy th:last-child,
+.message-copy td:last-child {
+  border-right: 0;
+}
+
+.message-copy tr:last-child td {
+  border-bottom: 0;
+}
+
+.message-copy .markdown-image-link {
+  display: inline-flex;
+  margin-block: 0.9em;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.55rem;
+  background: hsl(var(--secondary) / 0.52);
+  padding: 0.55em 0.75em;
+}
+
+.message-copy del {
+  color: hsl(var(--muted-foreground));
+}
+
+.message-copy sup {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+.message-copy [data-footnotes] {
+  margin-top: 1.4em;
+  padding-top: 0.75em;
+  border-top: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9em;
+}
+
+.message-copy--compact h1 {
+  font-size: 1.35em;
+}
+
+.message-copy--compact h2 {
+  font-size: 1.2em;
+}
+
+.message-copy--compact h3 {
+  font-size: 1.1em;
 }
 
 .branch-map-grid {

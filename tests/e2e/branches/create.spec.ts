@@ -1,7 +1,14 @@
 /** Prompt, selection, and nested branch creation semantics. */
 
-import { expect, test } from "@playwright/test";
-import { conversationRequests, installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
+import { expect, type Locator, type Page, test } from "@playwright/test";
+import {
+  type ControlledRuntimeStream,
+  conversationRequests,
+  installControlledRuntimeStream,
+  installRuntimeMock,
+  type RuntimeMock,
+  titleRequests,
+} from "../helpers/runtime";
 import {
   assistantMessage,
   childBranchRow,
@@ -14,11 +21,91 @@ import {
 } from "../helpers/workspace";
 
 let runtime: RuntimeMock;
+let controlledStream: ControlledRuntimeStream;
+let activeWorkspaceName: string;
 
 test.beforeEach(async ({ context, page }) => {
   runtime = await installRuntimeMock(context);
+  controlledStream = await installControlledRuntimeStream(context);
   await openFreshUser(page, "branch-create");
-  await createWorkspace(page, `Branch workspace ${Date.now()}`);
+  activeWorkspaceName = `Branch workspace ${Date.now()}`;
+  await createWorkspace(page, activeWorkspaceName);
+});
+
+async function selectTextWithMouse(page: Page, message: Locator, text: string) {
+  await message.evaluate((element, selectedText) => {
+    const walker = window.document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      const value = node.textContent ?? "";
+      const start = value.indexOf(selectedText);
+      if (start >= 0) {
+        const range = window.document.createRange();
+        range.setStart(node, start);
+        range.setEnd(node, start + selectedText.length);
+        const scroller = element.closest<HTMLElement>('[data-testid="transcript-scroller"]');
+        if (!scroller) throw new Error("Could not resolve the transcript scroller.");
+        const rangeRect = range.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        scroller.scrollTop +=
+          rangeRect.top - scrollerRect.top - scroller.clientHeight / 2 + rangeRect.height / 2;
+        return;
+      }
+      node = walker.nextNode();
+    }
+    throw new Error(`Could not scroll to text: ${selectedText}`);
+  }, text);
+
+  const points = await message.evaluate((element, selectedText) => {
+    const walker = window.document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      const value = node.textContent ?? "";
+      const start = value.indexOf(selectedText);
+      if (start >= 0) {
+        const firstCharacter = window.document.createRange();
+        firstCharacter.setStart(node, start);
+        firstCharacter.setEnd(node, start + 1);
+        const lastCharacter = window.document.createRange();
+        lastCharacter.setStart(node, start + selectedText.length - 1);
+        lastCharacter.setEnd(node, start + selectedText.length);
+        const firstRect = firstCharacter.getBoundingClientRect();
+        const lastRect = lastCharacter.getBoundingClientRect();
+        return {
+          start: { x: firstRect.left + 0.5, y: firstRect.top + firstRect.height / 2 },
+          end: { x: lastRect.right - 0.5, y: lastRect.top + lastRect.height / 2 },
+        };
+      }
+      node = walker.nextNode();
+    }
+    throw new Error(`Could not measure text: ${selectedText}`);
+  }, text);
+
+  await page.mouse.move(points.start.x, points.start.y);
+  await page.mouse.down();
+  await page.mouse.move(points.end.x, points.end.y, { steps: 12 });
+  await page.mouse.up();
+  return page.evaluate(() => window.getSelection()?.toString().trim() ?? "");
+}
+
+test("branch map shows response activity without shifting the branch title", async ({ page }) => {
+  const prompt = `Waiting child ${controlledStream.marker}`;
+  await createPromptBranch(page, prompt);
+  await controlledStream.waitForRequest(page);
+
+  const branch = childBranchRow(page, prompt);
+  const title = branch.getByTestId("branch-map-title");
+  await expect(branch).toHaveAttribute("aria-busy", "true");
+  await expect(branch.getByTestId("branch-response-spinner")).toBeVisible();
+  const waitingTitleBounds = await title.boundingBox();
+
+  await controlledStream.finish(page);
+  await expect(branch).toHaveAttribute("aria-busy", "false");
+  await expect(branch.getByTestId("branch-response-spinner")).toHaveCount(0);
+  const completedTitleBounds = await title.boundingBox();
+  if (!waitingTitleBounds || !completedTitleBounds) throw new Error("Could not measure title.");
+  expect(completedTitleBounds.x).toBe(waitingTitleBounds.x);
+  expect(completedTitleBounds.y).toBe(waitingTitleBounds.y);
 });
 
 test("prompt-only branch requires a non-whitespace prompt", async ({ page }) => {
@@ -38,26 +125,230 @@ test("prompt-only branch leaves its parent transcript unchanged", async ({ page 
   await sendMessage(page, "Parent-only turn", "Stub response: Parent-only turn");
   await createPromptBranch(page, "Child-only direction");
   await expect(userMessage(page, "Child-only direction")).toBeVisible();
+  const divider = page.getByTestId("branch-origin-divider");
+  await expect(divider).toHaveText(/Branched from parent/u);
+  await expect(divider.locator("time")).toHaveAttribute("datetime", /\d{4}-\d{2}-\d{2}T/u);
+  const parentBounds = await assistantMessage(
+    page,
+    "Stub response: Parent-only turn",
+  ).boundingBox();
+  const dividerBounds = await divider.boundingBox();
+  const childBounds = await userMessage(page, "Child-only direction").boundingBox();
+  expect(parentBounds?.y).toBeLessThan(dividerBounds?.y ?? 0);
+  expect(dividerBounds?.y).toBeLessThan(childBounds?.y ?? 0);
+  await divider.locator("time").hover();
+  await expect(page.getByRole("tooltip")).toBeVisible();
 
   await page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]').click();
+  await expect(divider).toHaveCount(0);
   await expect(userMessage(page, "Parent-only turn")).toBeVisible();
   await expect(userMessage(page, "Child-only direction")).toHaveCount(0);
 });
 
-test("branches from selected assistant text without requiring a prompt", async ({ page }) => {
+test("highlighted passage uses the default follow-up when the optional prompt is empty", async ({
+  page,
+}) => {
+  const response = `Good candidates include:
+
+- A table for mappings
+- A flow for sequence`;
+  await sendMessage(page, `[reply:${response}] Show candidates`, "Good candidates include:");
+
+  const document = page
+    .locator('[role="document"]')
+    .filter({ hasText: "Good candidates include:" })
+    .last();
+  const selectedText = await document.evaluate((element) => {
+    const sourceText = element.querySelector("p [data-markdown-source-start]")?.firstChild;
+    if (!(sourceText instanceof Text)) {
+      throw new Error("Could not resolve the screenshot-matching selection text.");
+    }
+    const word = "candidates";
+    const wordStart = sourceText.data.indexOf(word);
+    if (wordStart < 0) throw new Error("Could not find candidates in the response.");
+
+    const range = window.document.createRange();
+    range.setStart(sourceText, wordStart + word.length - 2);
+    range.setEnd(sourceText, wordStart + word.length);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    return selection?.toString();
+  });
+
+  expect(selectedText).toBe("es");
+  const action = page.getByTestId("selection-follow-up-action");
+  await expect(action).toHaveAccessibleName("Ask Follow-up");
+  await expect(action).toBeVisible();
+  await action.click();
+  const dialog = page.getByRole("dialog", { name: "Ask Follow-up" });
+  await expect(dialog.locator("blockquote")).toHaveText("“es”");
+  await dialog.getByRole("button", { name: "Create branch" }).click();
+  await expect(page.getByText("Following a branch from", { exact: true })).toBeVisible();
+  await expect(page.getByText("“es”", { exact: true })).toBeVisible();
+  await expect(userMessage(page, "Expand on this further")).toBeVisible();
+  await expect(assistantMessage(page, "Stub response: Expand on this further")).toBeVisible();
+  expect(conversationRequests(runtime).at(-1)?.messages.at(-1)).toEqual({
+    role: "user",
+    content: "Expand on this further",
+  });
+});
+
+for (const storageMode of ["local", "cloud"] as const) {
+  test(`selections beyond the metadata preview persist in ${storageMode} workspaces`, async ({
+    page,
+  }) => {
+    if (storageMode === "cloud") {
+      const cloudWorkspaceName = `Cloud branch workspace ${Date.now()}`;
+      await createWorkspace(page, cloudWorkspaceName, "cloud", activeWorkspaceName);
+    }
+    const lateSelection = `late hydrated anchor ${Date.now()}`;
+    const prompt = `${"Earlier hydrated message content. ".repeat(40)}${lateSelection}`;
+    await sendMessage(page, prompt, lateSelection);
+
+    const message = page.locator('[role="document"]').filter({ hasText: lateSelection }).last();
+    const sourceStart = await message.evaluate((element, selectedText) => {
+      const sourceElement = Array.from(
+        element.querySelectorAll<HTMLElement>("[data-markdown-source-start]"),
+      ).find((candidate) => candidate.textContent?.includes(selectedText));
+      if (!sourceElement) throw new Error("Could not resolve selected text source position.");
+      const sourceOffset = Number(sourceElement.dataset.markdownSourceStart);
+      return sourceOffset + (sourceElement.textContent?.indexOf(selectedText) ?? -1);
+    }, lateSelection);
+    expect(sourceStart).toBeGreaterThan(1_000);
+
+    const selectedText = await selectTextWithMouse(page, message, lateSelection);
+    expect(selectedText).toContain("late hydrated anchor");
+    const action = page.getByTestId("selection-follow-up-action");
+    await expect(action).toBeVisible();
+    await action.click();
+    const dialog = page.getByRole("dialog", { name: "Ask Follow-up" });
+    await expect(dialog.locator("blockquote")).toContainText(selectedText);
+    await dialog.getByRole("button", { name: "Create branch" }).click();
+    await expect(page.getByText("Following a branch from", { exact: true })).toBeVisible();
+  });
+}
+
+test("highlighted passage accepts a non-empty optional follow-up", async ({ page }) => {
   await sendMessage(
     page,
-    "[reply:A selectable passage about variance] Give a selectable answer",
-    "A selectable passage about variance",
+    "[reply:A highlighted passage to explain] Give a selectable answer",
+    "A highlighted passage to explain",
   );
-  await selectAssistantText(page, "selectable passage");
-  await page.getByRole("button", { name: "Follow this thread" }).click();
-  const dialog = page.getByRole("dialog", { name: "Branch from selection" });
-  await expect(dialog).toContainText("selectable passage");
+  await selectAssistantText(page, "highlighted passage");
+  await page.getByTestId("selection-follow-up-action").click();
+  const dialog = page.getByRole("dialog", { name: "Ask Follow-up" });
+  await dialog.getByLabel("Add a direction (optional)").fill("Explain this passage");
+  await dialog.getByRole("button", { name: "Create branch" }).click();
+
+  await expect(userMessage(page, "Explain this passage")).toBeVisible();
+  await expect(assistantMessage(page, "Stub response: Explain this passage")).toBeVisible();
+  expect(conversationRequests(runtime).at(-1)?.messages.at(-1)).toEqual({
+    role: "user",
+    content: "Explain this passage",
+  });
+});
+
+test("auto-names a highlighted branch from its selected passage with at most seven words", async ({
+  page,
+}) => {
+  const passage = "A detailed passage about pricing experiments across several customer segments";
+  const generatedTitle = "A detailed passage about pricing experiments across";
+  await sendMessage(page, `[reply:${passage}] Give a naming passage`, passage);
+  await selectAssistantText(page, passage);
+  await page.getByTestId("selection-follow-up-action").click();
+  await page
+    .getByRole("dialog", { name: "Ask Follow-up" })
+    .getByRole("button", { name: "Create branch" })
+    .click();
+
+  const branch = childBranchRow(page, generatedTitle);
+  await expect(branch.getByTestId("branch-map-title")).toHaveText(generatedTitle);
+  expect(generatedTitle.split(/\s+/u)).toHaveLength(7);
+  await expect
+    .poll(() =>
+      titleRequests(runtime).some((request) =>
+        request.messages.some(({ content }) => content.includes(passage)),
+      ),
+    )
+    .toBe(true);
+
+  await page.reload();
+  await expect(childBranchRow(page, generatedTitle)).toBeVisible();
+});
+
+test("structural Markdown selection boundaries preserve the visible passage", async ({ page }) => {
+  const phrase = "Good candidates include:";
+  const response = `### Visualizations
+
+${phrase}
+
+- A table for mappings
+- A flow for sequence`;
+  await sendMessage(page, `[reply:${response}] Show visualization options`, phrase);
+
+  const document = page.locator('[role="document"]').filter({ hasText: phrase }).last();
+  const selectedText = await document.evaluate((element) => {
+    const phraseText = element.querySelector("p [data-markdown-source-start]")?.firstChild;
+    const firstListItem = element.querySelector("li");
+    if (!(phraseText instanceof Text) || !(firstListItem instanceof HTMLLIElement)) {
+      throw new Error("Could not resolve the Markdown block-boundary selection.");
+    }
+
+    const range = window.document.createRange();
+    range.setStart(phraseText, 0);
+    range.setEnd(firstListItem, 0);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    return selection?.toString().trim();
+  });
+
+  expect(selectedText).toBe(phrase);
+  const action = page.getByTestId("selection-follow-up-action");
+  await expect(action).toBeVisible();
+  await action.click();
+  const dialog = page.getByRole("dialog", { name: "Ask Follow-up" });
+  await expect(dialog.locator("blockquote")).toHaveText(`“${phrase}”`);
+  await dialog.getByRole("button", { name: "Create branch" }).click();
+  await expect(page.getByText(`“${phrase}”`, { exact: true })).toBeVisible();
+  expect(conversationRequests(runtime)).toHaveLength(1);
+});
+
+test("selection action hides when cleared and tracks an immediate replacement", async ({
+  page,
+}) => {
+  const firstSelection = "earlier anchor phrase";
+  const secondSelection = "replacement anchor phrase";
+  await sendMessage(
+    page,
+    `[reply:### Selectable answer\n\nAn **${firstSelection}** starts this answer.\n\nA spacer paragraph separates the selections.\n\nThe **${secondSelection}** finishes it.] Give a selectable answer`,
+    firstSelection,
+  );
+
+  await selectAssistantText(page, firstSelection);
+  const action = page.getByTestId("selection-follow-up-action");
+  const firstPosition = await action.boundingBox();
+  if (!firstPosition) throw new Error("Could not measure the first selection action.");
+
+  await page.evaluate(() => window.getSelection()?.removeAllRanges());
+  await expect(action).toHaveCount(0);
+
+  await selectAssistantText(page, secondSelection);
+  const secondPosition = await action.boundingBox();
+  if (!secondPosition) throw new Error("Could not measure the replacement selection action.");
+  expect(Math.abs(secondPosition.y - firstPosition.y)).toBeGreaterThan(12);
+
+  await action.click();
+  const dialog = page.getByRole("dialog", { name: "Ask Follow-up" });
+  await expect(dialog).toContainText(secondSelection);
+  await expect(dialog).not.toContainText(firstSelection);
   await expect(dialog.getByRole("button", { name: "Create branch" })).toBeEnabled();
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(page.getByText("Following a branch from", { exact: true })).toBeVisible();
-  await expect(page.getByText("“selectable passage”", { exact: true })).toBeVisible();
+  await expect(page.getByText(`“${secondSelection}”`, { exact: true })).toBeVisible();
   expect(conversationRequests(runtime)).toHaveLength(1);
 });
 
@@ -66,19 +357,50 @@ test("selection branch with a prompt sends selection provenance in normalized co
 }) => {
   await sendMessage(
     page,
-    "[reply:Compare control variates with stratification] Give context",
-    "Compare control variates with stratification",
+    "[reply:Compare **control variates**\n\nwith stratification] Give context",
+    "control variates",
   );
-  await selectAssistantText(page, "control variates");
-  await page.getByRole("button", { name: "Follow this thread" }).click();
-  const dialog = page.getByRole("dialog", { name: "Branch from selection" });
+  const response = page.locator('[role="document"]').filter({ hasText: "control variates" }).last();
+  await response.evaluate((element) => {
+    const strongText = element.querySelector("strong")?.textContent;
+    const paragraphs = element.querySelectorAll("p");
+    const secondParagraph = paragraphs.item(1);
+    const startNode = element.querySelector("strong")?.firstChild?.firstChild;
+    const endNode = secondParagraph?.firstChild?.firstChild;
+    if (
+      strongText !== "control variates" ||
+      !(startNode instanceof Text) ||
+      !(endNode instanceof Text)
+    ) {
+      throw new Error("Could not resolve the formatted cross-block selection.");
+    }
+    const range = window.document.createRange();
+    range.setStart(startNode, 0);
+    range.setEnd(endNode, "with".length);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    element.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  });
+  await expect(page.getByTestId("selection-follow-up-action")).toBeVisible();
+  await page.getByTestId("selection-follow-up-action").click();
+  const dialog = page.getByRole("dialog", { name: "Ask Follow-up" });
+  await expect(dialog.locator("blockquote")).toHaveText(/control variates\s+with/);
+  await expect(dialog).not.toContainText("variates** with");
   await dialog.getByLabel("Add a direction (optional)").fill("Explain the tradeoff");
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(assistantMessage(page, "Stub response: Explain the tradeoff")).toBeVisible();
 
   const request = conversationRequests(runtime).at(-1);
-  expect(request?.messages.some(({ content }) => content.includes("control variates"))).toBe(true);
+  expect(
+    request?.messages.some(({ content }) => content.includes("“control variates\nwith”")),
+  ).toBe(true);
+  expect(request?.messages.some(({ content }) => content.includes("variates** with"))).toBe(false);
   expect(request?.messages.at(-1)).toEqual({ role: "user", content: "Explain the tradeoff" });
+
+  await page.reload();
+  await expect(page.getByText(/“control variates\s+with”/)).toBeVisible();
+  await expect(page.getByText(/variates\*\*\s+with/)).toHaveCount(0);
 });
 
 test("stale selected text is cleared when the transcript scrolls", async ({ page }) => {
@@ -89,7 +411,7 @@ test("stale selected text is cleared when the transcript scrolls", async ({ page
   );
   await selectAssistantText(page, "must become stale");
   await page.getByTestId("transcript-scroller").dispatchEvent("scroll");
-  await expect(page.getByRole("button", { name: "Follow this thread" })).toHaveCount(0);
+  await expect(page.getByTestId("selection-follow-up-action")).toHaveCount(0);
 });
 
 test("nested branching creates one child per action at the expected depth", async ({ page }) => {

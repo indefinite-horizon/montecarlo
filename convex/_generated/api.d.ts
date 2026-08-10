@@ -38,6 +38,7 @@ import type * as lib_localIdentity from "../lib/localIdentity.js";
 import type * as lib_localWorkspaceBootstrap from "../lib/localWorkspaceBootstrap.js";
 import type * as lib_logger from "../lib/logger.js";
 import type * as lib_workspaceAuth from "../lib/workspaceAuth.js";
+import type * as messageHistory from "../messageHistory.js";
 import type * as messages from "../messages.js";
 import type * as projects from "../projects.js";
 import type * as runs from "../runs.js";
@@ -80,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   "lib/localWorkspaceBootstrap": typeof lib_localWorkspaceBootstrap;
   "lib/logger": typeof lib_logger;
   "lib/workspaceAuth": typeof lib_workspaceAuth;
+  messageHistory: typeof messageHistory;
   messages: typeof messages;
   projects: typeof projects;
   runs: typeof runs;

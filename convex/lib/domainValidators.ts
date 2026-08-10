@@ -41,6 +41,7 @@ export const branchSelectionValidator = v.object({
   start: v.number(),
   end: v.number(),
   quote: v.string(),
+  displayText: v.optional(v.string()),
 });
 
 export const messageRoleValidator = v.union(
