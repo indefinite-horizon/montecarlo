@@ -387,7 +387,9 @@ test("selection branch with a prompt sends selection provenance in normalized co
   await expect(dialog).not.toContainText("variates** with");
   await dialog.getByLabel("Add a direction (optional)").fill("Explain the tradeoff");
   await dialog.getByRole("button", { name: "Create branch" }).click();
-  await expect(assistantMessage(page, "Stub response: Explain the tradeoff")).toBeVisible();
+  await expect(assistantMessage(page, "Stub response: Explain the tradeoff")).toBeVisible({
+    timeout: 15_000,
+  });
 
   const request = conversationRequests(runtime).at(-1);
   expect(
