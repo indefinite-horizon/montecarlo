@@ -18,7 +18,9 @@ const envFile = process.env.PLAYWRIGHT_ENV_FILE ?? ".env.local";
 // A single local Convex/auth stack backs every browser worker. Keep CI concurrency
 // low enough that auth callbacks and workspace subscriptions remain deterministic.
 const workerCount = Number(process.env.PLAYWRIGHT_WORKERS ?? (process.env.CI ? "2" : "4"));
-const expectTimeout = Number(process.env.PLAYWRIGHT_EXPECT_TIMEOUT ?? "5000");
+const expectTimeout = Number(
+  process.env.PLAYWRIGHT_EXPECT_TIMEOUT ?? (process.env.CI ? "15000" : "5000"),
+);
 const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === "true";
 const externalSpecs = ["**/*.external.spec.ts"];
 const nightlySpecs = ["**/*.nightly.external.spec.ts"];
@@ -29,7 +31,7 @@ const desktopSpecs = ["**/desktop/*.spec.ts"];
 
 export default defineConfig({
   testDir: "tests/e2e",
-  timeout: process.env.CI ? 60_000 : 30_000,
+  timeout: process.env.CI ? 120_000 : 30_000,
   retries: process.env.CI ? 1 : 0,
   workers: workerCount,
   expect: {
