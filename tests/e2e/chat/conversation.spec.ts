@@ -113,11 +113,14 @@ test("retry and edit replace a completed turn and truncate subsequent history", 
   const firstTurn = userMessage(page, "First prompt");
   await firstTurn.hover();
   await firstTurn.getByRole("button", { name: "Retry" }).click();
-  await expect.poll(() => conversationRequests(runtime).length, { timeout: 15_000 }).toBe(3);
+  await expect.poll(() => conversationRequests(runtime).length).toBe(3);
   await expect(assistantMessage(page, "Stub response: First prompt")).toBeVisible();
   await expect(userMessage(page, "Later prompt")).toHaveCount(0);
   await expect(assistantMessage(page, "Stub response: Later prompt")).toHaveCount(0);
   await expect(userMessage(page, "First prompt")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Send message" })).toBeVisible({
+    timeout: 15_000,
+  });
   expect(conversationRequests(runtime)[2]?.messages).toEqual([
     { role: "user", content: "First prompt" },
   ]);
@@ -128,7 +131,7 @@ test("retry and edit replace a completed turn and truncate subsequent history", 
   const dialog = page.getByRole("dialog", { name: "Edit message" });
   await dialog.getByRole("textbox", { name: "Message" }).fill("Edited prompt");
   await dialog.getByRole("button", { name: "Save and retry" }).click();
-  await expect.poll(() => conversationRequests(runtime).length, { timeout: 15_000 }).toBe(4);
+  await expect.poll(() => conversationRequests(runtime).length).toBe(4);
   await expect(userMessage(page, "First prompt")).toHaveCount(0);
   await expect(userMessage(page, "Edited prompt")).toHaveCount(1);
   await expect(assistantMessage(page, "Stub response: Edited prompt")).toBeVisible();
@@ -138,7 +141,7 @@ test("retry and edit replace a completed turn and truncate subsequent history", 
     .filter({ has: assistantMessage(page, "Stub response: Edited prompt") });
   await editedResponse.hover();
   await editedResponse.getByRole("button", { name: "Retry" }).click();
-  await expect.poll(() => conversationRequests(runtime).length, { timeout: 15_000 }).toBe(5);
+  await expect.poll(() => conversationRequests(runtime).length).toBe(5);
   await expect(userMessage(page, "Edited prompt")).toHaveCount(1);
   await expect(assistantMessage(page, "Stub response: Edited prompt")).toHaveCount(1);
 
