@@ -3,7 +3,7 @@
 const { realpathSync, statSync } = require("node:fs");
 const path = require("node:path");
 
-const desktopOrigin = "app://monte-carlo";
+const desktopOrigin = "app://montecarlo";
 const defaultDevelopmentRendererUrl = "http://localhost:5173/";
 // Keep aligned with runtimeDefaults.port in apps/runtime/src/config.ts.
 const runtimeDefaultPort = 43_127;
@@ -35,7 +35,7 @@ function readRuntimePort(rawValue) {
   if (rawValue === undefined || rawValue.trim() === "") return runtimeDefaultPort;
   const port = Number(rawValue);
   if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-    throw new Error("MONTE_CARLO_RUNTIME_PORT must be an integer between 0 and 65535.");
+    throw new Error("MONTECARLO_RUNTIME_PORT must be an integer between 0 and 65535.");
   }
   return port;
 }
@@ -98,7 +98,7 @@ function isAllowedRendererUrl(target, isDevelopment, developmentOrigin) {
   }
   return (
     url.protocol === "app:" &&
-    url.hostname === "monte-carlo" &&
+    url.hostname === "montecarlo" &&
     url.username === "" &&
     url.password === "" &&
     url.port === ""
@@ -137,7 +137,7 @@ function resolveRendererAsset(rendererRoot, requestUrl) {
   }
   if (
     url.protocol !== "app:" ||
-    url.hostname !== "monte-carlo" ||
+    url.hostname !== "montecarlo" ||
     url.username !== "" ||
     url.password !== "" ||
     url.port !== ""

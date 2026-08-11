@@ -36,7 +36,7 @@ const developmentRendererUrl = resolveDevelopmentRendererUrl(process.env.ELECTRO
 const rendererOrigin = isDevelopment ? new URL(developmentRendererUrl).origin : desktopOrigin;
 // Port zero lets the child bind an OS-assigned socket that another process
 // cannot pre-claim before the renderer receives its authenticated address.
-const runtimePort = readRuntimePort(process.env.MONTE_CARLO_RUNTIME_PORT ?? "0");
+const runtimePort = readRuntimePort(process.env.MONTECARLO_RUNTIME_PORT ?? "0");
 const runtimeToken = randomBytes(32).toString("base64url");
 const expectedRuntimeStops = new WeakSet();
 const runtimeStopGraceMs = 2_000;
@@ -101,12 +101,12 @@ function startRuntime() {
       ...providerEnvironment,
       PATH: runtimeExecutablePath(),
       ...(isDevelopment ? {} : { ELECTRON_RUN_AS_NODE: "1" }),
-      MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS: rendererOrigin,
-      MONTE_CARLO_RUNTIME_DEV: isDevelopment ? "1" : "0",
-      MONTE_CARLO_RUNTIME_HOST: "127.0.0.1",
-      MONTE_CARLO_RUNTIME_PORT: String(runtimePort),
-      MONTE_CARLO_RUNTIME_TOKEN: runtimeToken,
-      MONTE_CARLO_WORKSPACES_DIR: workspacesDirectory,
+      MONTECARLO_RUNTIME_ALLOWED_ORIGINS: rendererOrigin,
+      MONTECARLO_RUNTIME_DEV: isDevelopment ? "1" : "0",
+      MONTECARLO_RUNTIME_HOST: "127.0.0.1",
+      MONTECARLO_RUNTIME_PORT: String(runtimePort),
+      MONTECARLO_RUNTIME_TOKEN: runtimeToken,
+      MONTECARLO_WORKSPACES_DIR: workspacesDirectory,
       NODE_ENV: isDevelopment ? process.env.NODE_ENV || "development" : "production",
     },
     stdio: ["ignore", "pipe", isDevelopment ? "inherit" : "ignore"],
@@ -308,7 +308,7 @@ function createWindow() {
 
   if (isDevelopment) {
     void window.loadURL(developmentRendererUrl);
-    if (process.env.MONTE_CARLO_OPEN_DEVTOOLS === "1") {
+    if (process.env.MONTECARLO_OPEN_DEVTOOLS === "1") {
       window.webContents.openDevTools({ mode: "detach" });
     }
   } else {

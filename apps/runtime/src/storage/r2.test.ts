@@ -20,7 +20,7 @@ describe("R2ObjectStore", () => {
           ContentType: "application/json",
           ETag: '"etag-value"',
           Metadata: {
-            "monte-carlo-version": "1",
+            "montecarlo-version": "1",
             sha256: digest,
             "byte-length": String(data.byteLength),
             "envelope-version": "2",
@@ -32,7 +32,7 @@ describe("R2ObjectStore", () => {
       endpoint: "https://example.r2.cloudflarestorage.com",
       accessKeyId: "access-key",
       secretAccessKey: "secret-key",
-      bucket: "monte-carlo-blobs",
+      bucket: "montecarlo-blobs",
       prefix: "production/objects",
       client: fakeClient,
     });
@@ -52,7 +52,7 @@ describe("R2ObjectStore", () => {
     expect(commands).toHaveLength(2);
     expect(commands[0]).toBeInstanceOf(PutObjectCommand);
     expect((commands[0] as PutObjectCommand).input).toMatchObject({
-      Bucket: "monte-carlo-blobs",
+      Bucket: "montecarlo-blobs",
       Key: `production/objects/${key}`,
     });
     expect(commands[1]).toBeInstanceOf(GetObjectCommand);

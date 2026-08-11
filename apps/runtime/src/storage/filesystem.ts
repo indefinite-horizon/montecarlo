@@ -221,7 +221,7 @@ export class FilesystemObjectStore implements ObjectStoreV1 {
     await this.assertSafeFileIfPresent(target);
     signal?.throwIfAborted();
 
-    const temporary = join(parent, `.monte-carlo-${randomUUID()}.tmp`);
+    const temporary = join(parent, `.montecarlo-${randomUUID()}.tmp`);
     let renamed = false;
     let handle: FileHandle | undefined;
     try {

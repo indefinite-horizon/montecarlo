@@ -140,9 +140,9 @@ function configuredHealth(configured: boolean, label: string): Promise<ProviderH
 }
 
 export function createOpenRouterRunner(env: NodeJS.ProcessEnv = process.env): Runner {
-  const userApiKey = env.MONTE_CARLO_USER_OPENROUTER_API_KEY?.trim();
+  const userApiKey = env.MONTECARLO_USER_OPENROUTER_API_KEY?.trim();
   const managedApiKey =
-    env.MONTE_CARLO_MANAGED_OPENROUTER_API_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
+    env.MONTECARLO_MANAGED_OPENROUTER_API_KEY?.trim() || env.OPENROUTER_API_KEY?.trim();
   return new AiSdkRunner({
     descriptor: {
       id: "openrouter",

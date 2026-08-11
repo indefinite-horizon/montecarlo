@@ -4,7 +4,7 @@ import { validatePortableWorkspaceManifestReferences } from "./portable-referenc
 import { validatePortableWorkspaceEnvelopeShape } from "./portable-shape";
 import type { BlobId, Chat, ChatBranch, ChatMessage, ChatRun, Project, Workspace } from "./types";
 
-export const PORTABLE_WORKSPACE_FORMAT = "monte-carlo.workspace" as const;
+export const PORTABLE_WORKSPACE_FORMAT = "montecarlo.workspace" as const;
 export const PORTABLE_WORKSPACE_ENVELOPE_VERSION = 1 as const;
 export const PORTABLE_WORKSPACE_SCHEMA_VERSION = 1 as const;
 

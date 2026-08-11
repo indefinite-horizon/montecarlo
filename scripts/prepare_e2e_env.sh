@@ -44,7 +44,7 @@ ensure_default_var "CONVEX_URL" "http://127.0.0.1:3210"
 ensure_default_var "CONVEX_SITE_URL" "http://127.0.0.1:3211"
 ensure_default_var "VITE_CONVEX_URL" "http://127.0.0.1:3210"
 ensure_default_var "VITE_CONVEX_SITE_URL" "http://127.0.0.1:3211"
-ensure_nonempty_default_var "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY" "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPb6x9CwdZxD/1T1yR0kN6ohcSuLtjEIFRuNkVoIhFKSy1iQAwHEqnT1bMM1tUHjEy2HXpFQJpHhB656+DGmv5Q=="
+ensure_nonempty_default_var "MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY" "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPb6x9CwdZxD/1T1yR0kN6ohcSuLtjEIFRuNkVoIhFKSy1iQAwHEqnT1bMM1tUHjEy2HXpFQJpHhB656+DGmv5Q=="
 
 upsert_var() {
   local key="$1"

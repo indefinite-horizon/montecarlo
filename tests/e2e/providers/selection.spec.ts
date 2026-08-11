@@ -137,8 +137,8 @@ test("model submenu handles discovery in progress and defaults to the first reso
   });
 
   await page.evaluate(() => {
-    localStorage.removeItem("monte-carlo:provider:codex:model-catalog");
-    localStorage.removeItem("monte-carlo:provider:codex:selected-model");
+    localStorage.removeItem("montecarlo:provider:codex:model-catalog");
+    localStorage.removeItem("montecarlo:provider:codex:selected-model");
   });
   await page.reload();
 
@@ -247,7 +247,7 @@ test("thinking bars and cycle follow sparse model capabilities", async ({ page }
     });
   });
   await page.evaluate(() => {
-    localStorage.removeItem("monte-carlo:provider:codex:model-catalog");
+    localStorage.removeItem("montecarlo:provider:codex:model-catalog");
   });
   await page.reload();
 
@@ -321,7 +321,7 @@ test("unsafe or credential-bearing endpoints are rejected and never saved", asyn
   await openrouter.getByLabel("Provider endpoint").fill("https://user:secret@example.test/v1");
   await openrouter.getByRole("button", { name: "Save endpoint" }).click();
   await expect(
-    page.evaluate(() => localStorage.getItem("monte-carlo:provider:openrouter:base-url")),
+    page.evaluate(() => localStorage.getItem("montecarlo:provider:openrouter:base-url")),
   ).resolves.toBeNull();
 });
 

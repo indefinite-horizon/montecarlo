@@ -3,6 +3,16 @@
 
 set -euo pipefail
 
+if ! command -v git >/dev/null 2>&1; then
+  echo "Skipping Git hook setup: Git is unavailable."
+  exit 0
+fi
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Skipping Git hook setup: not inside a Git worktree."
+  exit 0
+fi
+
 ROOT="$(git rev-parse --show-toplevel)"
 HOOK_SOURCE="$ROOT/scripts/pre-commit"
 HOOK_DIR="$(git rev-parse --git-common-dir)/hooks"

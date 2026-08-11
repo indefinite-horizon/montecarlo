@@ -365,8 +365,8 @@ fs.writeFileSync(configFile, JSON.stringify(config));
 
 write_selected_ports_to_env() {
   local attestation_key_pair attestation_public_key attestation_private_key
-  attestation_public_key="$(env_file_value "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY")"
-  attestation_private_key="$(env_file_value "MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$RUNTIME_ENV_FILE")"
+  attestation_public_key="$(env_file_value "MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY")"
+  attestation_private_key="$(env_file_value "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$RUNTIME_ENV_FILE")"
   if [ -z "$attestation_public_key" ] || [ -z "$attestation_private_key" ]; then
     attestation_key_pair="$(
       bun -e 'const { publicKey, privateKey } = require("node:crypto").generateKeyPairSync("ec", { namedCurve: "P-256" }); console.log(publicKey.export({ format: "der", type: "spki" }).toString("base64")); console.log(privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"));'
@@ -374,8 +374,8 @@ write_selected_ports_to_env() {
     attestation_public_key="${attestation_key_pair%%$'\n'*}"
     attestation_private_key="${attestation_key_pair#*$'\n'}"
   fi
-  upsert_env_var "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY" "$attestation_public_key"
-  upsert_env_var "MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$attestation_private_key" "$RUNTIME_ENV_FILE"
+  upsert_env_var "MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY" "$attestation_public_key"
+  upsert_env_var "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$attestation_private_key" "$RUNTIME_ENV_FILE"
   upsert_env_var "CONVEX_AGENT_MODE" "anonymous"
   upsert_env_var "CONVEX_URL" "http://127.0.0.1:${backend_port}"
   upsert_env_var "VITE_CONVEX_URL" "http://127.0.0.1:${backend_port}"
@@ -541,11 +541,11 @@ export CONVEX_AGENT_MODE=anonymous
 export LOCAL_FRONTEND_PORT="$frontend_port"
 export LOCAL_FRONTEND_BIND_PORT="$frontend_bind_port"
 export SITE_PORT="$site_port"
-export MONTE_CARLO_RUNTIME_DEV=1
-export MONTE_CARLO_RUNTIME_PORT="$runtime_port"
-export MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS="http://localhost:${site_port},http://127.0.0.1:${frontend_bind_port}"
+export MONTECARLO_RUNTIME_DEV=1
+export MONTECARLO_RUNTIME_PORT="$runtime_port"
+export MONTECARLO_RUNTIME_ALLOWED_ORIGINS="http://localhost:${site_port},http://127.0.0.1:${frontend_bind_port}"
 export VITE_RUNTIME_URL="http://127.0.0.1:${runtime_port}"
-export VITE_RUNTIME_TOKEN="$(env_file_value "MONTE_CARLO_RUNTIME_TOKEN" "$RUNTIME_ENV_FILE")"
+export VITE_RUNTIME_TOKEN="$(env_file_value "MONTECARLO_RUNTIME_TOKEN" "$RUNTIME_ENV_FILE")"
 
 if env_file_has_usable_deployment_selector; then
   echo "Using existing Convex deployment selector from $ENV_FILE."

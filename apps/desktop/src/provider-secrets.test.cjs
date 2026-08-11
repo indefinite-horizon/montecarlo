@@ -30,7 +30,7 @@ describe("provider secret store", () => {
   let userDataPath;
 
   before(() => {
-    userDataPath = mkdtempSync(path.join(os.tmpdir(), "monte-carlo-secrets-"));
+    userDataPath = mkdtempSync(path.join(os.tmpdir(), "montecarlo-secrets-"));
   });
 
   after(() => {
@@ -44,14 +44,14 @@ describe("provider secret store", () => {
     const fileContents = readFileSync(path.join(userDataPath, "provider-secrets.v1.json"), "utf8");
     assert.equal(fileContents.includes("test-value-one"), false);
     assert.deepEqual(store.loadEnvironment(), {
-      MONTE_CARLO_USER_OPENROUTER_API_KEY: "test-value-one",
+      MONTECARLO_USER_OPENROUTER_API_KEY: "test-value-one",
     });
   });
 
   it("clears a saved value and rejects every provider outside the allowlist", () => {
     const store = createProviderSecretStore({ safeStorage: fakeSafeStorage(), userDataPath });
     store.save({ provider: "openrouter", secret: "" });
-    assert.equal(store.loadEnvironment().MONTE_CARLO_USER_OPENROUTER_API_KEY, undefined);
+    assert.equal(store.loadEnvironment().MONTECARLO_USER_OPENROUTER_API_KEY, undefined);
     assert.throws(
       () => parseProviderSecretUpdate({ provider: "ollama", secret: "not-applicable" }),
       /Unsupported provider/,

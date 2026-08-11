@@ -275,7 +275,7 @@ function startCodexAppServer(
   signal: AbortSignal,
 ): CodexAppServerProcess {
   signal.throwIfAborted();
-  const workingDirectory = mkdtempSync(join(tmpdir(), "monte-carlo-codex-"));
+  const workingDirectory = mkdtempSync(join(tmpdir(), "montecarlo-codex-"));
   let child: InteractiveChild;
   try {
     child = spawn(executable, [...CODEX_APP_SERVER_ARGUMENTS], {
@@ -556,7 +556,7 @@ export class CodexRunner implements LocalAuthRunner {
       const nextRequestId = () => nextRequestIdValue++;
       const initializeRequestId = nextRequestId();
       requestMessage(appServer.child, initializeRequestId, "initialize", {
-        clientInfo: { name: "monte-carlo", title: "Monte Carlo", version: "0.1.0" },
+        clientInfo: { name: "montecarlo", title: "Monte Carlo", version: "0.1.0" },
         capabilities: { experimentalApi: false, requestAttestation: false },
       });
       await waitForResponse(appServer.messages, initializeRequestId);

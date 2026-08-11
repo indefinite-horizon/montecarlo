@@ -22,7 +22,7 @@ export const env = cleanEnv(process.env, {
     default: "https://us.i.posthog.com",
   }),
   ANALYTICS_DISABLED: str({ desc: "Hard kill switch for analytics.", default: "" }),
-  MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY: str({
+  MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY: str({
     desc: "Public P-256 key used to verify loopback runtime blob writes.",
     default: "",
   }),

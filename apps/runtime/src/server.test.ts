@@ -163,7 +163,7 @@ describe("RuntimeServer", () => {
     expect(healthy.status).toBe(200);
     await expect(healthy.json()).resolves.toMatchObject({
       status: "ready",
-      service: "monte-carlo-runtime",
+      service: "montecarlo-runtime",
     });
   });
 
@@ -175,17 +175,17 @@ describe("RuntimeServer", () => {
         Origin: "http://localhost:5173",
         "Access-Control-Request-Method": "PUT",
         "Access-Control-Request-Headers":
-          "content-type,x-monte-carlo-envelope-version,x-monte-carlo-sha256,x-monte-carlo-storage-backend",
+          "content-type,x-montecarlo-envelope-version,x-montecarlo-sha256,x-montecarlo-storage-backend",
       },
     });
 
     expect(response.status).toBe(204);
     expect(response.headers.get("access-control-allow-methods")).toContain("PUT");
     expect(response.headers.get("access-control-allow-headers")).toContain(
-      "x-monte-carlo-envelope-version",
+      "x-montecarlo-envelope-version",
     );
     expect(response.headers.get("access-control-allow-headers")).toContain(
-      "x-monte-carlo-storage-backend",
+      "x-montecarlo-storage-backend",
     );
   });
 
@@ -355,9 +355,9 @@ describe("RuntimeServer", () => {
       headers: {
         ...requestHeaders(),
         "Content-Type": "application/json",
-        "X-Monte-Carlo-Envelope-Version": "1",
-        "X-Monte-Carlo-SHA256": digest,
-        "X-Monte-Carlo-Manifest-Id": "manifest_1",
+        "X-Montecarlo-Envelope-Version": "1",
+        "X-Montecarlo-SHA256": digest,
+        "X-Montecarlo-Manifest-Id": "manifest_1",
       },
       body,
     });
@@ -374,8 +374,8 @@ describe("RuntimeServer", () => {
 
     const get = await fetch(`${baseURL}/v1/blobs/${key}`, { headers: requestHeaders() });
     expect(get.status).toBe(200);
-    expect(get.headers.get("x-monte-carlo-sha256")).toBe(digest);
-    expect(get.headers.get("x-monte-carlo-envelope-version")).toBe("1");
+    expect(get.headers.get("x-montecarlo-sha256")).toBe(digest);
+    expect(get.headers.get("x-montecarlo-envelope-version")).toBe("1");
     await expect(get.text()).resolves.toBe(body);
   });
 
@@ -390,10 +390,10 @@ describe("RuntimeServer", () => {
     const headers = {
       ...requestHeaders(),
       "Content-Type": "application/json",
-      "X-Monte-Carlo-Envelope-Version": "1",
-      "X-Monte-Carlo-SHA256": digest,
-      "X-Monte-Carlo-Storage-Backend": "r2",
-      "X-Monte-Carlo-Manifest-Id": "manifest_2",
+      "X-Montecarlo-Envelope-Version": "1",
+      "X-Montecarlo-SHA256": digest,
+      "X-Montecarlo-Storage-Backend": "r2",
+      "X-Montecarlo-Manifest-Id": "manifest_2",
     };
 
     const put = await fetch(`${baseURL}/v1/blobs/${key}`, { method: "PUT", headers, body });
@@ -402,7 +402,7 @@ describe("RuntimeServer", () => {
 
     const get = await fetch(`${baseURL}/v1/blobs/${key}`, { headers });
     expect(get.status).toBe(200);
-    expect(get.headers.get("x-monte-carlo-storage-backend")).toBe("r2");
+    expect(get.headers.get("x-montecarlo-storage-backend")).toBe("r2");
     await expect(get.text()).resolves.toBe(body);
 
     const missingHeader = await fetch(`${baseURL}/v1/blobs/${key}`, {

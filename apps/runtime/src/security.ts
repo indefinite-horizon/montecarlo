@@ -6,7 +6,7 @@ import type { RuntimeConfig } from "./config.js";
 import { HttpError } from "./errors.js";
 
 const allowedRequestHeaders =
-  "authorization, content-type, accept, x-monte-carlo-envelope-version, x-monte-carlo-sha256, x-monte-carlo-storage-backend, x-monte-carlo-manifest-id";
+  "authorization, content-type, accept, x-montecarlo-envelope-version, x-montecarlo-sha256, x-montecarlo-storage-backend, x-montecarlo-manifest-id";
 const allowedMethods = "GET, POST, PUT, OPTIONS";
 
 function isLoopbackHostname(hostname: string): boolean {

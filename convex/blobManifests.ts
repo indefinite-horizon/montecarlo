@@ -163,7 +163,7 @@ export const markAvailable = mutation({
     if (!manifest || manifest.workspaceId !== args.workspaceId || manifest.status === "deleted") {
       throw new Error("Blob manifest not found in this workspace.");
     }
-    const encodedPublicKey = env.MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY;
+    const encodedPublicKey = env.MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY;
     if (!encodedPublicKey || !/^[A-Za-z0-9_-]{86}$/.test(args.attestation)) {
       throw new Error("Blob attestation is unavailable.");
     }

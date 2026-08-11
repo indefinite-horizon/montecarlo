@@ -11,7 +11,7 @@ export const runtimeDefaults = {
   providerHealthTimeoutMs: 5 * oneSecondMs,
   processKillGraceMs: oneSecondMs,
   developmentOrigins: ["http://localhost:5173", "http://127.0.0.1:5173"],
-  desktopOrigins: ["app://monte-carlo"],
+  desktopOrigins: ["app://montecarlo"],
   openRouterBaseURL: "https://openrouter.ai/api/v1",
   ollamaBaseURL: "http://127.0.0.1:11434/v1",
 } as const;
@@ -32,7 +32,7 @@ function readPort(raw: string | undefined): number {
   if (raw === undefined || raw.trim() === "") return runtimeDefaults.port;
   const port = Number(raw);
   if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-    throw new Error("MONTE_CARLO_RUNTIME_PORT must be an integer between 0 and 65535.");
+    throw new Error("MONTECARLO_RUNTIME_PORT must be an integer between 0 and 65535.");
   }
   return port;
 }
@@ -47,7 +47,7 @@ function readHost(raw: string | undefined): RuntimeConfig["host"] {
 
 function normalizeConfiguredOrigin(value: string): string {
   const trimmed = value.trim().replace(/\/$/, "");
-  if (trimmed === "app://monte-carlo") return trimmed;
+  if (trimmed === "app://montecarlo") return trimmed;
 
   let url: URL;
   try {
@@ -69,24 +69,24 @@ function normalizeConfiguredOrigin(value: string): string {
 }
 
 export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
-  const development = env.NODE_ENV === "development" || env.MONTE_CARLO_RUNTIME_DEV === "1";
-  const bearerToken = env.MONTE_CARLO_RUNTIME_TOKEN?.trim() || undefined;
+  const development = env.NODE_ENV === "development" || env.MONTECARLO_RUNTIME_DEV === "1";
+  const bearerToken = env.MONTECARLO_RUNTIME_TOKEN?.trim() || undefined;
   const blobAttestationPrivateKey =
-    env.MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY?.trim() || undefined;
+    env.MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY?.trim() || undefined;
   if (!development && (bearerToken === undefined || bearerToken.length < 32)) {
     throw new Error(
-      "MONTE_CARLO_RUNTIME_TOKEN must contain at least 32 characters outside development.",
+      "MONTECARLO_RUNTIME_TOKEN must contain at least 32 characters outside development.",
     );
   }
 
-  const configuredOriginValues = env.MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS?.split(",").filter(
+  const configuredOriginValues = env.MONTECARLO_RUNTIME_ALLOWED_ORIGINS?.split(",").filter(
     (origin) => origin.trim() !== "",
   );
   const configuredOrigins = configuredOriginValues?.length ? configuredOriginValues : undefined;
   const defaults = development
     ? [...runtimeDefaults.developmentOrigins, ...runtimeDefaults.desktopOrigins]
     : [...runtimeDefaults.desktopOrigins];
-  const configuredWorkspaceIdValues = env.MONTE_CARLO_RUNTIME_WORKSPACE_IDS?.split(",")
+  const configuredWorkspaceIdValues = env.MONTECARLO_RUNTIME_WORKSPACE_IDS?.split(",")
     .map((workspaceId) => workspaceId.trim())
     .filter(Boolean);
   const configuredWorkspaceIds = configuredWorkspaceIdValues?.length
@@ -97,12 +97,12 @@ export function loadRuntimeConfig(env: NodeJS.ProcessEnv = process.env): Runtime
       (workspaceId) => !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(workspaceId),
     )
   ) {
-    throw new Error("MONTE_CARLO_RUNTIME_WORKSPACE_IDS contains an invalid workspace ID.");
+    throw new Error("MONTECARLO_RUNTIME_WORKSPACE_IDS contains an invalid workspace ID.");
   }
 
   return {
-    host: readHost(env.MONTE_CARLO_RUNTIME_HOST),
-    port: readPort(env.MONTE_CARLO_RUNTIME_PORT),
+    host: readHost(env.MONTECARLO_RUNTIME_HOST),
+    port: readPort(env.MONTECARLO_RUNTIME_PORT),
     development,
     bearerToken,
     blobAttestationPrivateKey,

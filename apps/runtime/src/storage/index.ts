@@ -26,7 +26,7 @@ function defaultWorkspacesDirectory(
     return join(localData || join(userHome, "AppData", "Local"), "Monte Carlo", "workspaces");
   }
   const dataHome = env.XDG_DATA_HOME?.trim() || join(userHome, ".local", "share");
-  return join(dataHome, "monte-carlo", "workspaces");
+  return join(dataHome, "montecarlo", "workspaces");
 }
 
 function requireSetting(env: NodeJS.ProcessEnv, name: string): string {
@@ -42,7 +42,7 @@ function createFilesystemStore(
   platform: RuntimePlatform = process.platform,
   userHome: string = homedir(),
 ): ObjectStoreV1 {
-  const configuredRoot = env.MONTE_CARLO_WORKSPACES_DIR?.trim();
+  const configuredRoot = env.MONTECARLO_WORKSPACES_DIR?.trim();
   return new FilesystemObjectStore({
     rootDirectory: resolve(configuredRoot || defaultWorkspacesDirectory(env, platform, userHome)),
     maxObjectBytes: runtimeDefaults.maxBlobBytes,
@@ -61,9 +61,9 @@ function createR2Store(env: NodeJS.ProcessEnv): ObjectStoreV1 {
 }
 
 function selectedBackend(env: NodeJS.ProcessEnv): ObjectStoreBackend {
-  const backend = env.MONTE_CARLO_OBJECT_STORE?.trim() || "filesystem";
+  const backend = env.MONTECARLO_OBJECT_STORE?.trim() || "filesystem";
   if (backend === "filesystem" || backend === "r2") return backend;
-  throw new ObjectStoreConfigurationError("MONTE_CARLO_OBJECT_STORE must be filesystem or r2.");
+  throw new ObjectStoreConfigurationError("MONTECARLO_OBJECT_STORE must be filesystem or r2.");
 }
 
 /** Legacy single-store factory retained for embedded consumers. */

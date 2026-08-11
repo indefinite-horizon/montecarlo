@@ -23,7 +23,7 @@ function fakeCodexCli(
     leakMcp?: boolean;
   } = {},
 ) {
-  const directory = mkdtempSync(join(tmpdir(), "monte-carlo-codex-"));
+  const directory = mkdtempSync(join(tmpdir(), "montecarlo-codex-"));
   temporaryDirectories.push(directory);
   const executable = join(directory, "codex");
   const processPath = join(directory, "process.json");
@@ -40,7 +40,7 @@ fs.writeFileSync(${JSON.stringify(processPath)}, JSON.stringify({
   args,
   cwd: process.cwd(),
   homePresent: typeof process.env.HOME === "string",
-  runtimeSecretPresent: typeof process.env.MONTE_CARLO_RUNTIME_TOKEN === "string",
+  runtimeSecretPresent: typeof process.env.MONTECARLO_RUNTIME_TOKEN === "string",
   openRouterSecretPresent: typeof process.env.OPENROUTER_API_KEY === "string",
 }));
 const requestsPath = ${JSON.stringify(requestsPath)};
@@ -116,13 +116,13 @@ describe("Codex transcript prompt", () => {
           messages: [{ role: "user", content: "hello" }],
           options: { reasoningEffort: "medium" },
         },
-        "/tmp/monte-carlo-codex-test",
+        "/tmp/montecarlo-codex-test",
         ["fixture-mcp"],
       ),
     ).toMatchObject({
       model: "gpt-5",
       serviceTier: "default",
-      cwd: "/tmp/monte-carlo-codex-test",
+      cwd: "/tmp/montecarlo-codex-test",
       approvalPolicy: "never",
       sandbox: "read-only",
       config: {
@@ -179,7 +179,7 @@ describe("Codex transcript prompt", () => {
     const runner = new CodexRunner({
       ...process.env,
       CODEX_PATH: fake.executable,
-      MONTE_CARLO_RUNTIME_TOKEN: "runtime-secret-sentinel",
+      MONTECARLO_RUNTIME_TOKEN: "runtime-secret-sentinel",
       OPENROUTER_API_KEY: "provider-secret-sentinel",
     });
     const events = [];
@@ -253,7 +253,7 @@ describe("Codex transcript prompt", () => {
       runtimeSecretPresent: false,
     });
     expect(childProcess.cwd).not.toBe(process.cwd());
-    expect(childProcess.cwd).toContain("monte-carlo-codex-");
+    expect(childProcess.cwd).toContain("montecarlo-codex-");
     expect(existsSync(childProcess.cwd)).toBe(false);
     expect(childProcess.args).toContain("features.shell_tool=false");
     expect(childProcess.args).toContain('shell_environment_policy.inherit="none"');

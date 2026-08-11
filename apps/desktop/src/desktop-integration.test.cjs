@@ -18,10 +18,10 @@ describe("desktop integration contracts", () => {
   it("launches the runtime's real source and packaged entrypoints with its origin variable", () => {
     assert.match(mainSource, /runtime\/src\/index\.ts/);
     assert.match(mainSource, /"runtime", "runtime\.cjs"/);
-    assert.match(mainSource, /MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS/);
-    assert.doesNotMatch(mainSource, /MONTE_CARLO_ALLOWED_ORIGINS/);
+    assert.match(mainSource, /MONTECARLO_RUNTIME_ALLOWED_ORIGINS/);
+    assert.doesNotMatch(mainSource, /MONTECARLO_ALLOWED_ORIGINS/);
     assert.match(runtimeConfigSource, /port: 43_127/);
-    assert.match(mainSource, /MONTE_CARLO_RUNTIME_PORT \?\? "0"/);
+    assert.match(mainSource, /MONTECARLO_RUNTIME_PORT \?\? "0"/);
     assert.match(mainSource, /parseRuntimeReadyLine/);
     assert.match(mainSource, /requestSingleInstanceLock/);
     assert.doesNotMatch(mainSource, /baseUrl: `http:\/\/127\.0\.0\.1:\$\{runtimePort\}`/);

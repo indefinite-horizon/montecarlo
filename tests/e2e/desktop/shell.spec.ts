@@ -13,7 +13,7 @@ test.beforeEach(async () => {
     env: {
       ...process.env,
       ELECTRON_START_URL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5173/",
-      MONTE_CARLO_OPEN_DEVTOOLS: "0",
+      MONTECARLO_OPEN_DEVTOOLS: "0",
     },
   });
 });
