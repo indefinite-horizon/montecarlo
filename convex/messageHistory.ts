@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 import { convexConfig } from "./config";
 import { createPublicId } from "./lib/domainValidation";
+import { selectLatestStandaloneMessage } from "./lib/messageOrder";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
 
 const truncateResultValidator = v.object({
@@ -123,24 +124,24 @@ export const truncateFromUserMessage = mutation({
     const latestMessage = latestRun?.outputMessageId
       ? await ctx.db.get(latestRun.outputMessageId)
       : null;
-    const latestStandaloneMessage = await ctx.db
-      .query("messages")
-      .withIndex("by_workspace_chat_created_at", (index) =>
-        index.eq("workspaceId", args.workspaceId).eq("chatId", args.chatId),
-      )
-      .filter((query) =>
-        query.or(query.eq(query.field("role"), "user"), query.eq(query.field("role"), "system")),
-      )
-      .order("desc")
-      .first();
     const latestUserMessage = await ctx.db
       .query("messages")
-      .withIndex("by_workspace_chat_created_at", (index) =>
-        index.eq("workspaceId", args.workspaceId).eq("chatId", args.chatId),
+      .withIndex("by_workspace_chat_role_created_at", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("chatId", args.chatId).eq("role", "user"),
       )
-      .filter((query) => query.eq(query.field("role"), "user"))
       .order("desc")
       .first();
+    const latestSystemMessage = await ctx.db
+      .query("messages")
+      .withIndex("by_workspace_chat_role_created_at", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("chatId", args.chatId).eq("role", "system"),
+      )
+      .order("desc")
+      .first();
+    const latestStandaloneMessage = selectLatestStandaloneMessage(
+      latestUserMessage,
+      latestSystemMessage,
+    );
     const now = Date.now();
     const latestRunAt = latestRun?.completedAt ?? 0;
     const latestStandaloneAt = latestStandaloneMessage?.createdAt ?? 0;

@@ -148,17 +148,10 @@ export default defineSchema({
     .index("by_workspace_public_id", ["workspaceId", "publicId"])
     .index("by_workspace_updated_at", ["workspaceId", "updatedAt"])
     .index("by_workspace_project_updated_at", ["workspaceId", "projectId", "updatedAt"])
-    .index("by_workspace_archived_updated_at", ["workspaceId", "archivedAt", "updatedAt"])
     .index("by_workspace_archived_last_user_message_at", [
       "workspaceId",
       "archivedAt",
       "lastUserMessageAt",
-    ])
-    .index("by_workspace_project_archived_updated_at", [
-      "workspaceId",
-      "projectId",
-      "archivedAt",
-      "updatedAt",
     ])
     .index("by_workspace_project_archived_last_user_message_at", [
       "workspaceId",
@@ -223,6 +216,7 @@ export default defineSchema({
   })
     .index("by_workspace_public_id", ["workspaceId", "publicId"])
     .index("by_workspace_chat_created_at", ["workspaceId", "chatId", "createdAt"])
+    .index("by_workspace_chat_role_created_at", ["workspaceId", "chatId", "role", "createdAt"])
     .index("by_workspace_branch_ordinal", ["workspaceId", "branchId", "ordinal"]),
 
   agent_runs: defineTable({

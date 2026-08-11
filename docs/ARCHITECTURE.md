@@ -81,6 +81,8 @@ workspace
 
 Branches form a rooted DAG with a single parent per node. A branch anchor records source message, selection offsets/text, prompt, and an immutable bounded set of ancestor message IDs. Messages belong to the branch where they were created. A transcript view includes only that snapshot plus messages created on the active branch, so later parent turns cannot leak into an existing child.
 
+Selection offsets and quotes that overlap the Convex preview are checked against that preview. A selection wholly inside an object-stored tail can only be checked for valid bounds until the runtime hydrates the body. Selection text is therefore user-authored branch focus, not an authorization or content-attestation boundary.
+
 ## Context materialization
 
 Context is deterministic and bounded by bytes and turns. The algorithm walks the active lineage backwards, preserves whole recent turns where possible, guarantees the anchor source turn when within configured limits, adds a clearly delimited selected passage, and appends the branch prompt. Truncation occurs at UTF-8-safe boundaries and is reported in metadata.

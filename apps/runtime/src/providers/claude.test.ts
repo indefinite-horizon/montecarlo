@@ -13,7 +13,7 @@ import {
 
 const temporaryDirectories: string[] = [];
 
-function fakeClaudeCli(): string {
+function fakeClaudeCli(options: { completedText?: string } = {}): string {
   const directory = mkdtempSync(join(tmpdir(), "monte-carlo-claude-"));
   temporaryDirectories.push(directory);
   const executable = join(directory, "claude");
@@ -32,7 +32,7 @@ if (args.includes("--print")) {
     process.stdout.write(JSON.stringify({ type: "system", subtype: "init", session_id: "session-1" }) + "\\n");
     process.stdout.write(JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "hel" } } }) + "\\n");
     process.stdout.write(JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "lo" } } }) + "\\n");
-    process.stdout.write(JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "hello" }] } }) + "\\n");
+    process.stdout.write(JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: ${JSON.stringify(options.completedText ?? "hello")} }] } }) + "\\n");
     process.stdout.write(JSON.stringify({ type: "result", is_error: false, usage: { input_tokens: 2, output_tokens: 1 } }) + "\\n");
   });
 }
@@ -160,5 +160,25 @@ describe("ClaudeRunner", () => {
         usage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 },
       },
     ]);
+  });
+
+  it("fails when the completed message disagrees with streamed text", async () => {
+    const runner = new ClaudeRunner({
+      CLAUDE_PATH: fakeClaudeCli({ completedText: "different" }),
+    });
+    const consume = async () => {
+      for await (const _event of runner.run(
+        {
+          provider: "anthropic",
+          model: "sonnet",
+          messages: [{ role: "user", content: "Hello" }],
+        },
+        new AbortController().signal,
+      )) {
+        // Consume streamed events before the reconciliation error.
+      }
+    };
+
+    await expect(consume()).rejects.toThrow("inconsistent streamed message content");
   });
 });

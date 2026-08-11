@@ -32,9 +32,7 @@ import { latestUserPrompt, transcriptPrompt } from "./codexPrompt.js";
 export { transcriptPrompt } from "./codexPrompt.js";
 
 type InteractiveChild = ChildProcessByStdio<Writable, Readable, Readable>;
-
 type JsonObject = Record<string, unknown>;
-
 type CodexAppServerMessage = {
   id?: unknown;
   method?: unknown;
@@ -42,7 +40,6 @@ type CodexAppServerMessage = {
   result?: unknown;
   error?: unknown;
 };
-
 type CodexAppServerProcess = {
   child: InteractiveChild;
   messages: AsyncQueue<CodexAppServerMessage>;
@@ -50,7 +47,6 @@ type CodexAppServerProcess = {
   stderr: () => string;
   stop: () => void;
 };
-
 type CodexThreadStartParams = {
   model: string;
   serviceTier: "default" | "fast";
@@ -68,7 +64,6 @@ type CodexThreadStartParams = {
   };
   ephemeral: false;
 };
-
 const CODEX_DISABLED_FEATURES = [
   "apps",
   "browser_use",
@@ -473,7 +468,9 @@ function completedAgentText(
   const text = stringField(params.item, "text");
   if (!itemId || text === undefined) return undefined;
   const streamed = streamedTextByItem.get(itemId) ?? "";
-  if (!text.startsWith(streamed)) return streamed === "" ? text : undefined;
+  if (streamed && !text.startsWith(streamed)) {
+    throw new Error("The Codex app-server returned inconsistent streamed message content.");
+  }
   const suffix = text.slice(streamed.length);
   if (suffix) streamedTextByItem.set(itemId, text);
   return suffix || undefined;
@@ -522,7 +519,6 @@ export class CodexRunner implements LocalAuthRunner {
       };
     }
   }
-
   async *deviceLogin(signal: AbortSignal): AsyncIterable<AuthEvent> {
     yield { type: "status", status: "starting", message: "Starting the official Codex CLI." };
     const process = streamProcess(
@@ -549,7 +545,6 @@ export class CodexRunner implements LocalAuthRunner {
       if (signal.aborted && process.child.exitCode === null) terminateProcess(process.child);
     }
   }
-
   async listModels(
     _connection?: { baseURL?: string },
     signal?: AbortSignal,
@@ -561,7 +556,6 @@ export class CodexRunner implements LocalAuthRunner {
       fetchedAt: Date.now(),
     };
   }
-
   async *run(input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent> {
     const appServer = startCodexAppServer(this.cliExecutable, this.childEnvironment, signal);
     try {
@@ -574,7 +568,6 @@ export class CodexRunner implements LocalAuthRunner {
       });
       await waitForResponse(appServer.messages, initializeRequestId);
       notifyMessage(appServer.child, "initialized");
-
       const globalMcpInventory = await readMcpInventory(appServer, nextRequestId);
       const startParams = codexThreadStartParams(
         input,
@@ -597,13 +590,11 @@ export class CodexRunner implements LocalAuthRunner {
           })();
       const threadId = stringField(threadResult.thread, "id");
       if (!threadId) throw new Error("The Codex app-server did not return a thread id.");
-
       const scopedMcpInventory = await readMcpInventory(appServer, nextRequestId, threadId);
       if (scopedMcpInventory.capabilityCount !== 0) {
         throw new Error("The Codex app-server did not disable external tools for this thread.");
       }
       yield { type: "provider-thread", threadId };
-
       const prompt = input.providerThreadId
         ? latestUserPrompt(input.messages)
         : transcriptPrompt(input.messages);
@@ -613,7 +604,6 @@ export class CodexRunner implements LocalAuthRunner {
         input: [{ type: "text", text: prompt, text_elements: [] }],
         effort: codexReasoningEffort(input.options?.reasoningEffort),
       });
-
       const streamedTextByItem = new Map<string, string>();
       let usage: TokenUsage | undefined;
       for await (const message of appServer.messages) {
@@ -676,6 +666,9 @@ export class CodexRunner implements LocalAuthRunner {
         if (status === "failed") {
           const turnError = isObject(completed.turn.error) ? completed.turn.error : undefined;
           throw new Error(stringField(turnError, "message") ?? "The Codex turn failed.");
+        }
+        if (status !== "completed" && status !== "interrupted") {
+          throw new Error("The Codex app-server returned an unknown turn status.");
         }
         yield {
           type: "finish",

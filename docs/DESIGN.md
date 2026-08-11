@@ -115,9 +115,6 @@ adds blue/gold only when another hue improves path recognition.
 - Acknowledge user actions immediately. Use toasts for ephemeral success, error,
   and completion feedback; use inline notices only when the state must remain
   visible or needs an in-context action.
-- For simple, low-stakes actions such as copying a text block, do not show a
-  toast. Momentarily replace the copy icon with a checkmark while preserving the
-  button's styling, size, and position.
 - Scope loading and disabled states as narrowly as possible. Background startup,
   discovery, or refresh work should not make unrelated controls appear broken.
 - Only present options that the current context supports. When an unavailable

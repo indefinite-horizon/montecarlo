@@ -31,7 +31,7 @@ const desktopSpecs = ["**/desktop/*.spec.ts"];
 
 export default defineConfig({
   testDir: "tests/e2e",
-  timeout: process.env.CI ? 120_000 : 30_000,
+  timeout: process.env.CI ? 60_000 : 30_000,
   retries: process.env.CI ? 1 : 0,
   workers: workerCount,
   expect: {

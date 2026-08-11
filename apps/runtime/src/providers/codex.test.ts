@@ -15,7 +15,15 @@ import {
 
 const temporaryDirectories: string[] = [];
 
-function fakeCodexCli(options: { fail?: boolean; leakMcp?: boolean } = {}) {
+function fakeCodexCli(
+  options: {
+    completedText?: string;
+    completionStatus?: string;
+    fail?: boolean;
+    hang?: boolean;
+    leakMcp?: boolean;
+  } = {},
+) {
   const directory = mkdtempSync(join(tmpdir(), "monte-carlo-codex-"));
   temporaryDirectories.push(directory);
   const executable = join(directory, "codex");
@@ -53,6 +61,10 @@ input.on("line", (line) => {
     send({ id: message.id, result: { thread: { id: "thread-1" } } });
   } else if (message.method === "turn/start") {
     send({ id: message.id, result: { turn: { id: "turn-1", status: "inProgress" } } });
+    if (${String(options.hang === true)}) {
+      setTimeout(() => send({ method: "item/agentMessage/delta", params: { threadId: "thread-1", turnId: "turn-1", itemId: "item-1", delta: "Token " } }), 5);
+      return;
+    }
     if (${String(options.fail === true)}) {
       setTimeout(() => send({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: "failed", error: { message: "Codex fixture failed." } } } }), 5);
       return;
@@ -60,8 +72,8 @@ input.on("line", (line) => {
     setTimeout(() => send({ method: "item/agentMessage/delta", params: { threadId: "thread-1", turnId: "turn-1", itemId: "item-1", delta: "Token " } }), 5);
     setTimeout(() => send({ method: "item/agentMessage/delta", params: { threadId: "thread-1", turnId: "turn-1", itemId: "item-1", delta: "stream" } }), 10);
     setTimeout(() => send({ method: "thread/tokenUsage/updated", params: { threadId: "thread-1", turnId: "turn-1", tokenUsage: { last: { inputTokens: 4, outputTokens: 2, totalTokens: 6, cachedInputTokens: 1, reasoningOutputTokens: 0 } } } }), 15);
-    setTimeout(() => send({ method: "item/completed", params: { threadId: "thread-1", turnId: "turn-1", item: { id: "item-1", type: "agentMessage", text: "Token stream" } } }), 20);
-    setTimeout(() => send({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed", error: null } } }), 25);
+    setTimeout(() => send({ method: "item/completed", params: { threadId: "thread-1", turnId: "turn-1", item: { id: "item-1", type: "agentMessage", text: ${JSON.stringify(options.completedText ?? "Token stream")} } } }), 20);
+    setTimeout(() => send({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: ${JSON.stringify(options.completionStatus ?? "completed")}, error: null } } }), 25);
   }
 });
 `,
@@ -276,7 +288,74 @@ describe("Codex transcript prompt", () => {
     await expect(consume()).rejects.toThrow("Codex fixture failed.");
   });
 
-  it("fails closed before a turn when an MCP capability remains visible", async () => {
+  it("fails when the completed message disagrees with streamed text", async () => {
+    const runner = new CodexRunner({
+      ...process.env,
+      CODEX_PATH: fakeCodexCli({ completedText: "different" }).executable,
+    });
+    const consume = async () => {
+      for await (const _event of runner.run(
+        {
+          provider: "codex",
+          model: "gpt-5",
+          messages: [{ role: "user", content: "Hello" }],
+        },
+        new AbortController().signal,
+      )) {
+        // Consume streamed events before the reconciliation error.
+      }
+    };
+
+    await expect(consume()).rejects.toThrow("inconsistent streamed message content");
+  });
+
+  it("fails closed on unknown completed-turn statuses", async () => {
+    const runner = new CodexRunner({
+      ...process.env,
+      CODEX_PATH: fakeCodexCli({ completionStatus: "future-status" }).executable,
+    });
+    const consume = async () => {
+      for await (const _event of runner.run(
+        {
+          provider: "codex",
+          model: "gpt-5",
+          messages: [{ role: "user", content: "Hello" }],
+        },
+        new AbortController().signal,
+      )) {
+        // Consume streamed events before the terminal status error.
+      }
+    };
+
+    await expect(consume()).rejects.toThrow("unknown turn status");
+  });
+
+  it("cancels an in-progress app-server turn", async () => {
+    const runner = new CodexRunner({
+      ...process.env,
+      CODEX_PATH: fakeCodexCli({ hang: true }).executable,
+    });
+    const controller = new AbortController();
+    const consume = async () => {
+      for await (const event of runner.run(
+        {
+          provider: "codex",
+          model: "gpt-5",
+          messages: [{ role: "user", content: "Hello" }],
+        },
+        controller.signal,
+      )) {
+        if (event.type === "text-delta") controller.abort();
+      }
+    };
+
+    await expect(consume()).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it.each([
+    undefined,
+    "existing-thread",
+  ])("fails closed before a turn when an MCP capability remains visible (%s)", async (providerThreadId) => {
     const fake = fakeCodexCli({ leakMcp: true });
     const runner = new CodexRunner({ ...process.env, CODEX_PATH: fake.executable });
     const consume = async () => {
@@ -285,6 +364,7 @@ describe("Codex transcript prompt", () => {
           provider: "codex",
           model: "gpt-5",
           messages: [{ role: "user", content: "Hello" }],
+          providerThreadId,
         },
         new AbortController().signal,
       )) {

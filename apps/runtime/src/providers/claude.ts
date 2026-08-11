@@ -389,11 +389,10 @@ export class ClaudeRunner implements LocalAuthRunner {
           if (typeof sessionId === "string") yield { type: "provider-thread", threadId: sessionId };
         } else if (type === "assistant") {
           const completeText = textFromMessage(event).join("");
-          const suffix = completeText.startsWith(streamedAssistantText)
-            ? completeText.slice(streamedAssistantText.length)
-            : streamedAssistantText
-              ? ""
-              : completeText;
+          if (streamedAssistantText && !completeText.startsWith(streamedAssistantText)) {
+            throw new Error("The Claude CLI returned inconsistent streamed message content.");
+          }
+          const suffix = completeText.slice(streamedAssistantText.length);
           if (suffix) yield { type: "text-delta", delta: suffix };
           streamedAssistantText = "";
         } else if (type === "result") {
