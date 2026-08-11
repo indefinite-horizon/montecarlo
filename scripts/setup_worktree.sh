@@ -3,8 +3,16 @@
 
 set -euo pipefail
 
-MAIN_REPO="$(git worktree list --porcelain | head -1 | sed 's/worktree //')"
 WORKTREE_DIR="$(git rev-parse --show-toplevel)"
+
+if [ "${CONDUCTOR_IS_LOCAL:-1}" = "0" ]; then
+  bun install --frozen-lockfile
+  bash "$WORKTREE_DIR/scripts/setup_git_hooks.sh"
+  echo "Cloud workspace setup complete."
+  exit 0
+fi
+
+MAIN_REPO="${CONDUCTOR_ROOT_PATH:-$(git worktree list --porcelain | head -1 | sed 's/worktree //')}"
 
 if [ "$MAIN_REPO" = "$WORKTREE_DIR" ]; then
   if [ ! -f "$WORKTREE_DIR/.env.local" ]; then
