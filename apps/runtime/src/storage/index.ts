@@ -26,7 +26,7 @@ function defaultWorkspacesDirectory(
     return join(localData || join(userHome, "AppData", "Local"), "Monte Carlo", "workspaces");
   }
   const dataHome = env.XDG_DATA_HOME?.trim() || join(userHome, ".local", "share");
-  return join(dataHome, "montecarlo", "workspaces");
+  return join(dataHome, "monte-carlo", "workspaces");
 }
 
 function requireSetting(env: NodeJS.ProcessEnv, name: string): string {

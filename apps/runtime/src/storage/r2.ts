@@ -149,7 +149,7 @@ export class R2ObjectStore implements ObjectStoreV1 {
         ContentLength: input.data.byteLength,
         ContentType: input.mediaType,
         Metadata: {
-          "montecarlo-version": String(objectStoreContractVersion),
+          "monte-carlo-version": String(objectStoreContractVersion),
           sha256: digest,
           "byte-length": String(input.data.byteLength),
           "envelope-version": String(input.envelopeVersion),
@@ -191,7 +191,7 @@ export class R2ObjectStore implements ObjectStoreV1 {
     if (data.byteLength > this.maxObjectBytes) throw new ObjectIntegrityError();
 
     const metadata = result.Metadata ?? {};
-    const version = readPositiveInteger(metadata["montecarlo-version"]);
+    const version = readPositiveInteger(metadata["monte-carlo-version"]);
     const byteLength = readNonNegativeInteger(metadata["byte-length"]);
     const envelopeVersion = readPositiveInteger(metadata["envelope-version"]);
     const digest = sha256(data);

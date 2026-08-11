@@ -20,7 +20,7 @@ describe("R2ObjectStore", () => {
           ContentType: "application/json",
           ETag: '"etag-value"',
           Metadata: {
-            "montecarlo-version": "1",
+            "monte-carlo-version": "1",
             sha256: digest,
             "byte-length": String(data.byteLength),
             "envelope-version": "2",
@@ -54,6 +54,7 @@ describe("R2ObjectStore", () => {
     expect((commands[0] as PutObjectCommand).input).toMatchObject({
       Bucket: "montecarlo-blobs",
       Key: `production/objects/${key}`,
+      Metadata: { "monte-carlo-version": "1" },
     });
     expect(commands[1]).toBeInstanceOf(GetObjectCommand);
   });
