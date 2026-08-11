@@ -91,6 +91,10 @@ export type ChatBranch = {
   openingContentReady?: boolean;
 };
 
+export function hasStreamingMessage(branches: readonly ChatBranch[]): boolean {
+  return branches.some((branch) => branch.messages.some((message) => message.isStreaming));
+}
+
 export type ChatSummary = {
   id: string;
   /** Stable portable identity used at browser and persistence boundaries. */

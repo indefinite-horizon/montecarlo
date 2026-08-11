@@ -210,13 +210,6 @@ export function codexReasoningEffort(
   return reasoningEffort;
 }
 
-export function codexFastModeConfig(fastMode = false) {
-  return {
-    service_tier: fastMode ? "fast" : "default",
-    features: { fast_mode: fastMode },
-  };
-}
-
 export function codexThreadStartParams(
   input: ChatRequest,
   workingDirectory: string,

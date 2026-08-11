@@ -146,8 +146,6 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_workspace_public_id", ["workspaceId", "publicId"])
-    .index("by_workspace_updated_at", ["workspaceId", "updatedAt"])
-    .index("by_workspace_project_updated_at", ["workspaceId", "projectId", "updatedAt"])
     .index("by_workspace_archived_last_user_message_at", [
       "workspaceId",
       "archivedAt",

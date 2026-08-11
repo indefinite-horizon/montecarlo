@@ -55,6 +55,7 @@ export const truncateFromUserMessage = mutation({
       throw new Error("Chat branch limit exceeded.");
     }
 
+    const messageLimit = convexConfig.domain.limits.maxTruncateMessageCount;
     const targetTail = await ctx.db
       .query("messages")
       .withIndex("by_workspace_branch_ordinal", (index) =>
@@ -63,7 +64,10 @@ export const truncateFromUserMessage = mutation({
           .eq("branchId", target.branchId)
           .gte("ordinal", target.ordinal),
       )
-      .collect();
+      .take(messageLimit + 1);
+    if (targetTail.length > messageLimit) {
+      throw new Error("Message truncation limit exceeded.");
+    }
     const removedMessages = new Map<Id<"messages">, Doc<"messages">>(
       targetTail.map((message) => [message._id, message]),
     );
@@ -78,21 +82,32 @@ export const truncateFromUserMessage = mutation({
         branch.contextMessageIds.some((messageId) => removedMessages.has(messageId));
       if (!dependsOnRemovedHistory) continue;
       removedBranchIds.add(branch._id);
+      const remainingMessageLimit = messageLimit - removedMessages.size;
       const branchMessages = await ctx.db
         .query("messages")
         .withIndex("by_workspace_branch_ordinal", (index) =>
           index.eq("workspaceId", args.workspaceId).eq("branchId", branch._id),
         )
-        .collect();
+        .take(remainingMessageLimit + 1);
+      if (branchMessages.length > remainingMessageLimit) {
+        throw new Error("Message truncation limit exceeded.");
+      }
       for (const message of branchMessages) removedMessages.set(message._id, message);
     }
 
+    const runLimit = convexConfig.domain.limits.maxRunHistorySize;
     const allRuns = await ctx.db
       .query("agent_runs")
       .withIndex("by_workspace_chat_updated_at", (index) =>
         index.eq("workspaceId", args.workspaceId).eq("chatId", args.chatId),
       )
-      .collect();
+      .take(runLimit + 1);
+    if (allRuns.length > runLimit) {
+      throw new Error("Chat run history limit exceeded.");
+    }
+    if (allRuns.some((run) => run.branchId === targetBranch._id && run.status === "running")) {
+      throw new Error("Wait for the current response to finish before retrying.");
+    }
     const runsToDelete = allRuns.filter(
       (run) =>
         removedBranchIds.has(run.branchId) ||
@@ -159,12 +174,16 @@ export const truncateFromUserMessage = mutation({
       updatedAt: now,
     });
 
+    const userStateLimit = convexConfig.domain.limits.maxChatUserStateCount;
     const userStates = await ctx.db
       .query("chat_user_states")
       .withIndex("by_workspace_chat", (index) =>
         index.eq("workspaceId", args.workspaceId).eq("chatId", args.chatId),
       )
-      .collect();
+      .take(userStateLimit + 1);
+    if (userStates.length > userStateLimit) {
+      throw new Error("Chat participant limit exceeded.");
+    }
     for (const state of userStates) {
       if (state.lastReadMessageId && removedMessages.has(state.lastReadMessageId)) {
         await ctx.db.patch(state._id, {

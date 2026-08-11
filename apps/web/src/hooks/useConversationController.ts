@@ -6,6 +6,7 @@ import {
   type BranchAnchor,
   type ChatBranch,
   type ChatMessage,
+  hasStreamingMessage,
   type ProviderId,
   type ReasoningEffort,
   visibleMessages,
@@ -497,7 +498,7 @@ export function useConversationController(
 
   const retryMessage = useCallback(
     async (source: ChatMessage, replacementContent = source.content) => {
-      if (loading || messages.some((message) => message.isStreaming)) return false;
+      if (loading || hasStreamingMessage(branches)) return false;
       const text = replacementContent.trim();
       if (!text || source.role !== "user") return false;
       const sourceBranch = branches.find((branch) => branch.id === source.branchId);
@@ -583,7 +584,6 @@ export function useConversationController(
       domain,
       durable,
       loading,
-      messages,
       persistenceErrorMessage,
       sendMessage,
       setFallbackBranches,

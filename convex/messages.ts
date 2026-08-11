@@ -248,7 +248,7 @@ export const append = mutation({
     await ctx.db.patch(args.branchId, { nextMessageOrdinal: ordinal + 1 });
     await ctx.db.patch(args.chatId, {
       updatedAt: now,
-      ...(args.role === "user" || args.role === "system"
+      ...(args.role === "system"
         ? {
             latestCompletedMessageId: messageId,
             latestCompletedMessagePublicId: publicId,
@@ -263,35 +263,6 @@ export const append = mutation({
         ? { autoTitleInputMessageId: messageId }
         : {}),
     });
-    if (args.role === "user") {
-      const readState = await ctx.db
-        .query("chat_user_states")
-        .withIndex("by_workspace_user_chat", (index) =>
-          index
-            .eq("workspaceId", args.workspaceId)
-            .eq("userId", user._id)
-            .eq("chatId", args.chatId),
-        )
-        .unique();
-      if (readState) {
-        await ctx.db.patch(readState._id, {
-          lastReadMessageId: messageId,
-          lastReadMessagePublicId: publicId,
-          updatedAt: now,
-        });
-      } else {
-        await ctx.db.insert("chat_user_states", {
-          publicId: createPublicId("chatstate"),
-          workspaceId: args.workspaceId,
-          chatId: args.chatId,
-          userId: user._id,
-          lastReadMessageId: messageId,
-          lastReadMessagePublicId: publicId,
-          createdAt: now,
-          updatedAt: now,
-        });
-      }
-    }
 
     return {
       id: messageId,

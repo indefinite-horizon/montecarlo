@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CodexRunner,
-  codexFastModeConfig,
   codexReasoningEffort,
   codexThreadStartParams,
   normalizeCodexModelCatalog,
@@ -109,14 +108,6 @@ describe("Codex transcript prompt", () => {
     expect(codexReasoningEffort("none")).toBe("none");
     expect(codexReasoningEffort("xhigh")).toBe("xhigh");
     expect(codexReasoningEffort("max")).toBe("max");
-    expect(codexFastModeConfig()).toEqual({
-      service_tier: "default",
-      features: { fast_mode: false },
-    });
-    expect(codexFastModeConfig(true)).toEqual({
-      service_tier: "fast",
-      features: { fast_mode: true },
-    });
     expect(
       codexThreadStartParams(
         {

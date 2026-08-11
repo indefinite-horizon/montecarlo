@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ChatBranch,
   type ChatMessage,
+  hasStreamingMessage,
   isThreadOpeningContentReady,
   nextReasoningEffort,
   visibleMessages,
@@ -14,6 +15,29 @@ function message(id: string, branchId: string, createdAt: number): ChatMessage {
 }
 
 describe("browser branch transcript", () => {
+  it("detects response activity outside the visible branch", () => {
+    const branches: ChatBranch[] = [
+      {
+        id: "root",
+        title: "Root",
+        depth: 0,
+        createdAt: 1,
+        messages: [message("settled", "root", 2)],
+      },
+      {
+        id: "child",
+        parentBranchId: "root",
+        title: "Child",
+        depth: 1,
+        createdAt: 3,
+        messages: [{ ...message("streaming", "child", 4), isStreaming: true }],
+      },
+    ];
+
+    expect(hasStreamingMessage(branches)).toBe(true);
+    expect(hasStreamingMessage([{ ...branches[0], messages: [] } as ChatBranch])).toBe(false);
+  });
+
   it("does not leak parent messages written after a durable child snapshot", () => {
     const branches: ChatBranch[] = [
       {

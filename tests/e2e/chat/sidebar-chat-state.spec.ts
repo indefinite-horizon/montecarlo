@@ -68,6 +68,17 @@ test("keeps a chat unread until its completed branch message enters the viewport
     assistantMessage(page, "Only the child branch can show this completion."),
   ).toHaveCount(0);
 
+  const rootPrompt = "Keep the child unread while sending here [e2e:slow]";
+  await page.getByPlaceholder("Ask a follow-up or start a new direction…").fill(rootPrompt);
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByRole("button", { name: "Stop generation" })).toBeVisible();
+  await expect(row).toHaveAttribute("data-unread", "true");
+  await expect(childBranch).toHaveAttribute("data-unread", "true");
+  await page.getByRole("button", { name: "Stop generation" }).click();
+  await expect(page.getByRole("button", { name: "Send message" })).toBeVisible();
+  await expect(row).toHaveAttribute("data-unread", "true");
+  await expect(childBranch).toHaveAttribute("data-unread", "true");
+
   await childBranch.click();
   await expect(
     assistantMessage(page, "Only the child branch can show this completion."),
