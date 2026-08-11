@@ -43,7 +43,7 @@ import {
 const DEFAULT_SIDEBAR_WIDTH = 264;
 const MIN_SIDEBAR_WIDTH = 224;
 const MAX_SIDEBAR_WIDTH = 420;
-const SIDEBAR_WIDTH_STORAGE_KEY = "montecarlo:sidebar-width";
+const SIDEBAR_WIDTH_STORAGE_KEY = "monte-carlo:sidebar-width";
 const CHAT_PAGE_SIZE = 5;
 
 function clampSidebarWidth(width: number): number {

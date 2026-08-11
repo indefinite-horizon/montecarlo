@@ -10,7 +10,7 @@ export const defaultProviderModels = {
 } as const satisfies Record<ProviderId, string>;
 
 function selectedModelStorageKey(provider: ProviderId): string {
-  return `montecarlo:provider:${provider}:selected-model`;
+  return `monte-carlo:provider:${provider}:selected-model`;
 }
 
 export function initialProviderModels(): Record<ProviderId, string> {

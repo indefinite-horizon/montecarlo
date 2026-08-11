@@ -18,7 +18,7 @@ import { Button } from "./ui/button";
 const DEFAULT_BRANCH_MAP_WIDTH = 304;
 const MIN_BRANCH_MAP_WIDTH = 256;
 const MAX_BRANCH_MAP_WIDTH = 480;
-const BRANCH_MAP_WIDTH_STORAGE_KEY = "montecarlo:branch-map-width";
+const BRANCH_MAP_WIDTH_STORAGE_KEY = "monte-carlo:branch-map-width";
 
 function clampBranchMapWidth(width: number): number {
   return Math.min(MAX_BRANCH_MAP_WIDTH, Math.max(MIN_BRANCH_MAP_WIDTH, width));

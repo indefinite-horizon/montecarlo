@@ -59,7 +59,7 @@ export type ProviderModelCatalog = {
 type EndpointProvider = "openrouter" | "ollama";
 
 function endpointStorageKey(provider: EndpointProvider): string {
-  return `montecarlo:provider:${provider}:base-url`;
+  return `monte-carlo:provider:${provider}:base-url`;
 }
 
 export function getProviderEndpoint(provider: EndpointProvider): string {
@@ -223,7 +223,7 @@ export async function getRuntimeProviders(): Promise<ProviderStatus[]> {
 }
 
 function modelCatalogStorageKey(provider: ProviderId): string {
-  return `montecarlo:provider:${provider}:model-catalog`;
+  return `monte-carlo:provider:${provider}:model-catalog`;
 }
 
 type StoredModelCatalog = ProviderModelCatalog & { connectionBaseURL?: string };
