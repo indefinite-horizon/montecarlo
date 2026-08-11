@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe("filter_convex_env.sh", () => {
   it("keeps Convex-owned values and drops runtime, browser, and unknown values", () => {
-    const directory = mkdtempSync(join(tmpdir(), "monte-carlo-env-filter-"));
+    const directory = mkdtempSync(join(tmpdir(), "montecarlo-env-filter-"));
     temporaryDirectories.push(directory);
     const envFile = join(directory, ".env.local");
     writeFileSync(
@@ -25,8 +25,8 @@ describe("filter_convex_env.sh", () => {
       [
         "SITE_URL=http://localhost:5173",
         "export BETTER_AUTH_SECRET=convex-secret",
-        "MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY=public-key",
-        "MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY=runtime-private-key",
+        "MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY=public-key",
+        "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY=runtime-private-key",
         "OPENROUTER_API_KEY=provider-secret",
         "R2_SECRET_ACCESS_KEY=storage-secret",
         "CONVEX_DEPLOY_KEY=deployment-secret",
@@ -40,7 +40,7 @@ describe("filter_convex_env.sh", () => {
 
     expect(output).toContain("SITE_URL=http://localhost:5173");
     expect(output).toContain("export BETTER_AUTH_SECRET=convex-secret");
-    expect(output).toContain("MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY=public-key");
+    expect(output).toContain("MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY=public-key");
     expect(output).not.toContain("runtime-private-key");
     expect(output).not.toContain("provider-secret");
     expect(output).not.toContain("storage-secret");

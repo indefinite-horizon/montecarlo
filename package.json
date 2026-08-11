@@ -1,5 +1,5 @@
 {
-  "name": "monte-carlo",
+  "name": "montecarlo",
   "private": true,
   "version": "0.1.0",
   "engines": {
@@ -14,7 +14,7 @@
     "dev": "bash scripts/run_local.sh",
     "_dev": "concurrently -n web,convex,runtime \"bun run dev:web\" \"bun run dev:convex\" \"bun run dev:runtime\"",
     "dev:web": "bun run --filter './apps/web' dev",
-    "dev:runtime": "MONTE_CARLO_RUNTIME_DEV=1 bun --env-file=.env.runtime.local run --filter './apps/runtime' dev",
+    "dev:runtime": "MONTECARLO_RUNTIME_DEV=1 bun --env-file=.env.runtime.local run --filter './apps/runtime' dev",
     "dev:desktop": "bun run --filter './apps/desktop' dev",
     "dev:convex": "convex dev --run init",
     "deploy:convex": "convex deploy",
@@ -63,7 +63,7 @@
   },
   "dependencies": {
     "@convex-dev/better-auth": "0.12.0",
-    "@monte-carlo/app-constants": "workspace:*",
+    "@montecarlo/app-constants": "workspace:*",
     "better-auth": "1.6.11",
     "convex": "^1.37.0",
     "effect": "^3.21.0",

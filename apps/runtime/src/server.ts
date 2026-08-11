@@ -173,7 +173,7 @@ export class RuntimeServer {
     if (request.method === "GET" && url.pathname === "/v1/health") {
       writeJson(response, 200, {
         status: "ready",
-        service: "monte-carlo-runtime",
+        service: "montecarlo-runtime",
         activeOperations: this.activeOperations.size,
         objectStore:
           this.objectStores.size === 0
@@ -388,7 +388,7 @@ export class RuntimeServer {
   }
 
   private requireObjectStore(request: IncomingMessage): ObjectStoreV1 {
-    const requested = request.headers["x-monte-carlo-storage-backend"];
+    const requested = request.headers["x-montecarlo-storage-backend"];
     if (
       Array.isArray(requested) ||
       (requested !== undefined && requested !== "filesystem" && requested !== "r2")
@@ -396,7 +396,7 @@ export class RuntimeServer {
       throw new HttpError(
         400,
         "invalid_storage_backend",
-        "X-Monte-Carlo-Storage-Backend must be filesystem or r2.",
+        "X-Montecarlo-Storage-Backend must be filesystem or r2.",
       );
     }
     if (requested !== undefined) {
@@ -416,7 +416,7 @@ export class RuntimeServer {
       throw new HttpError(
         400,
         "storage_backend_required",
-        "X-Monte-Carlo-Storage-Backend is required when multiple stores are configured.",
+        "X-Montecarlo-Storage-Backend is required when multiple stores are configured.",
       );
     }
     throw new HttpError(503, "object_store_unavailable", "Object storage is not configured.");
@@ -453,7 +453,7 @@ export class RuntimeServer {
     if (mediaType === undefined || mediaType === "" || mediaType.length > 255) {
       throw new HttpError(415, "invalid_media_type", "A valid Content-Type header is required.");
     }
-    const envelopeHeader = request.headers["x-monte-carlo-envelope-version"];
+    const envelopeHeader = request.headers["x-montecarlo-envelope-version"];
     const envelopeVersion =
       typeof envelopeHeader === "string" && /^[1-9][0-9]*$/.test(envelopeHeader)
         ? Number(envelopeHeader)
@@ -462,17 +462,17 @@ export class RuntimeServer {
       throw new HttpError(
         400,
         "invalid_envelope_version",
-        "X-Monte-Carlo-Envelope-Version must be a positive integer.",
+        "X-Montecarlo-Envelope-Version must be a positive integer.",
       );
     }
-    const expectedHeader = request.headers["x-monte-carlo-sha256"];
+    const expectedHeader = request.headers["x-montecarlo-sha256"];
     const expectedSha256 =
       typeof expectedHeader === "string" ? expectedHeader.toLowerCase() : undefined;
     if (expectedSha256 !== undefined && !/^[a-f0-9]{64}$/.test(expectedSha256)) {
       throw new HttpError(
         400,
         "invalid_sha256",
-        "X-Monte-Carlo-SHA256 must be a lowercase or uppercase SHA-256 hex digest.",
+        "X-Montecarlo-SHA256 must be a lowercase or uppercase SHA-256 hex digest.",
       );
     }
     const data = await readBinaryBody(request, this.config.maxBlobBytes);
@@ -484,7 +484,7 @@ export class RuntimeServer {
         envelopeVersion,
         expectedSha256,
       });
-      const manifestId = request.headers["x-monte-carlo-manifest-id"];
+      const manifestId = request.headers["x-montecarlo-manifest-id"];
       const encodedPrivateKey = this.config.blobAttestationPrivateKey;
       if (typeof manifestId !== "string" || !manifestId || !encodedPrivateKey) {
         throw new HttpError(
@@ -542,10 +542,10 @@ export class RuntimeServer {
       response.setHeader("Content-Type", stored.manifest.mediaType);
       response.setHeader("Content-Length", stored.manifest.byteLength);
       response.setHeader("ETag", `"${stored.manifest.sha256}"`);
-      response.setHeader("X-Monte-Carlo-Object-Store-Version", stored.manifest.version);
-      response.setHeader("X-Monte-Carlo-Envelope-Version", stored.manifest.envelopeVersion);
-      response.setHeader("X-Monte-Carlo-SHA256", stored.manifest.sha256);
-      response.setHeader("X-Monte-Carlo-Storage-Backend", stored.manifest.backend);
+      response.setHeader("X-Montecarlo-Object-Store-Version", stored.manifest.version);
+      response.setHeader("X-Montecarlo-Envelope-Version", stored.manifest.envelopeVersion);
+      response.setHeader("X-Montecarlo-SHA256", stored.manifest.sha256);
+      response.setHeader("X-Montecarlo-Storage-Backend", stored.manifest.backend);
       response.end(stored.data);
     } catch (error) {
       throw this.mapObjectStoreError(error, "get");

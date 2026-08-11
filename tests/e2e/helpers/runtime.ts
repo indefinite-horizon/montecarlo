@@ -38,7 +38,7 @@ const e2eBlobAttestationPrivateKey =
 function corsHeaders(contentType = "application/json") {
   return {
     "access-control-allow-headers":
-      "authorization,content-type,x-monte-carlo-envelope-version,x-monte-carlo-manifest-id,x-monte-carlo-sha256,x-monte-carlo-storage-backend",
+      "authorization,content-type,x-montecarlo-envelope-version,x-montecarlo-manifest-id,x-montecarlo-sha256,x-montecarlo-storage-backend",
     "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
     "access-control-allow-origin": "*",
     "content-type": contentType,
@@ -279,10 +279,10 @@ async function handlePutBlob(
 ) {
   const body = request.postDataBuffer() ?? Buffer.alloc(0);
   const headers = request.headers();
-  const backend = headers["x-monte-carlo-storage-backend"];
-  const envelopeVersion = Number(headers["x-monte-carlo-envelope-version"]);
-  const sha256 = headers["x-monte-carlo-sha256"];
-  const manifestId = headers["x-monte-carlo-manifest-id"];
+  const backend = headers["x-montecarlo-storage-backend"];
+  const envelopeVersion = Number(headers["x-montecarlo-envelope-version"]);
+  const sha256 = headers["x-montecarlo-sha256"];
+  const manifestId = headers["x-montecarlo-manifest-id"];
   if (backend !== "filesystem" && backend !== "r2") {
     await json(route, { error: "invalid storage backend" }, 400);
     return;
@@ -379,7 +379,7 @@ async function handleRuntimeRoute(route: Route, state: RuntimeMock) {
       await json(route, { error: "not found" }, 404);
       return;
     }
-    if (request.headers()["x-monte-carlo-storage-backend"] !== backend) {
+    if (request.headers()["x-montecarlo-storage-backend"] !== backend) {
       await json(route, { error: "storage backend mismatch" }, 409);
       return;
     }
@@ -388,9 +388,9 @@ async function handleRuntimeRoute(route: Route, state: RuntimeMock) {
       status: 200,
       headers: {
         ...corsHeaders(envelopeContentType),
-        "x-monte-carlo-envelope-version": "1",
-        "x-monte-carlo-sha256": objectKey.split("/").at(-1) ?? "",
-        "x-monte-carlo-storage-backend": backend,
+        "x-montecarlo-envelope-version": "1",
+        "x-montecarlo-sha256": objectKey.split("/").at(-1) ?? "",
+        "x-montecarlo-storage-backend": backend,
       },
       body,
     });

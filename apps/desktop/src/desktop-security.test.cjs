@@ -29,7 +29,7 @@ describe("desktop security helpers", () => {
   let rendererRoot;
 
   before(() => {
-    temporaryRoot = mkdtempSync(path.join(os.tmpdir(), "monte-carlo-desktop-"));
+    temporaryRoot = mkdtempSync(path.join(os.tmpdir(), "montecarlo-desktop-"));
     rendererRoot = path.join(temporaryRoot, "renderer");
     mkdirSync(path.join(rendererRoot, "assets"), { recursive: true });
     writeFileSync(path.join(rendererRoot, "index.html"), "<html></html>");

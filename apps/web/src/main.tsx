@@ -1,7 +1,7 @@
 /** Bootstraps the web app, Convex auth provider, TanStack Router, and global toasts. */
 
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
-import { getAppName } from "@monte-carlo/app-constants";
+import { getAppName } from "@montecarlo/app-constants";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { ConvexReactClient } from "convex/react";
 import React from "react";

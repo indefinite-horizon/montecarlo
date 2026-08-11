@@ -14,7 +14,7 @@ import {
 const temporaryDirectories: string[] = [];
 
 function fakeClaudeCli(options: { completedText?: string } = {}): string {
-  const directory = mkdtempSync(join(tmpdir(), "monte-carlo-claude-"));
+  const directory = mkdtempSync(join(tmpdir(), "montecarlo-claude-"));
   temporaryDirectories.push(directory);
   const executable = join(directory, "claude");
   writeFileSync(

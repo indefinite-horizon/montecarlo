@@ -6,16 +6,14 @@ import { parseChatRequest, resolveOllamaBaseURL, resolveOpenRouterBaseURL } from
 
 describe("runtime validation", () => {
   it("requires a strong token outside development", () => {
-    expect(() => loadRuntimeConfig({ NODE_ENV: "production" })).toThrow(
-      "MONTE_CARLO_RUNTIME_TOKEN",
-    );
+    expect(() => loadRuntimeConfig({ NODE_ENV: "production" })).toThrow("MONTECARLO_RUNTIME_TOKEN");
   });
 
   it("treats blank optional allowlists as unset", () => {
     const config = loadRuntimeConfig({
-      MONTE_CARLO_RUNTIME_DEV: "1",
-      MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS: "",
-      MONTE_CARLO_RUNTIME_WORKSPACE_IDS: "",
+      MONTECARLO_RUNTIME_DEV: "1",
+      MONTECARLO_RUNTIME_ALLOWED_ORIGINS: "",
+      MONTECARLO_RUNTIME_WORKSPACE_IDS: "",
     });
 
     expect(config.allowedOrigins).toContain("http://localhost:5173");

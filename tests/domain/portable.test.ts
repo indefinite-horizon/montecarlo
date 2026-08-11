@@ -26,6 +26,7 @@ describe("portable workspace envelope", () => {
     const envelope = makePortableWorkspaceEnvelope();
     const result = validatePortableWorkspaceEnvelope(envelope);
 
+    expect(envelope.format).toBe("monte-carlo.workspace");
     expect(result).toEqual({ ok: true, value: envelope });
     expect(parsePortableWorkspaceEnvelope(envelope)).toBe(envelope);
   });

@@ -1,6 +1,6 @@
 appId: chat.montecarlo.desktop
 productName: Monte Carlo
-executableName: monte-carlo
+executableName: montecarlo
 asar: true
 directories:
   output: ../../dist/desktop

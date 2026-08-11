@@ -148,10 +148,10 @@ export async function putRuntimeBlob(input: {
     method: "PUT",
     headers: {
       "content-type": MESSAGE_ENVELOPE_CONTENT_TYPE,
-      "x-monte-carlo-storage-backend": input.backend,
-      "x-monte-carlo-envelope-version": String(MESSAGE_ENVELOPE_VERSION),
-      "x-monte-carlo-sha256": input.sha256,
-      "x-monte-carlo-manifest-id": input.manifestId,
+      "x-montecarlo-storage-backend": input.backend,
+      "x-montecarlo-envelope-version": String(MESSAGE_ENVELOPE_VERSION),
+      "x-montecarlo-sha256": input.sha256,
+      "x-montecarlo-manifest-id": input.manifestId,
     },
     body: input.data,
     signal: input.signal,
@@ -186,15 +186,15 @@ export async function getRuntimeMessageContent(input: {
   signal?: AbortSignal;
 }): Promise<string> {
   const response = await runtimeFetch(`/v1/blobs/${encodeURIComponent(input.objectKey)}`, {
-    headers: { "x-monte-carlo-storage-backend": input.backend },
+    headers: { "x-montecarlo-storage-backend": input.backend },
     signal: input.signal,
   });
   if (!response.ok) throw new Error(`Runtime returned ${response.status}`);
 
   const data = new Uint8Array(await response.arrayBuffer());
   const digest = await sha256Hex(data);
-  const responseDigest = response.headers.get("x-monte-carlo-sha256")?.toLowerCase();
-  const responseEnvelopeVersion = response.headers.get("x-monte-carlo-envelope-version");
+  const responseDigest = response.headers.get("x-montecarlo-sha256")?.toLowerCase();
+  const responseEnvelopeVersion = response.headers.get("x-montecarlo-envelope-version");
   if (input.envelopeVersion !== MESSAGE_ENVELOPE_VERSION) {
     throw new Error(`Unsupported message envelope version ${input.envelopeVersion}.`);
   }

@@ -3,6 +3,49 @@
 Use this runbook when creating a production Convex deployment and pointing a
 Vercel frontend at it.
 
+Generate deployment inputs interactively from a trusted local checkout:
+
+```sh
+bash scripts/generate_deploy_env.sh prod
+bash scripts/generate_deploy_env.sh preview
+```
+
+These write gitignored `.env.prod` and `.env.preview` files for Convex and
+Vercel plus separate `.env.runtime.<environment>` files containing runtime-only
+blob attestation private keys. Never upload the runtime files to Convex or
+Vercel. The generator prompts for PostHog configuration and enables analytics
+for both the backend and browser when a project token is set. The PostHog token
+is required for production and optional for preview; leave the preview prompt
+blank to disable PostHog delivery in that preview. Preview generation uses
+`https://dummy-preview-siteurl.indefinitehorizon.com` as its project-default
+`SITE_URL`. This value is used by the hosted auth layer for OAuth and magic-link
+callbacks, trusted-origin validation, and CORS; it does not select the Convex
+deployment or local runtime. Because every preview has a different frontend
+origin, a durable project default cannot be correct. The Vercel build therefore
+replaces the dummy with that deployment's actual preview origin before the
+preview is used. Production generation also optionally prompts for Google OAuth
+credentials and prints the callback URI to register. Re-running
+the same command preserves existing non-empty values and prompts only for values
+that are missing, so it is safe to run after the template adds a new variable.
+Use `--force` to re-prompt configurable values while preserving generated Better
+Auth and attestation secrets. Use `--rotate-generated-secrets` only for an
+intentional generated-secret rotation. Apply the generated values after
+authenticating and linking both CLIs:
+
+```sh
+bash scripts/set_convex_deploy_env.sh prod
+bash scripts/set_vercel_deploy_env.sh prod
+bash scripts/set_convex_deploy_env.sh preview
+bash scripts/set_vercel_deploy_env.sh preview
+bunx vercel deploy --prod --logs
+```
+
+The Convex setup script updates project defaults for the selected deployment
+type. For `prod`, deployment-specific `CONVEX_URL` and `CONVEX_SITE_URL` values
+are also applied to the current production deployment. Preview deployment URLs
+are generated per branch and injected by `scripts/vercel_build.sh`, so they are
+never stored as project defaults or Vercel preview variables.
+
 ## 1. Create The Convex Deployment
 
 Run from the repo root. If you already have another deployment in the same

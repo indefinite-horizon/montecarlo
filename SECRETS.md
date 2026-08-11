@@ -31,8 +31,8 @@ These values form one key pair but are never stored in the same environment.
 
 | Variable | Secrecy | Owner | Purpose |
 | --- | --- | --- | --- |
-| `MONTE_CARLO_BLOB_ATTESTATION_PUBLIC_KEY` | public | Convex | Verifies signed loopback-runtime blob writes |
-| `MONTE_CARLO_BLOB_ATTESTATION_PRIVATE_KEY` | secret | Runtime | Signs loopback-runtime blob writes |
+| `MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY` | public | Convex | Verifies signed loopback-runtime blob writes |
+| `MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY` | secret | Runtime | Signs loopback-runtime blob writes |
 
 ## Convex-only secrets
 
@@ -41,15 +41,15 @@ These values form one key pair but are never stored in the same environment.
 | `BETTER_AUTH_SECRET` | Better Auth session encryption |
 | `GOOGLE_CLIENT_SECRET` | Optional Google OAuth |
 | `RESEND_API_KEY` | Production magic-link delivery |
-| `POSTHOG_PROJECT_TOKEN` | Optional backend analytics ingestion |
+| `POSTHOG_PROJECT_TOKEN` | Backend analytics ingestion; optional in preview and required by the production deployment scripts |
 
 ## Runtime-only secrets
 
 | Variable | Purpose |
 | --- | --- |
 | `OPENROUTER_API_KEY` | Optional user-managed OpenRouter calls outside the desktop credential flow |
-| `MONTE_CARLO_MANAGED_OPENROUTER_API_KEY` | Administrator-provisioned OpenRouter calls in a trusted runtime |
-| `MONTE_CARLO_RUNTIME_TOKEN` | Authenticates requests to the companion outside development |
+| `MONTECARLO_MANAGED_OPENROUTER_API_KEY` | Administrator-provisioned OpenRouter calls in a trusted runtime |
+| `MONTECARLO_RUNTIME_TOKEN` | Authenticates requests to the companion outside development |
 | `R2_ACCESS_KEY_ID` | R2-compatible object-store access key id |
 | `R2_SECRET_ACCESS_KEY` | R2-compatible object-store secret key |
 
@@ -91,20 +91,20 @@ not operator prompts in `.env.example`.
 
 | Variable | Purpose |
 | --- | --- |
-| `MONTE_CARLO_RUNTIME_WORKSPACE_IDS` | Optional workspace allowlist for a locked-down companion |
+| `MONTECARLO_RUNTIME_WORKSPACE_IDS` | Optional workspace allowlist for a locked-down companion |
 | `CODEX_PATH` | Optional official Codex CLI path |
 | `CLAUDE_PATH` | Optional official Claude CLI path |
 | `R2_ENDPOINT` | R2-compatible object-store endpoint |
 | `R2_BUCKET` | R2-compatible object-store bucket |
 | `R2_PREFIX` | Optional object-key prefix |
-| `MONTE_CARLO_WORKSPACES_DIR` | Optional filesystem object-store root |
+| `MONTECARLO_WORKSPACES_DIR` | Optional filesystem object-store root |
 | `OPENROUTER_BASE_URL` | Optional compatible OpenRouter endpoint override |
 | `OLLAMA_BASE_URL` | Optional Ollama-compatible endpoint override |
 
-`MONTE_CARLO_RUNTIME_HOST`, `MONTE_CARLO_RUNTIME_PORT`,
-`MONTE_CARLO_RUNTIME_ALLOWED_ORIGINS`, and `MONTE_CARLO_RUNTIME_DEV` are local
+`MONTECARLO_RUNTIME_HOST`, `MONTECARLO_RUNTIME_PORT`,
+`MONTECARLO_RUNTIME_ALLOWED_ORIGINS`, and `MONTECARLO_RUNTIME_DEV` are local
 runner or deployment controls with safe defaults in `apps/runtime/src/config.ts`.
-`MONTE_CARLO_OBJECT_STORE` defaults to `filesystem`; providing the complete R2
+`MONTECARLO_OBJECT_STORE` defaults to `filesystem`; providing the complete R2
 configuration enables R2 alongside it.
 
 ## Convex CLI and deployment configuration
@@ -123,7 +123,7 @@ rather than Convex backend variables.
 | --- | --- | --- |
 | `VITE_CONVEX_URL` | public | Browser Convex endpoint |
 | `VITE_CONVEX_SITE_URL` | public | Browser and HTTP-action endpoint |
-| `VITE_POSTHOG_PROJECT_TOKEN` | public | Browser analytics project token |
+| `VITE_POSTHOG_PROJECT_TOKEN` | public | Browser analytics project token; optional in preview and required by the production deployment scripts |
 | `VITE_POSTHOG_HOST` | public | Browser analytics host |
 | `VITE_ANALYTICS_DISABLED` | public | Browser analytics kill switch |
 | `VITE_AUTH_GOOGLE_ENABLED` | public | Enables Google sign-in UI |

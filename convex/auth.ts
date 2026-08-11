@@ -3,7 +3,7 @@
 import { type AuthFunctions, createClient, type GenericCtx } from "@convex-dev/better-auth";
 import { convex, crossDomain } from "@convex-dev/better-auth/plugins";
 import { isMutationCtx, isRunMutationCtx } from "@convex-dev/better-auth/utils";
-import { getAppName } from "@monte-carlo/app-constants";
+import { getAppName } from "@montecarlo/app-constants";
 import { betterAuth } from "better-auth/minimal";
 import { magicLink } from "better-auth/plugins";
 import type { GenericActionCtx } from "convex/server";

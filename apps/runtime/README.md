@@ -11,9 +11,9 @@ ASCII path segments.
 ```text
 PUT /v1/blobs/<portable-key>
 Content-Type: application/json
-X-Monte-Carlo-Envelope-Version: 1
-X-Monte-Carlo-SHA256: <optional expected SHA-256 hex>
-X-Monte-Carlo-Storage-Backend: filesystem | r2
+X-Montecarlo-Envelope-Version: 1
+X-Montecarlo-SHA256: <optional expected SHA-256 hex>
+X-Montecarlo-Storage-Backend: filesystem | r2
 
 <raw object bytes>
 ```
@@ -24,22 +24,22 @@ storage version. It never contains an absolute path, bucket URL, or credential.
 
 ```text
 GET /v1/blobs/<portable-key>
-X-Monte-Carlo-Storage-Backend: filesystem | r2
+X-Montecarlo-Storage-Backend: filesystem | r2
 ```
 
 The response is the original bytes with `Content-Type`, `Content-Length`, `ETag`,
-`X-Monte-Carlo-Object-Store-Version`, `X-Monte-Carlo-Envelope-Version`, and
-`X-Monte-Carlo-SHA256` headers. Both routes use the runtime's normal Origin and bearer-token
+`X-Montecarlo-Object-Store-Version`, `X-Montecarlo-Envelope-Version`, and
+`X-Montecarlo-SHA256` headers. Both routes use the runtime's normal Origin and bearer-token
 checks. The upload limit is 32 MiB.
 
 ## Storage configuration
 
-- Filesystem storage is always available below `MONTE_CARLO_WORKSPACES_DIR`. If the directory is
+- Filesystem storage is always available below `MONTECARLO_WORKSPACES_DIR`. If the directory is
   omitted, the runtime selects the platform application-data directory.
-- `MONTE_CARLO_OBJECT_STORE=r2` or any R2 configuration enables R2 alongside filesystem and
+- `MONTECARLO_OBJECT_STORE=r2` or any R2 configuration enables R2 alongside filesystem and
   requires `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET`;
   `R2_PREFIX` is optional.
-- `MONTE_CARLO_RUNTIME_WORKSPACE_IDS` optionally restricts blob endpoints to a
+- `MONTECARLO_RUNTIME_WORKSPACE_IDS` optionally restricts blob endpoints to a
   comma-separated set of workspace public IDs. A public shared runtime is not
   supported until requests use Better Auth-bound, workspace-scoped capabilities.
 

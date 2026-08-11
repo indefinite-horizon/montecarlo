@@ -140,6 +140,7 @@ function seedLocalUser(ctx: ReturnType<typeof makeMockCtx>, now = 100): string {
 
 describe("local anonymous workspace bootstrap", () => {
   it("completes the durable workspace graph for an already-seeded local user", async () => {
+    expect(LOCAL_ANONYMOUS_AUTH_SUBJECT).toBe("local:monte-carlo");
     const ctx = makeMockCtx();
     const userId = seedLocalUser(ctx);
 
