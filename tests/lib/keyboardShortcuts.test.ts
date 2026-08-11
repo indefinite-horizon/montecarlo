@@ -21,9 +21,11 @@ describe("application keyboard shortcuts", () => {
   it("shows platform-correct labels", () => {
     expect(appShortcutLabel("commandPalette", "macos")).toBe("⌘K");
     expect(appShortcutLabel("newProject", "macos")).toBe("⌘⌥A");
+    expect(appShortcutLabel("archiveChat", "macos")).toBe("⌘⇧A");
     expect(appShortcutLabel("providerSelection", "macos")).toBe("⌥P");
     expect(appShortcutLabel("thinkingLevel", "windows")).toBe("Alt+T");
     expect(appShortcutLabel("newChat", "linux")).toBe("Ctrl+Shift+N");
+    expect(appShortcutLabel("archiveChat", "windows")).toBe("Ctrl+Shift+A");
   });
 
   it("matches macOS Option shortcuts by physical code", () => {
@@ -39,6 +41,13 @@ describe("application keyboard shortcuts", () => {
     ).toBe(true);
     expect(
       matchesAppShortcut(keyboardEvent("KeyT", { altKey: true }), "thinkingLevel", "macos"),
+    ).toBe(true);
+    expect(
+      matchesAppShortcut(
+        keyboardEvent("KeyA", { metaKey: true, shiftKey: true }),
+        "archiveChat",
+        "macos",
+      ),
     ).toBe(true);
   });
 
@@ -56,5 +65,12 @@ describe("application keyboard shortcuts", () => {
     expect(matchesAppShortcut(keyboardEvent("KeyN", { metaKey: true }), "newChat", "linux")).toBe(
       false,
     );
+    expect(
+      matchesAppShortcut(
+        keyboardEvent("KeyA", { ctrlKey: true, shiftKey: true, altKey: true }),
+        "archiveChat",
+        "windows",
+      ),
+    ).toBe(false);
   });
 });

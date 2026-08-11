@@ -7,17 +7,29 @@ import {
   ChevronDown,
   Cloud,
   Folder,
+  FolderPlus,
   HardDrive,
   PanelLeft,
   Plus,
   Search,
 } from "lucide-react";
-import { memo } from "react";
+import {
+  type CSSProperties,
+  memo,
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatSummary, ProjectSummary } from "@/lib/conversation";
 import { appShortcutLabel } from "@/lib/keyboardShortcuts";
+import { organizeSidebarChats } from "@/lib/sidebarChats";
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "./ActionTooltip";
+import { SidebarChatRow } from "./SidebarChatRow";
+import { SidebarMoreButton } from "./SidebarMoreButton";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -28,6 +40,21 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
+const DEFAULT_SIDEBAR_WIDTH = 264;
+const MIN_SIDEBAR_WIDTH = 224;
+const MAX_SIDEBAR_WIDTH = 420;
+const SIDEBAR_WIDTH_STORAGE_KEY = "monte-carlo:sidebar-width";
+const CHAT_PAGE_SIZE = 5;
+
+function clampSidebarWidth(width: number): number {
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, width));
+}
+
+function storedSidebarWidth(): number {
+  const storedWidth = Number.parseFloat(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY) ?? "");
+  return Number.isFinite(storedWidth) ? clampSidebarWidth(storedWidth) : DEFAULT_SIDEBAR_WIDTH;
+}
+
 export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   chats,
   projects,
@@ -37,6 +64,11 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   workspaceMode,
   workspaces,
   onCreateChat,
+  onArchiveChat,
+  onCopyChatLink,
+  onMarkChatUnread,
+  onRenameChat,
+  onSetChatPinned,
   onSelectChat,
   onSelectWorkspace,
   onCreateWorkspace,
@@ -57,6 +89,11 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   workspaceMode?: "local" | "cloud";
   workspaces: Array<{ id: string; name: string; storageMode: "local" | "cloud" }>;
   onCreateChat: (projectId?: string) => void;
+  onArchiveChat: (chatId: string) => void;
+  onCopyChatLink: (chatId: string) => void;
+  onMarkChatUnread: (chatId: string) => void;
+  onRenameChat: (chatId: string) => void;
+  onSetChatPinned: (chatId: string, pinned: boolean) => void;
   onSelectChat: (chatId: string) => void;
   onSelectWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: () => void;
@@ -73,7 +110,81 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   const newChatShortcut = appShortcutLabel("newChat");
   const commandPaletteShortcut = appShortcutLabel("commandPalette");
   const newProjectShortcut = appShortcutLabel("newProject");
-  const looseChats = chats.filter((chat) => !chat.projectId);
+  const archiveChatShortcut = appShortcutLabel("archiveChat");
+  const { pinned, projectless, chatsByProjectId } = organizeSidebarChats(chats, projects);
+  const [sidebarWidth, setSidebarWidth] = useState(storedSidebarWidth);
+  const [visibleChatCounts, setVisibleChatCounts] = useState<Record<string, number>>({});
+  const [collapsedProjectIds, setCollapsedProjectIds] = useState<Set<string>>(() => new Set());
+  const dragStartRef = useRef<{ clientX: number; width: number } | undefined>(undefined);
+  const projectlessChatListId = useId();
+  const projectlessSectionKey = `${workspaceId ?? "workspace"}:projectless`;
+  const projectlessVisibleCount = visibleChatCounts[projectlessSectionKey] ?? CHAT_PAGE_SIZE;
+
+  const visibleChatCount = (sectionKey: string) => visibleChatCounts[sectionKey] ?? CHAT_PAGE_SIZE;
+  const revealMoreChats = (
+    sectionKey: string,
+    total: number,
+    currentlyVisible: number,
+    chatListId: string,
+  ) => {
+    const nextVisible = Math.min(currentlyVisible + CHAT_PAGE_SIZE, total);
+    setVisibleChatCounts((current) => ({
+      ...current,
+      [sectionKey]: Math.max(current[sectionKey] ?? CHAT_PAGE_SIZE, nextVisible),
+    }));
+    if (nextVisible === total) {
+      requestAnimationFrame(() => {
+        document
+          .getElementById(chatListId)
+          ?.querySelectorAll<HTMLButtonElement>('[data-testid="chat-row"] > button:first-child')
+          .item(currentlyVisible)
+          ?.focus();
+      });
+    }
+  };
+  const toggleProject = (projectId: string) => {
+    setCollapsedProjectIds((current) => {
+      const next = new Set(current);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const updateSidebarWidth = useCallback((width: number) => {
+    const nextWidth = clampSidebarWidth(width);
+    setSidebarWidth(nextWidth);
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(nextWidth));
+  }, []);
+
+  const handleResizePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLHRElement>) => {
+      if (event.button !== 0) return;
+      dragStartRef.current = { clientX: event.clientX, width: sidebarWidth };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [sidebarWidth],
+  );
+
+  const handleResizePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLHRElement>) => {
+      const dragStart = dragStartRef.current;
+      if (!dragStart) return;
+      updateSidebarWidth(dragStart.width + event.clientX - dragStart.clientX);
+    },
+    [updateSidebarWidth],
+  );
+
+  const finishResize = useCallback((event: ReactPointerEvent<HTMLHRElement>) => {
+    dragStartRef.current = undefined;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  }, []);
 
   if (!open) return null;
 
@@ -87,11 +198,13 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
       />
       <aside
         aria-label={t("sidebar.navigation")}
-        className="fixed inset-y-0 left-0 z-50 flex h-screen w-[264px] shrink-0 flex-col border-r border-border bg-background shadow-xl md:relative md:z-auto md:bg-secondary/35 md:shadow-none"
+        className="fixed inset-y-0 left-0 z-50 flex h-screen w-[min(264px,calc(100vw-3rem))] shrink-0 flex-col border-r border-border bg-background shadow-xl md:relative md:z-auto md:w-[var(--sidebar-width)] md:bg-secondary/35 md:shadow-none"
+        style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
       >
         <div className="flex h-14 items-center gap-1 px-3">
           <ActionTooltip label={t("sidebar.collapse")} side="bottom">
             <Button
+              className="text-muted-foreground hover:text-muted-foreground"
               size="icon"
               variant="ghost"
               aria-label={t("sidebar.collapse")}
@@ -103,6 +216,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
           <span className="flex-1" />
           <ActionTooltip label={t("sidebar.back")} side="bottom">
             <Button
+              className="text-muted-foreground hover:text-muted-foreground"
               size="icon"
               variant="ghost"
               aria-label={t("sidebar.back")}
@@ -114,6 +228,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
           </ActionTooltip>
           <ActionTooltip label={t("sidebar.forward")} side="bottom">
             <Button
+              className="text-muted-foreground hover:text-muted-foreground"
               size="icon"
               variant="ghost"
               aria-label={t("sidebar.forward")}
@@ -183,29 +298,33 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
 
         <div className="space-y-1 px-3 pb-4">
           <Button
-            className="group w-full justify-start bg-transparent px-3 text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
+            className="group w-full justify-start bg-transparent px-3 text-sm text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
             variant="ghost"
             aria-label={t("sidebar.newChat")}
             onClick={() => onCreateChat()}
           >
-            <Plus />
-            <span className="flex-1 text-left">{t("sidebar.create")}</span>
+            <Plus className="text-muted-foreground" />
+            <span className="flex-1 text-left text-sm" data-testid="sidebar-create-label">
+              {t("sidebar.create")}
+            </span>
             <span
               aria-hidden="true"
-              className="text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
             >
               {newChatShortcut}
             </span>
           </Button>
           <Button
-            className="group w-full justify-start bg-transparent px-3 text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
+            className="group w-full justify-start bg-transparent px-3 text-sm text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
             variant="ghost"
             aria-label={t("sidebar.searchCommands")}
             onClick={onOpenCommandPalette}
           >
-            <Search />
-            <span className="flex-1 text-left">{t("sidebar.search")}</span>
-            <span className="text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            <Search className="text-muted-foreground" />
+            <span className="flex-1 text-left text-sm" data-testid="sidebar-search-label">
+              {t("sidebar.search")}
+            </span>
+            <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               {commandPaletteShortcut}
             </span>
           </Button>
@@ -215,75 +334,181 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
           className="min-h-0 flex-1 overflow-y-auto px-2 pb-5"
           aria-label={t("sidebar.navigation")}
         >
-          <div className="mb-2 flex items-center justify-between px-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {t("sidebar.projects")}
-            </p>
+          {pinned.length ? (
+            <section className="mb-4" data-testid="pinned-chats-section">
+              <h2 className="mb-1 px-2 text-xs font-medium text-muted-foreground">
+                {t("sidebar.pinned")}
+              </h2>
+              <div className="space-y-0.5">
+                {pinned.map((chat) => (
+                  <SidebarChatRow
+                    key={chat.id}
+                    chat={chat}
+                    active={chat.id === activeChatId}
+                    archiveShortcut={archiveChatShortcut}
+                    onArchive={onArchiveChat}
+                    onCopyLink={onCopyChatLink}
+                    onMarkUnread={onMarkChatUnread}
+                    onRename={onRenameChat}
+                    onSetPinned={onSetChatPinned}
+                    onSelect={onSelectChat}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {projectless.length ? (
+            <section className="mb-4" data-testid="projectless-chats">
+              <div id={projectlessChatListId} className="space-y-0.5">
+                {projectless.slice(0, projectlessVisibleCount).map((chat) => (
+                  <SidebarChatRow
+                    key={chat.id}
+                    chat={chat}
+                    active={chat.id === activeChatId}
+                    archiveShortcut={archiveChatShortcut}
+                    onArchive={onArchiveChat}
+                    onCopyLink={onCopyChatLink}
+                    onMarkUnread={onMarkChatUnread}
+                    onRename={onRenameChat}
+                    onSetPinned={onSetChatPinned}
+                    onSelect={onSelectChat}
+                  />
+                ))}
+              </div>
+              {projectless.length > projectlessVisibleCount ? (
+                <SidebarMoreButton
+                  ariaLabel={t("sidebar.showMoreChats")}
+                  controls={projectlessChatListId}
+                  onClick={() =>
+                    revealMoreChats(
+                      projectlessSectionKey,
+                      projectless.length,
+                      projectlessVisibleCount,
+                      projectlessChatListId,
+                    )
+                  }
+                />
+              ) : null}
+            </section>
+          ) : null}
+
+          <div className="mb-1 flex h-8 items-center justify-between pl-2">
+            <h2 className="text-xs font-medium text-muted-foreground">{t("sidebar.projects")}</h2>
             <ActionTooltip
               label={t("sidebar.newProject")}
               shortcut={newProjectShortcut}
               side="right"
             >
               <Button
-                className="size-7"
+                className="mr-1 size-7 text-muted-foreground hover:text-muted-foreground"
                 size="icon"
                 variant="ghost"
                 aria-label={t("sidebar.newProject")}
                 onClick={onOpenProjectCreate}
               >
-                <Plus />
+                <FolderPlus />
               </Button>
             </ActionTooltip>
           </div>
 
-          <div className="space-y-3">
-            {projects.map((project) => (
-              <section key={project.id}>
-                <div className="group flex h-8 items-center gap-2 rounded-md px-2 text-sm text-foreground/80">
-                  <Folder className="size-3.5 text-primary" />
-                  <span className="min-w-0 flex-1 truncate font-medium">{project.name}</span>
-                  <ActionTooltip label={`${t("sidebar.newChat")} — ${project.name}`} side="right">
+          <div className="mt-1 space-y-1">
+            {projects.map((project) => {
+              const projectChats = chatsByProjectId.get(project.id) ?? [];
+              const sectionKey = `project:${project.id}`;
+              const chatListId = `project-chat-list-${project.id}`;
+              const projectContentId = `project-content-${project.id}`;
+              const collapsed = collapsedProjectIds.has(project.id);
+              const visibleCount = visibleChatCount(sectionKey);
+              const projectChatCount = chats.filter((chat) => chat.projectId === project.id).length;
+              return (
+                <section key={project.id} data-testid="project-section">
+                  <div className="group flex h-9 items-center gap-1 rounded-lg pl-2 text-sm text-muted-foreground transition-colors hover:bg-card/70 hover:text-foreground focus-within:bg-card/70 focus-within:text-foreground">
                     <button
                       type="button"
-                      className="grid size-6 place-items-center rounded text-muted-foreground opacity-0 hover:bg-card group-hover:opacity-100 focus:opacity-100"
-                      onClick={() => onCreateChat(project.id)}
-                      aria-label={`${t("sidebar.newChat")} — ${project.name}`}
+                      data-testid="project-toggle"
+                      className="group/toggle flex h-full min-w-0 flex-1 items-center gap-2 rounded-md text-left outline-none"
+                      aria-expanded={!collapsed}
+                      aria-controls={projectContentId}
+                      onClick={() => toggleProject(project.id)}
                     >
-                      <Plus className="size-3" />
+                      <span className="relative size-4 shrink-0">
+                        <Folder
+                          className="absolute inset-0 size-4 text-muted-foreground transition-opacity group-hover:opacity-0 group-focus-visible/toggle:opacity-0"
+                          strokeWidth={1.6}
+                        />
+                        <ChevronDown
+                          className={cn(
+                            "absolute left-0.5 top-0.5 size-3 text-muted-foreground opacity-0 transition-[opacity,transform] group-hover:opacity-100 group-focus-visible/toggle:opacity-100",
+                            collapsed && "-rotate-90",
+                          )}
+                        />
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className="min-w-0 truncate">{project.name}</span>
+                        {collapsed ? (
+                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                            {projectChatCount}
+                          </span>
+                        ) : null}
+                      </span>
                     </button>
-                  </ActionTooltip>
-                </div>
-                <div className="ml-4 border-l border-border pl-1.5">
-                  {chats
-                    .filter((chat) => chat.projectId === project.id)
-                    .map((chat) => (
-                      <ChatRow
-                        key={chat.id}
-                        chat={chat}
-                        active={chat.id === activeChatId}
-                        onSelect={onSelectChat}
+                    <ActionTooltip label={`${t("sidebar.newChat")} — ${project.name}`} side="right">
+                      <button
+                        type="button"
+                        className="mr-1 grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-muted-foreground"
+                        onClick={() => {
+                          setCollapsedProjectIds((current) => {
+                            if (!current.has(project.id)) return current;
+                            const next = new Set(current);
+                            next.delete(project.id);
+                            return next;
+                          });
+                          onCreateChat(project.id);
+                        }}
+                        aria-label={`${t("sidebar.newChat")} — ${project.name}`}
+                      >
+                        <Plus className="size-4" />
+                      </button>
+                    </ActionTooltip>
+                  </div>
+                  <div
+                    id={projectContentId}
+                    className={cn("space-y-0.5", collapsed && "hidden")}
+                    hidden={collapsed}
+                  >
+                    <div id={chatListId} className="space-y-0.5">
+                      {projectChats.slice(0, visibleCount).map((chat) => (
+                        <SidebarChatRow
+                          key={chat.id}
+                          chat={chat}
+                          active={chat.id === activeChatId}
+                          archiveShortcut={archiveChatShortcut}
+                          onArchive={onArchiveChat}
+                          onCopyLink={onCopyChatLink}
+                          onMarkUnread={onMarkChatUnread}
+                          onRename={onRenameChat}
+                          onSetPinned={onSetChatPinned}
+                          onSelect={onSelectChat}
+                        />
+                      ))}
+                    </div>
+                    {projectChats.length > visibleCount ? (
+                      <SidebarMoreButton
+                        ariaLabel={t("sidebar.showMoreChatsInProject", {
+                          project: project.name,
+                        })}
+                        controls={chatListId}
+                        onClick={() =>
+                          revealMoreChats(sectionKey, projectChats.length, visibleCount, chatListId)
+                        }
                       />
-                    ))}
-                </div>
-              </section>
-            ))}
+                    ) : null}
+                  </div>
+                </section>
+              );
+            })}
           </div>
-
-          {looseChats.length ? (
-            <section className="mt-5">
-              <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {t("sidebar.unfiled")}
-              </p>
-              {looseChats.map((chat) => (
-                <ChatRow
-                  key={chat.id}
-                  chat={chat}
-                  active={chat.id === activeChatId}
-                  onSelect={onSelectChat}
-                />
-              ))}
-            </section>
-          ) : null}
         </nav>
 
         <div className="border-t border-border px-4 py-3 text-[11px] text-muted-foreground">
@@ -292,6 +517,30 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
             {workspaceMode === "cloud" ? t("workspace.cloudStatus") : t("workspace.localStatus")}
           </span>
         </div>
+
+        <hr
+          aria-label={t("sidebar.resize")}
+          aria-orientation="vertical"
+          aria-valuemin={MIN_SIDEBAR_WIDTH}
+          aria-valuemax={MAX_SIDEBAR_WIDTH}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+          data-testid="sidebar-resize-handle"
+          className="absolute inset-y-0 -right-1 hidden h-auto w-2 cursor-col-resize touch-none border-0 outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-transparent after:transition-colors hover:after:bg-primary/60 focus-visible:after:bg-primary md:block"
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={finishResize}
+          onPointerCancel={finishResize}
+          onDoubleClick={() => updateSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") updateSidebarWidth(sidebarWidth - 8);
+            else if (event.key === "ArrowRight") updateSidebarWidth(sidebarWidth + 8);
+            else if (event.key === "Home") updateSidebarWidth(MIN_SIDEBAR_WIDTH);
+            else if (event.key === "End") updateSidebarWidth(MAX_SIDEBAR_WIDTH);
+            else return;
+            event.preventDefault();
+          }}
+        />
       </aside>
     </>
   );
@@ -306,35 +555,3 @@ function workspaceInitials(name?: string): string {
     .join("")
     .toLocaleUpperCase();
 }
-
-const ChatRow = memo(function ChatRow({
-  chat,
-  active,
-  onSelect,
-}: {
-  chat: ChatSummary;
-  active: boolean;
-  onSelect: (chatId: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid="chat-row"
-      className={cn(
-        "group relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
-        active
-          ? "bg-accent font-semibold text-accent-foreground before:absolute before:-left-1.5 before:inset-y-1.5 before:w-0.5 before:rounded-full before:bg-primary"
-          : "text-muted-foreground hover:bg-card",
-      )}
-      onClick={() => onSelect(chat.id)}
-      aria-current={active ? "page" : undefined}
-    >
-      <span className="min-w-0 flex-1 truncate">{chat.title}</span>
-      {chat.branchCount > 1 ? (
-        <span className="rounded-full border border-border bg-background px-1.5 text-[9px] tabular-nums">
-          {chat.branchCount}
-        </span>
-      ) : null}
-    </button>
-  );
-});

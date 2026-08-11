@@ -3,8 +3,20 @@
 import type { BranchAnchor, ChatBranch, ChatMessage } from "./conversation";
 
 export function branchTitle(anchor: BranchAnchor): string {
-  const value = anchor.prompt || anchor.selectedText || "New branch";
-  return value.length > 38 ? `${value.slice(0, 37).trim()}…` : value;
+  return (
+    anchor.displayText?.trim() ||
+    anchor.selectedText?.trim() ||
+    anchor.prompt.trim() ||
+    "New branch"
+  ).slice(0, 200);
+}
+
+export function updateBranchTitle(
+  branches: ChatBranch[],
+  branchId: string,
+  title: string,
+): ChatBranch[] {
+  return branches.map((branch) => (branch.id === branchId ? { ...branch, title } : branch));
 }
 
 export function contextSnapshot(

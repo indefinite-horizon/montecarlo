@@ -4,37 +4,14 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { authComponent } from "../auth";
 import { localAnonymousWorkspacesEnabled } from "../env";
-import type { WorkspacePermission, WorkspaceRole } from "./domainValidators";
+import type { WorkspacePermission } from "./domainValidators";
 import { LOCAL_ANONYMOUS_AUTH_SUBJECT } from "./localIdentity";
+import { ROLE_PERMISSIONS } from "./workspacePermissions";
 
 export type { WorkspacePermission } from "./domainValidators";
+export { permissionsForRole } from "./workspacePermissions";
 
 type AuthenticatedCtx = QueryCtx | MutationCtx;
-
-const ROLE_PERMISSIONS: Record<WorkspaceRole, ReadonlySet<WorkspacePermission>> = {
-  owner: new Set([
-    "workspace:read",
-    "workspace:manage",
-    "members:manage",
-    "content:read",
-    "content:write",
-    "runs:execute",
-  ]),
-  admin: new Set([
-    "workspace:read",
-    "workspace:manage",
-    "members:manage",
-    "content:read",
-    "content:write",
-    "runs:execute",
-  ]),
-  member: new Set(["workspace:read", "content:read", "content:write", "runs:execute"]),
-  viewer: new Set(["workspace:read", "content:read"]),
-};
-
-export function permissionsForRole(role: WorkspaceRole): WorkspacePermission[] {
-  return [...ROLE_PERMISSIONS[role]];
-}
 
 export async function requireAppUser(ctx: AuthenticatedCtx): Promise<Doc<"users">> {
   const authUser = await authComponent.safeGetAuthUser(ctx);

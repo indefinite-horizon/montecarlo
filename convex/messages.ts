@@ -9,7 +9,11 @@ import {
   requireNonNegativeInteger,
   requireText,
 } from "./lib/domainValidation";
-import { blobBackendValidator, messageRoleValidator } from "./lib/domainValidators";
+import {
+  blobBackendValidator,
+  messageRoleValidator,
+  runStatusValidator,
+} from "./lib/domainValidators";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
 
 const messageSummaryValidator = v.object({
@@ -30,6 +34,9 @@ const messageSummaryValidator = v.object({
   sha256: v.string(),
   replyToMessageId: v.optional(v.id("messages")),
   runId: v.optional(v.id("agent_runs")),
+  provider: v.optional(v.string()),
+  model: v.optional(v.string()),
+  runStatus: v.optional(runStatusValidator),
   createdAt: v.number(),
 });
 
@@ -78,14 +85,20 @@ export const list = query({
     const hasMore = messages.length > limit;
     const items = await Promise.all(
       messages.slice(0, limit).map(async (message) => {
-        const manifest = await ctx.db
-          .query("blob_manifests")
-          .withIndex("by_workspace_public_id", (index) =>
-            index.eq("workspaceId", args.workspaceId).eq("publicId", message.contentRef),
-          )
-          .unique();
+        const [manifest, run] = await Promise.all([
+          ctx.db
+            .query("blob_manifests")
+            .withIndex("by_workspace_public_id", (index) =>
+              index.eq("workspaceId", args.workspaceId).eq("publicId", message.contentRef),
+            )
+            .unique(),
+          message.runId ? ctx.db.get(message.runId) : null,
+        ]);
         if (manifest?.status !== "available") {
           throw new Error("Available message content was not found in this workspace.");
+        }
+        if (run && run.workspaceId !== args.workspaceId) {
+          throw new Error("Message run was not found in this workspace.");
         }
         return {
           id: message._id,
@@ -105,6 +118,9 @@ export const list = query({
           sha256: message.sha256,
           replyToMessageId: message.replyToMessageId,
           runId: message.runId,
+          provider: message.provider ?? run?.provider,
+          model: message.model ?? run?.model,
+          runStatus: run?.status,
           createdAt: message.createdAt,
         };
       }),
@@ -145,6 +161,9 @@ export const append = mutation({
     if ((args.role === "assistant" || args.role === "tool") && !args.runId) {
       throw new Error("Assistant and tool messages must identify their run.");
     }
+    let provider: string | undefined;
+    let model: string | undefined;
+    let runStatus: "running" | undefined;
     if (args.runId) {
       const run = await ctx.db.get(args.runId);
       if (
@@ -155,6 +174,11 @@ export const append = mutation({
         run.status !== "running"
       ) {
         throw new Error("Active run not found for this message.");
+      }
+      if (args.role === "assistant" || args.role === "tool") {
+        provider = run.provider;
+        model = run.model;
+        runStatus = "running";
       }
     }
     if (args.replyToMessageId) {
@@ -216,12 +240,22 @@ export const append = mutation({
       sha256: manifest.sha256,
       replyToMessageId: args.replyToMessageId,
       runId: args.runId,
+      provider,
+      model,
       createdByUserId: user._id,
       createdAt: now,
     });
     await ctx.db.patch(args.branchId, { nextMessageOrdinal: ordinal + 1 });
     await ctx.db.patch(args.chatId, {
       updatedAt: now,
+      ...(args.role === "system"
+        ? {
+            latestCompletedMessageId: messageId,
+            latestCompletedMessagePublicId: publicId,
+            latestCompletedAt: now,
+          }
+        : {}),
+      ...(args.role === "user" ? { lastUserMessageAt: now } : {}),
       ...(args.role === "user" &&
       chat.autoTitleStatus !== undefined &&
       chat.autoTitleStatus !== "generated" &&
@@ -248,6 +282,9 @@ export const append = mutation({
       sha256: manifest.sha256,
       replyToMessageId: args.replyToMessageId,
       runId: args.runId,
+      provider,
+      model,
+      runStatus,
       createdAt: now,
     };
   },

@@ -15,6 +15,7 @@ const APP_TABLES = [
   "dev_magic_links",
   "workspace_memberships",
   "projects",
+  "chat_user_states",
   "messages",
   "agent_runs",
   "chat_branches",

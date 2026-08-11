@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   type ChatBranch,
   type ChatMessage,
+  hasStreamingMessage,
+  isThreadOpeningContentReady,
   nextReasoningEffort,
   visibleMessages,
 } from "../../apps/web/src/lib/conversation";
@@ -13,6 +15,29 @@ function message(id: string, branchId: string, createdAt: number): ChatMessage {
 }
 
 describe("browser branch transcript", () => {
+  it("detects response activity outside the visible branch", () => {
+    const branches: ChatBranch[] = [
+      {
+        id: "root",
+        title: "Root",
+        depth: 0,
+        createdAt: 1,
+        messages: [message("settled", "root", 2)],
+      },
+      {
+        id: "child",
+        parentBranchId: "root",
+        title: "Child",
+        depth: 1,
+        createdAt: 3,
+        messages: [{ ...message("streaming", "child", 4), isStreaming: true }],
+      },
+    ];
+
+    expect(hasStreamingMessage(branches)).toBe(true);
+    expect(hasStreamingMessage([{ ...branches[0], messages: [] } as ChatBranch])).toBe(false);
+  });
+
   it("does not leak parent messages written after a durable child snapshot", () => {
     const branches: ChatBranch[] = [
       {
@@ -80,5 +105,28 @@ describe("reasoning effort cycling", () => {
     expect(nextReasoningEffort("high", sparseOptions)).toBe("none");
     expect(nextReasoningEffort("medium", sparseOptions)).toBe("none");
     expect(nextReasoningEffort("medium", [])).toBe("medium");
+  });
+});
+
+describe("thread opening content", () => {
+  it("waits for the latest anchored turn without blocking on older messages", () => {
+    const messages = [
+      { ...message("old-user", "root", 1), contentReady: false },
+      {
+        ...message("old-assistant", "root", 2),
+        role: "assistant" as const,
+        contentReady: false,
+      },
+      { ...message("latest-user", "root", 3), contentReady: true },
+      {
+        ...message("latest-assistant", "root", 4),
+        role: "assistant" as const,
+        contentReady: true,
+      },
+    ];
+
+    expect(isThreadOpeningContentReady(messages)).toBe(true);
+    messages[3] = { ...messages[3], contentReady: false };
+    expect(isThreadOpeningContentReady(messages)).toBe(false);
   });
 });

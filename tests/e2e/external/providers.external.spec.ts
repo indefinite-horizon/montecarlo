@@ -10,8 +10,9 @@ const providers = [
     id: "codex",
     label: "Codex",
     flag: "E2E_CODEX_ENABLED",
-    prompt: "Reply with CODEX_E2E_OK.",
+    prompt: "Begin with CODEX_E2E_OK, then write exactly 80 words about ocean tides.",
     marker: "CODEX_E2E_OK",
+    expectsIncrementalDeltas: true,
   },
   {
     id: "ollama",
@@ -19,6 +20,7 @@ const providers = [
     flag: "E2E_OLLAMA_ENABLED",
     prompt: "Reply with OLLAMA_E2E_OK.",
     marker: "OLLAMA_E2E_OK",
+    expectsIncrementalDeltas: false,
   },
   {
     id: "openrouter",
@@ -26,6 +28,7 @@ const providers = [
     flag: "E2E_OPENROUTER_USER_KEY_ENABLED",
     prompt: "Reply with OPENROUTER_E2E_OK.",
     marker: "OPENROUTER_E2E_OK",
+    expectsIncrementalDeltas: false,
   },
   {
     id: "openrouter",
@@ -33,13 +36,15 @@ const providers = [
     flag: "E2E_OPENROUTER_MANAGED_KEY_ENABLED",
     prompt: "Reply with OPENROUTER_MANAGED_E2E_OK.",
     marker: "OPENROUTER_MANAGED_E2E_OK",
+    expectsIncrementalDeltas: false,
   },
   {
     id: "anthropic",
     label: "Claude",
     flag: "E2E_CLAUDE_SUBSCRIPTION_ENABLED",
-    prompt: "Reply with CLAUDE_E2E_OK.",
+    prompt: "Begin with CLAUDE_E2E_OK, then write exactly 80 words about ocean tides.",
     marker: "CLAUDE_E2E_OK",
+    expectsIncrementalDeltas: true,
   },
 ] as const;
 
@@ -74,10 +79,41 @@ for (const provider of providers) {
     await createWorkspace(page, `External ${provider.flag}`);
     await selectProvider(page, provider.id, provider.label);
     const before = await page.getByRole("document").count();
+    if (provider.expectsIncrementalDeltas) {
+      await page.evaluate(() => {
+        const state = window as typeof window & {
+          __monteCarloStreamLengths?: number[];
+          __monteCarloStreamObserver?: MutationObserver;
+        };
+        state.__monteCarloStreamLengths = [];
+        state.__monteCarloStreamObserver = new MutationObserver(() => {
+          const documents = document.querySelectorAll('[role="document"]');
+          const length = documents.item(documents.length - 1)?.textContent?.length ?? 0;
+          const lengths = state.__monteCarloStreamLengths;
+          if (length > 0 && lengths?.at(-1) !== length) lengths?.push(length);
+        });
+        state.__monteCarloStreamObserver.observe(document.body, {
+          characterData: true,
+          childList: true,
+          subtree: true,
+        });
+      });
+    }
     await page.getByPlaceholder("Ask a follow-up or start a new direction…").fill(provider.prompt);
     await page.getByRole("button", { name: "Send message" }).click();
     await expect(page.getByRole("document")).toHaveCount(before + 1, { timeout: 60_000 });
     await expect(page.getByRole("document").last()).toContainText(provider.marker);
     await expect(page.getByRole("button", { name: "Send message" })).toBeVisible();
+    if (provider.expectsIncrementalDeltas) {
+      const lengths = await page.evaluate(() => {
+        const state = window as typeof window & {
+          __monteCarloStreamLengths?: number[];
+          __monteCarloStreamObserver?: MutationObserver;
+        };
+        state.__monteCarloStreamObserver?.disconnect();
+        return state.__monteCarloStreamLengths ?? [];
+      });
+      expect(lengths.length).toBeGreaterThan(1);
+    }
   });
 }

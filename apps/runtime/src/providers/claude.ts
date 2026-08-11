@@ -150,6 +150,20 @@ function textFromMessage(value: unknown): string[] {
   );
 }
 
+function textDeltaFromStreamEvent(value: unknown): string | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  if ((value as { type?: unknown }).type !== "stream_event") return undefined;
+  const event = (value as { event?: unknown }).event;
+  if (typeof event !== "object" || event === null) return undefined;
+  if ((event as { type?: unknown }).type !== "content_block_delta") return undefined;
+  const delta = (event as { delta?: unknown }).delta;
+  if (typeof delta !== "object" || delta === null) return undefined;
+  return (delta as { type?: unknown }).type === "text_delta" &&
+    typeof (delta as { text?: unknown }).text === "string"
+    ? (delta as { text: string }).text
+    : undefined;
+}
+
 function usageFromResult(value: unknown): TokenUsage | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const usage = (value as { usage?: unknown }).usage;
@@ -223,6 +237,7 @@ export function claudeRunArguments(input: ChatRequest): string[] {
     "--print",
     "--output-format",
     "stream-json",
+    "--include-partial-messages",
     "--verbose",
     "--model",
     input.model,
@@ -352,6 +367,7 @@ export class ClaudeRunner implements LocalAuthRunner {
     try {
       const lines = createInterface({ input: child.stdout, crlfDelay: Number.POSITIVE_INFINITY });
       let sawFinish = false;
+      let streamedAssistantText = "";
       for await (const line of lines) {
         if (!line.trim()) continue;
         let event: unknown;
@@ -362,11 +378,23 @@ export class ClaudeRunner implements LocalAuthRunner {
         }
         if (typeof event !== "object" || event === null) continue;
         const type = (event as { type?: unknown }).type;
-        if (type === "system" && (event as { subtype?: unknown }).subtype === "init") {
+        const partialText = textDeltaFromStreamEvent(event);
+        if (partialText !== undefined) {
+          if (partialText) {
+            streamedAssistantText += partialText;
+            yield { type: "text-delta", delta: partialText };
+          }
+        } else if (type === "system" && (event as { subtype?: unknown }).subtype === "init") {
           const sessionId = (event as { session_id?: unknown }).session_id;
           if (typeof sessionId === "string") yield { type: "provider-thread", threadId: sessionId };
         } else if (type === "assistant") {
-          for (const text of textFromMessage(event)) yield { type: "text-delta", delta: text };
+          const completeText = textFromMessage(event).join("");
+          if (streamedAssistantText && !completeText.startsWith(streamedAssistantText)) {
+            throw new Error("The Claude CLI returned inconsistent streamed message content.");
+          }
+          const suffix = completeText.slice(streamedAssistantText.length);
+          if (suffix) yield { type: "text-delta", delta: suffix };
+          streamedAssistantText = "";
         } else if (type === "result") {
           if ((event as { is_error?: unknown }).is_error === true) {
             throw new Error("The Claude turn failed.");

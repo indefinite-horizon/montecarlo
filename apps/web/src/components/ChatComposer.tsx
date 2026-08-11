@@ -68,13 +68,18 @@ export const ChatComposer = memo(function ChatComposer({
   const { t } = useTranslation();
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const submittingRef = useRef(false);
   const restoreComposerFocus = useCallback(() => textareaRef.current?.focus(), []);
 
   const submit = () => {
     const prompt = value.trim();
-    if (!prompt || isStreaming || disabled || branchDisabled) return;
+    if (!prompt || isStreaming || disabled || branchDisabled || submittingRef.current) return;
+    submittingRef.current = true;
     setValue("");
     void onSend(prompt);
+    window.setTimeout(() => {
+      submittingRef.current = false;
+    }, 0);
   };
 
   return (
@@ -158,7 +163,9 @@ export const ChatComposer = memo(function ChatComposer({
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={onStop}
+                  onClick={() => {
+                    if (!submittingRef.current) onStop();
+                  }}
                   aria-label={t("composer.stop")}
                 >
                   <Square className="fill-current" />

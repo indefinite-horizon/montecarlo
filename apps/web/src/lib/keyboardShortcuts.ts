@@ -29,6 +29,12 @@ export const appShortcuts = {
     macos: ["meta", "alt"],
     windowsLinux: ["control", "alt"],
   },
+  archiveChat: {
+    code: "KeyA",
+    key: "A",
+    macos: ["meta", "shift"],
+    windowsLinux: ["control", "shift"],
+  },
   providerSelection: {
     code: "KeyP",
     key: "P",

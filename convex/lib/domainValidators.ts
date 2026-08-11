@@ -25,6 +25,7 @@ export const workspacePermissionValidator = v.union(
   v.literal("workspace:manage"),
   v.literal("members:manage"),
   v.literal("content:read"),
+  v.literal("content:personalize"),
   v.literal("content:write"),
   v.literal("runs:execute"),
 );
@@ -41,6 +42,7 @@ export const branchSelectionValidator = v.object({
   start: v.number(),
   end: v.number(),
   quote: v.string(),
+  displayText: v.optional(v.string()),
 });
 
 export const messageRoleValidator = v.union(

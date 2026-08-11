@@ -9,6 +9,7 @@ export type PublicIdPrefix =
   | "blob"
   | "branch"
   | "chat"
+  | "chatstate"
   | "member"
   | "message"
   | "project"
@@ -69,4 +70,35 @@ export function requireSha256(value: string): string {
     throw new Error("SHA-256 must be a 64-character lowercase hexadecimal digest.");
   }
   return normalized;
+}
+
+type StoredSelection = { start: number; end: number; quote: string };
+
+/**
+ * Convex stores only a bounded prefix; the verified full body remains in object storage.
+ * Validate all available source bytes plus the shape of selections in the hydrated tail.
+ */
+export function selectionMatchesStoredMessage(
+  selection: StoredSelection,
+  sourceMessage: { byteLength: number; contentPreview: string },
+): boolean {
+  if (
+    !Number.isSafeInteger(selection.start) ||
+    !Number.isSafeInteger(selection.end) ||
+    selection.start < 0 ||
+    selection.end <= selection.start ||
+    selection.end - selection.start !== selection.quote.length ||
+    selection.end > sourceMessage.byteLength
+  ) {
+    return false;
+  }
+
+  const overlapStart = Math.min(selection.start, sourceMessage.contentPreview.length);
+  const overlapEnd = Math.min(selection.end, sourceMessage.contentPreview.length);
+  if (overlapEnd <= overlapStart) return true;
+  const quoteStart = overlapStart - selection.start;
+  return (
+    sourceMessage.contentPreview.slice(overlapStart, overlapEnd) ===
+    selection.quote.slice(quoteStart, quoteStart + overlapEnd - overlapStart)
+  );
 }

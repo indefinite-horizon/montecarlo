@@ -31,19 +31,45 @@ export function nextReasoningEffort(
 
 export type ChatMessage = {
   id: string;
+  /** Stable portable identity used for UI state across optimistic persistence. */
+  publicId?: string;
   branchId: string;
   role: "user" | "assistant" | "system";
   content: string;
+  /** Whether persisted content resolution settled, including preview fallback. */
+  contentReady?: boolean;
   createdAt: number;
   provider?: ProviderId;
   model?: string;
+  runStatus?: "running" | "succeeded" | "failed" | "canceled";
   isStreaming?: boolean;
   isError?: boolean;
 };
 
+export function messageScrollId(message: ChatMessage): string {
+  return message.publicId ?? message.id;
+}
+
+export function isThreadOpeningContentReady(messages: ChatMessage[]): boolean {
+  let latestAnchorIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") {
+      latestAnchorIndex = index;
+      break;
+    }
+  }
+  const openingTurnIndex = latestAnchorIndex >= 0 ? latestAnchorIndex : messages.length - 1;
+  return messages
+    .slice(Math.max(0, openingTurnIndex))
+    .every((message) => message.contentReady !== false);
+}
+
 export type BranchAnchor = {
   sourceMessageId?: string;
+  /** Exact source slice used to validate stable selection offsets. */
   selectedText?: string;
+  /** Rendered text shown to the user and supplied as branch context. */
+  displayText?: string;
   selectionStart?: number;
   selectionEnd?: number;
   prompt: string;
@@ -61,7 +87,13 @@ export type ChatBranch = {
   createdAt: number;
   anchor?: BranchAnchor;
   messages: ChatMessage[];
+  /** Whether this branch has enough settled content for its initial scroll anchor. */
+  openingContentReady?: boolean;
 };
+
+export function hasStreamingMessage(branches: readonly ChatBranch[]): boolean {
+  return branches.some((branch) => branch.messages.some((message) => message.isStreaming));
+}
 
 export type ChatSummary = {
   id: string;
@@ -72,7 +104,16 @@ export type ChatSummary = {
   projectId?: string;
   title: string;
   updatedAt: number;
+  /** Recency key for sidebar ordering; only user messages advance it. */
+  lastUserMessageAt: number;
   branchCount: number;
+  /** Stable identity of the latest fully completed message across every branch. */
+  latestCompletedMessagePublicId?: string;
+  isUnread: boolean;
+  isPinned: boolean;
+  pinnedAt?: number;
+  /** Session-owned response activity; intentionally resets after reload. */
+  hasOngoingResponse: boolean;
 };
 
 export type ProjectSummary = {
@@ -85,7 +126,10 @@ export type ProjectSummary = {
 
 export type SelectionAnchor = {
   messageId: string;
+  /** Rendered text selected by the user. */
   text: string;
+  /** Exact Markdown source slice corresponding to the selected range. */
+  sourceText?: string;
   start: number;
   end: number;
   rect: { top: number; left: number; width: number; height: number };

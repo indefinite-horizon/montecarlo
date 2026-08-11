@@ -58,6 +58,64 @@ test("desktop renders three panes and preserves state while panes collapse", asy
   await expect(responsiveBranch).toHaveClass(/border-primary/u);
 });
 
+test("desktop sidebar can be resized within bounds and remembers its width", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const sidebar = page.getByRole("complementary", { name: "Projects and chats" });
+  const resizeHandle = page.getByRole("separator", { name: "Resize sidebar" });
+
+  await expect(sidebar).toHaveCSS("width", "264px");
+  const handleBox = await resizeHandle.boundingBox();
+  if (!handleBox) throw new Error("Sidebar resize handle is not visible");
+  const handleCenter = handleBox.x + handleBox.width / 2;
+  await page.mouse.move(handleCenter, handleBox.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(handleCenter + 76, handleBox.y + 100);
+  await page.mouse.up();
+  await expect(sidebar).toHaveCSS("width", "340px");
+
+  await resizeHandle.press("End");
+  await expect(sidebar).toHaveCSS("width", "420px");
+  await resizeHandle.press("ArrowRight");
+  await expect(sidebar).toHaveCSS("width", "420px");
+  await page.reload();
+  await expect(sidebar).toHaveCSS("width", "420px");
+
+  await resizeHandle.press("Home");
+  await expect(sidebar).toHaveCSS("width", "224px");
+  await resizeHandle.press("ArrowLeft");
+  await expect(sidebar).toHaveCSS("width", "224px");
+});
+
+test("desktop branch map can be resized within bounds and remembers its width", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const branchMap = page.getByRole("complementary", { name: "Branch map" });
+  const resizeHandle = page.getByRole("separator", { name: "Resize branch map" });
+
+  await expect(branchMap).toHaveCSS("width", "304px");
+  const handleBox = await resizeHandle.boundingBox();
+  if (!handleBox) throw new Error("Branch map resize handle is not visible");
+  const handleCenter = handleBox.x + handleBox.width / 2;
+  await page.mouse.move(handleCenter, handleBox.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(handleCenter - 96, handleBox.y + 100);
+  await page.mouse.up();
+  await expect(branchMap).toHaveCSS("width", "400px");
+
+  await resizeHandle.press("End");
+  await expect(branchMap).toHaveCSS("width", "480px");
+  await resizeHandle.press("ArrowLeft");
+  await expect(branchMap).toHaveCSS("width", "480px");
+  await page.reload();
+  await expect(branchMap).toHaveCSS("width", "480px");
+
+  await resizeHandle.press("Home");
+  await expect(branchMap).toHaveCSS("width", "256px");
+  await resizeHandle.press("ArrowRight");
+  await expect(branchMap).toHaveCSS("width", "256px");
+});
+
 test("active branch has semantic state in addition to visual styling", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const active = page.getByRole("complementary").last().locator('button[aria-current="true"]');

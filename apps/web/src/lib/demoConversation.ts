@@ -34,7 +34,11 @@ export const demoChats: ChatSummary[] = [
     projectId: "project-probability",
     title: "Why simulations converge",
     updatedAt: now,
+    lastUserMessageAt: now,
     branchCount: 4,
+    isUnread: false,
+    isPinned: false,
+    hasOngoingResponse: false,
   },
   {
     id: "chat-bayesian",
@@ -43,7 +47,11 @@ export const demoChats: ChatSummary[] = [
     projectId: "project-probability",
     title: "Bayesian priors, visually",
     updatedAt: now - 86_400_000,
+    lastUserMessageAt: now - 86_400_000,
     branchCount: 1,
+    isUnread: false,
+    isPinned: false,
+    hasOngoingResponse: false,
   },
   {
     id: "chat-essay",
@@ -52,7 +60,11 @@ export const demoChats: ChatSummary[] = [
     projectId: "project-writing",
     title: "Notes on useful uncertainty",
     updatedAt: now - 172_800_000,
+    lastUserMessageAt: now - 172_800_000,
     branchCount: 2,
+    isUnread: false,
+    isPinned: false,
+    hasOngoingResponse: false,
   },
   {
     id: "chat-unfiled",
@@ -60,7 +72,11 @@ export const demoChats: ChatSummary[] = [
     rootBranchPublicId: "branch-root-chat-unfiled",
     title: "A quick question about entropy",
     updatedAt: now - 259_200_000,
+    lastUserMessageAt: now - 259_200_000,
     branchCount: 1,
+    isUnread: false,
+    isPinned: false,
+    hasOngoingResponse: false,
   },
 ];
 
