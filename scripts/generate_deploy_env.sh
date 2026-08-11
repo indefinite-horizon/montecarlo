@@ -228,8 +228,8 @@ if [[ "$deployment_environment" == prod ]]; then
   resolve_required site_url SITE_URL "Production frontend origin (SITE_URL)"
 else
   # SITE_URL is the hosted-auth browser origin used for callbacks, origin
-  # validation, and CORS. Each Vercel preview has a different origin, so keep a
-  # harmless project default here; vercel_build.sh installs the real preview URL.
+  # validation, and CORS. The project default is a placeholder; each preview
+  # deployment overrides it with the correct preview URL via vercel_build.sh.
   site_url="https://dummy-preview-siteurl.indefinitehorizon.com"
 fi
 validate_https_origin "SITE_URL" "$site_url"
