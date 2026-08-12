@@ -2,6 +2,9 @@
 exact = false
 frozenLockfile = true
 minimumReleaseAge = 1209600
+# electron-builder's Bun collector resolves production deps via Node module lookup
+# from apps/desktop. Isolated workspace links are not always materialized.
+linker = "hoisted"
 
 [test]
 root = "."

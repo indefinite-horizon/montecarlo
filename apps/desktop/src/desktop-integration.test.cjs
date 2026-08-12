@@ -66,6 +66,17 @@ describe("desktop integration contracts", () => {
     assert.doesNotMatch(preloadSource, /update-available/);
   });
 
+  it("materializes production dependencies before electron-builder runs", () => {
+    const desktopPackage = JSON.parse(readFileSync(path.join(desktopRoot, "package.json"), "utf8"));
+    const bunfig = readFileSync(path.resolve(desktopRoot, "../../bunfig.toml"), "utf8");
+    assert.equal(desktopPackage.dependencies["electron-updater"], "6.8.9");
+    assert.match(bunfig, /linker = "hoisted"/);
+    assert.match(desktopPackage.scripts.build, /ensure:production-deps/);
+    assert.match(desktopPackage.scripts["build:dir"], /ensure:production-deps/);
+    assert.match(desktopPackage.scripts["build:smoke:mac"], /ensure:production-deps/);
+    assert.match(desktopPackage.scripts["build:release:mac"], /ensure:production-deps/);
+  });
+
   it("runs a persisted packaged-model turn before merge and release", () => {
     assert.match(ciWorkflow, /desktop-smoke-macos:/);
     assert.match(ciWorkflow, /actions\/setup-node@v4/);
@@ -85,6 +96,7 @@ describe("desktop integration contracts", () => {
   it("uses the custom protocol and exposes provider saves only as one-way IPC", () => {
     assert.match(mainSource, /protocol\.handle\("app"/);
     assert.match(mainSource, /window\.loadURL\(`\$\{desktopOrigin\}\//);
+    assert.match(mainSource, /will-prevent-unload/);
     assert.doesNotMatch(mainSource, /window\.loadFile/);
     assert.match(preloadSource, /ipcRenderer\.send\("provider-secret:save"/);
     assert.doesNotMatch(preloadSource, /ipcRenderer\.invoke\("provider-secret/);
