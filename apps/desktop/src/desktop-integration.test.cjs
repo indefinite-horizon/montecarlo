@@ -70,7 +70,8 @@ describe("desktop integration contracts", () => {
     const desktopPackage = JSON.parse(readFileSync(path.join(desktopRoot, "package.json"), "utf8"));
     const bunfig = readFileSync(path.resolve(desktopRoot, "../../bunfig.toml"), "utf8");
     assert.equal(desktopPackage.dependencies["electron-updater"], "6.8.9");
-    assert.match(bunfig, /linker = "hoisted"/);
+    // Hoisted installs mix @types/react copies and break Vercel `tsc --noEmit`.
+    assert.doesNotMatch(bunfig, /linker\s*=\s*"hoisted"/);
     assert.match(builderConfig, /electronVersion: "43\.1\.1"/);
     assert.match(desktopPackage.scripts.build, /ensure:production-deps/);
     assert.match(desktopPackage.scripts["build:dir"], /ensure:production-deps/);
