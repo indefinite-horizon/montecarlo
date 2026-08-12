@@ -12,7 +12,7 @@ source scripts/convex_cli_utils.sh
 
 ENV_FILE="${LOCAL_ENV_FILE:-.env.local}"
 AFTER_START_COMMAND="${LOCAL_AFTER_START_COMMAND:-}"
-APP_TARGET="desktop"
+APP_TARGET="both"
 CONVEX_CLI="${CONVEX_CLI:-bunx convex}"
 LOCAL_BACKEND_PORT="${LOCAL_BACKEND_PORT:-}"
 LOCAL_BACKEND_SITE_PORT="${LOCAL_BACKEND_SITE_PORT:-}"
@@ -89,15 +89,15 @@ trap cleanup EXIT INT TERM
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/run_local.sh [desktop|web] [env-file] [--command "<command>"]
+Usage: bash scripts/run_local.sh [both|desktop|web] [env-file] [--command "<command>"]
 
-Starts a local anonymous Convex stack and the selected app. Desktop mode is
-the default. Without --command, the stack stays attached until Ctrl+C. With
---command, the command runs after Convex and Vite are healthy, then the stack
-is stopped.
+Starts a local anonymous Convex stack and the selected app frontends. Both mode
+is the default. Without --command, the stack stays attached until Ctrl+C. With
+--command, the command runs after Convex and Vite are healthy, then the stack is
+stopped.
 
 Arguments:
-  desktop|web          App to launch. Default: desktop.
+  both|desktop|web     App frontends to launch. Default: both.
   env-file              Env file to update and sync. Default: .env.local.
   --command "<command>" Command to run after the anonymous stack is healthy.
   -h, --help            Show this help.
@@ -137,7 +137,7 @@ while [[ $# -gt 0 ]]; do
       AFTER_START_COMMAND="$2"
       shift 2
       ;;
-    desktop|web)
+    both|desktop|web)
       if $APP_TARGET_SET; then
         echo "Error: app target already set to $APP_TARGET; unexpected extra target: $1" >&2
         exit 1
@@ -595,7 +595,7 @@ if [ -z "$DEV_GIT_REF" ]; then
   DEV_GIT_REF="$(git rev-parse --short HEAD 2>/dev/null || true)"
 fi
 WEB_DEV_COMMAND="bun --env-file=\"$ENV_FILE\" run dev:web -- --host 0.0.0.0 --port $frontend_bind_port --strictPort"
-if [ "$APP_TARGET" = "desktop" ]; then
+if [ "$APP_TARGET" = "desktop" ] || [ "$APP_TARGET" = "both" ]; then
   ELECTRON_DEV_COMMAND="ELECTRON_START_URL=http://localhost:${site_port} bun --env-file=\"$ENV_FILE\" scripts/electron_dev_watch.mjs"
   APP_DEV_COMMAND="bunx concurrently --kill-others-on-fail -n web,desktop '$WEB_DEV_COMMAND' '$ELECTRON_DEV_COMMAND'"
 else
