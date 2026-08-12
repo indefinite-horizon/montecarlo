@@ -61,7 +61,23 @@ jobs:
       - run: bun run --filter './apps/desktop' build:dir
 
   desktop-smoke-macos:
-    runs-on: macos-14
+    name: desktop-smoke-macos (${{ matrix.runner-name }}, sample ${{ matrix.sample }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-14
+          - blacksmith-6vcpu-macos-15
+        sample:
+          - 1
+          - 2
+          - 3
+        include:
+          - runner: macos-14
+            runner-name: github
+          - runner: blacksmith-6vcpu-macos-15
+            runner-name: blacksmith
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
