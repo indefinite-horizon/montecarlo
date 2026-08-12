@@ -80,6 +80,7 @@ describe("desktop integration contracts", () => {
 
   it("runs a persisted packaged-model turn before merge and release", () => {
     assert.match(ciWorkflow, /desktop-smoke-macos:/);
+    assert.match(ciWorkflow, /if: github\.event_name == 'push'/);
     assert.match(ciWorkflow, /actions\/setup-node@v4/);
     assert.match(ciWorkflow, /build:smoke:mac/);
     assert.match(ciWorkflow, /bash scripts\/smoke_packaged_desktop\.sh/);
