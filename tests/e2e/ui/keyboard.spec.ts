@@ -165,10 +165,11 @@ test("global shortcuts open commands and cycle thinking without changing views",
   });
   await expect(chatRows).toHaveCount(before + 1);
 
+  const leftSidebar = page.getByRole("navigation", { name: "Projects and chats" });
   await page.keyboard.press(leftSidebarShortcutKeys);
-  await expect(page.getByRole("complementary", { name: "Projects and chats" })).toHaveCount(0);
+  await expect(leftSidebar).toHaveCount(0);
   await page.keyboard.press(leftSidebarShortcutKeys);
-  await expect(page.getByRole("complementary", { name: "Projects and chats" })).toBeVisible();
+  await expect(leftSidebar).toBeVisible();
 
   const branchMap = page.getByRole("complementary", { name: "Branch map" });
   const branchMapWasOpen = (await branchMap.count()) > 0;
