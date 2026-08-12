@@ -61,6 +61,7 @@ jobs:
       - run: bun run --filter './apps/desktop' build:dir
 
   desktop-smoke-macos:
+    if: github.event_name == 'push'
     runs-on: macos-14
     timeout-minutes: 45
     steps:
