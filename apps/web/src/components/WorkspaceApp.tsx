@@ -82,6 +82,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   const [modelEditorOpen, setModelEditorOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [branchMapOpen, setBranchMapOpen] = useState(() => window.innerWidth >= 1280);
+  const createChatInFlightRef = useRef(false);
   const sidebarOverlaysWorkspace = useMediaQuery("(max-width: 767px)");
   const branchMapOverlaysWorkspace = useMediaQuery("(max-width: 1279px)");
   const activeBranch = controller.branches.find(
@@ -153,19 +154,38 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     );
   }, [availableReasoningEfforts, controller.reasoningEffort, controller.setReasoningEffort]);
 
+  const toggleLeftSidebar = useCallback(() => {
+    setSidebarOpen((current) => !current);
+  }, []);
+
+  const toggleRightSidebar = useCallback(() => {
+    if (view !== "thread") {
+      setBranchMapOpen(true);
+      setWorkspaceView("thread");
+      return;
+    }
+    setBranchMapOpen((current) => !current);
+  }, [setWorkspaceView, view]);
+
   const createNewChat = useCallback(
     async (projectId?: string) => {
-      const created = await controller.createChat(randomFoodChatName(), projectId);
-      if (!created) return false;
-      if (typeof created === "object") {
-        navigateToRoute({
-          workspace: controller.workspacePublicId,
-          chat: created.publicId,
-          branch: created.rootBranchPublicId,
-          view,
-        });
+      if (createChatInFlightRef.current) return false;
+      createChatInFlightRef.current = true;
+      try {
+        const created = await controller.createChat(randomFoodChatName(), projectId);
+        if (!created) return false;
+        if (typeof created === "object") {
+          navigateToRoute({
+            workspace: controller.workspacePublicId,
+            chat: created.publicId,
+            branch: created.rootBranchPublicId,
+            view,
+          });
+        }
+        return true;
+      } finally {
+        createChatInFlightRef.current = false;
       }
-      return true;
     },
     [controller.createChat, controller.workspacePublicId, navigateToRoute, view],
   );
@@ -353,6 +373,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   );
 
   const newChatShortcut = appShortcutLabel("newChat");
+  const toggleLeftSidebarShortcut = appShortcutLabel("toggleLeftSidebar");
+  const toggleRightSidebarShortcut = appShortcutLabel("toggleRightSidebar");
   const archiveChatShortcut = appShortcutLabel("archiveChat");
   const providerShortcut = appShortcutLabel("providerSelection");
   const thinkingShortcut = appShortcutLabel("thinkingLevel");
@@ -378,6 +400,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     archiveFocusedChat,
     openProviderSelection,
     cycleThinkingLevel,
+    toggleLeftSidebar,
+    toggleRightSidebar,
     setCommandPaletteOpen,
     setProjectCreateOpen,
     setProviderMenuOpen,
@@ -413,6 +437,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         onForward={goForward}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        toggleShortcut={toggleLeftSidebarShortcut}
       />
 
       <section className="relative flex min-w-0 flex-1 flex-col">
@@ -420,9 +445,11 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
           activeChatTitle={controller.activeChatTitle}
           activeProjectName={controller.activeProjectName}
           branchMapOpen={branchMapOpen}
+          branchMapShortcut={toggleRightSidebarShortcut}
           onOpenBranchMap={() => setBranchMapOpen(true)}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSidebar={() => setSidebarOpen(true)}
+          sidebarShortcut={toggleLeftSidebarShortcut}
           onViewChange={setWorkspaceView}
           sidebarOpen={sidebarOpen}
           view={view}
@@ -567,6 +594,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         onCreate={openPromptBranch}
         open={view === "thread" && branchMapOpen}
         onClose={() => setBranchMapOpen(false)}
+        toggleShortcut={toggleRightSidebarShortcut}
       />
       <ProjectCreateDialog
         open={projectCreateOpen}
@@ -607,6 +635,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
         onOpenProvider={openProviderSelection}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenWorkspaceCreate={() => setWorkspaceSetupOpen(true)}
+        onToggleLeftSidebar={toggleLeftSidebar}
+        onToggleRightSidebar={toggleRightSidebar}
         onSelectChat={selectChat}
         onSelectWorkspace={(workspaceId) => void selectWorkspace(workspaceId)}
         onViewChange={setWorkspaceView}
@@ -616,6 +646,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
           newProject: newProjectShortcut,
           provider: providerShortcut,
           thinking: thinkingShortcut,
+          toggleLeftSidebar: toggleLeftSidebarShortcut,
+          toggleRightSidebar: toggleRightSidebarShortcut,
         }}
         view={view}
       />

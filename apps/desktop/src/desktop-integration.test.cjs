@@ -121,5 +121,7 @@ describe("desktop integration contracts", () => {
     assert.match(mainSource, /window\.webContents\.send\("new-chat"\)/);
     assert.match(preloadSource, /ipcRenderer\.on\("new-chat"/);
     assert.match(preloadSource, /ipcRenderer\.removeListener\("new-chat"/);
+    assert.match(preloadSource, /if \(newChatHandler\) ipcRenderer\.removeListener/);
+    assert.doesNotMatch(preloadSource, /newChatHandlers = new WeakMap/);
   });
 });

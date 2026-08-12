@@ -239,6 +239,8 @@
     "persistence": "Messages persist in Convex; large content stays in the workspace object store."
   },
   "commandPalette": {
+    "toggleLeftSidebar": "Toggle left sidebar",
+    "toggleRightSidebar": "Toggle right sidebar",
     "label": "Command menu",
     "placeholder": "Search commands, chats, and workspaces…",
     "empty": "No matching commands",

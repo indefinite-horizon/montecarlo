@@ -22,10 +22,12 @@ type WorkspaceHeaderProps = {
   activeChatTitle?: string;
   activeProjectName?: string;
   branchMapOpen: boolean;
+  branchMapShortcut: string;
   onOpenBranchMap: () => void;
   onOpenSettings: () => void;
   onOpenSidebar: () => void;
   onViewChange: (view: WorkspaceView) => void;
+  sidebarShortcut: string;
   sidebarOpen: boolean;
   view: WorkspaceView;
 };
@@ -34,10 +36,12 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
   activeChatTitle,
   activeProjectName,
   branchMapOpen,
+  branchMapShortcut,
   onOpenBranchMap,
   onOpenSettings,
   onOpenSidebar,
   onViewChange,
+  sidebarShortcut,
   sidebarOpen,
   view,
 }: WorkspaceHeaderProps) {
@@ -49,7 +53,7 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
       className="electron-titlebar z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:px-5"
       data-testid="workspace-titlebar"
     >
-      <ActionTooltip label={t("sidebar.open")} side="bottom">
+      <ActionTooltip label={t("sidebar.open")} shortcut={sidebarShortcut} side="bottom">
         <Button
           className={
             sidebarOpen ? "electron-titlebar-leading md:hidden" : "electron-titlebar-leading-offset"
@@ -142,7 +146,7 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
         </Button>
       </ActionTooltip>
       {view === "thread" && !branchMapOpen ? (
-        <ActionTooltip label={t("branch.mapTitle")} side="bottom">
+        <ActionTooltip label={t("branch.mapTitle")} shortcut={branchMapShortcut} side="bottom">
           <Button
             size="icon"
             variant="ghost"

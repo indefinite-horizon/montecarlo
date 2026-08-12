@@ -37,6 +37,7 @@ export const BranchMap = memo(function BranchMap({
   onCreate,
   open,
   onClose,
+  toggleShortcut,
 }: {
   branches: ChatBranch[];
   activeBranchId: string;
@@ -45,6 +46,7 @@ export const BranchMap = memo(function BranchMap({
   onCreate: () => void;
   open: boolean;
   onClose: () => void;
+  toggleShortcut: string;
 }) {
   const { t } = useTranslation();
   const [branchMapWidth, setBranchMapWidth] = useState(storedBranchMapWidth);
@@ -98,7 +100,7 @@ export const BranchMap = memo(function BranchMap({
       >
         <GitBranch className="size-4 text-primary" />
         <h2 className="min-w-0 flex-1 text-xs font-semibold">{t("branch.mapTitle")}</h2>
-        <ActionTooltip label={t("branch.closeMap")} side="left">
+        <ActionTooltip label={t("branch.closeMap")} shortcut={toggleShortcut} side="left">
           <Button
             size="icon"
             variant="ghost"

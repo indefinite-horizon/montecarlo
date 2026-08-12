@@ -26,6 +26,29 @@ describe("application keyboard shortcuts", () => {
     expect(appShortcutLabel("thinkingLevel", "windows")).toBe("Alt+T");
     expect(appShortcutLabel("newChat", "linux")).toBe("Ctrl+Shift+N");
     expect(appShortcutLabel("archiveChat", "windows")).toBe("Ctrl+Shift+A");
+    expect(appShortcutLabel("toggleLeftSidebar", "macos")).toBe("⌘B");
+    expect(appShortcutLabel("toggleRightSidebar", "macos")).toBe("⌘⌥B");
+    expect(appShortcutLabel("toggleRightSidebar", "linux")).toBe("Ctrl+Alt+B");
+  });
+
+  it("distinguishes left and right sidebar shortcuts", () => {
+    expect(
+      matchesAppShortcut(keyboardEvent("KeyB", { metaKey: true }), "toggleLeftSidebar", "macos"),
+    ).toBe(true);
+    expect(
+      matchesAppShortcut(
+        keyboardEvent("KeyB", { altKey: true, metaKey: true }),
+        "toggleRightSidebar",
+        "macos",
+      ),
+    ).toBe(true);
+    expect(
+      matchesAppShortcut(
+        keyboardEvent("KeyB", { altKey: true, metaKey: true }),
+        "toggleLeftSidebar",
+        "macos",
+      ),
+    ).toBe(false);
   });
 
   it("matches macOS Option shortcuts by physical code", () => {

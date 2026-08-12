@@ -17,13 +17,13 @@ export const SidebarMoreButton = memo(function SidebarMoreButton({
     <button
       type="button"
       data-testid="show-more-chats"
-      className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm text-muted-foreground outline-none transition-colors hover:bg-card/80 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+      className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-sm text-muted-foreground/70 outline-none transition-colors hover:bg-card/80 hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
       aria-label={ariaLabel}
       aria-controls={controls}
       onClick={onClick}
     >
       <span className="size-4 shrink-0" aria-hidden="true" />
-      <span>{t("sidebar.more")}</span>
+      <span className="text-sm font-normal">{t("sidebar.more")}</span>
     </button>
   );
 });

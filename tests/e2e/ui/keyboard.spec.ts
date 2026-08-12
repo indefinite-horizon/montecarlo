@@ -8,8 +8,9 @@ import { createWorkspace, openFreshUser, userMessage } from "../helpers/workspac
 
 const primaryModifier = process.platform === "darwin" ? "Meta" : "Control";
 const newChatShortcutLabel = process.platform === "darwin" ? "⌘N" : "Ctrl+Shift+N";
-const newChatShortcutKeys = process.platform === "darwin" ? "Meta+N" : "Control+Shift+N";
 const thinkingShortcutLabel = process.platform === "darwin" ? "⌥T" : "Alt+T";
+const leftSidebarShortcutKeys = process.platform === "darwin" ? "Meta+B" : "Control+B";
+const rightSidebarShortcutKeys = process.platform === "darwin" ? "Meta+Alt+B" : "Control+Alt+B";
 
 test.beforeEach(async ({ context, page }) => {
   await installRuntimeMock(context);
@@ -147,7 +148,33 @@ test("global shortcuts open commands and cycle thinking without changing views",
     .getByRole("navigation", { name: "Projects and chats" })
     .getByTestId("chat-row");
   const before = await chatRows.count();
-  await page.keyboard.press(newChatShortcutKeys);
+  await page.evaluate(() => {
+    const macos = /mac|iphone|ipad|ipod/iu.test(`${navigator.platform} ${navigator.userAgent}`);
+    for (let index = 0; index < 20; index += 1) {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          code: "KeyN",
+          key: "n",
+          metaKey: macos,
+          ctrlKey: !macos,
+          shiftKey: !macos,
+        }),
+      );
+    }
+  });
   await expect(chatRows).toHaveCount(before + 1);
+
+  await page.keyboard.press(leftSidebarShortcutKeys);
+  await expect(page.getByRole("complementary", { name: "Projects and chats" })).toHaveCount(0);
+  await page.keyboard.press(leftSidebarShortcutKeys);
+  await expect(page.getByRole("complementary", { name: "Projects and chats" })).toBeVisible();
+
+  const branchMap = page.getByRole("complementary", { name: "Branch map" });
+  const branchMapWasOpen = (await branchMap.count()) > 0;
+  await page.keyboard.press(rightSidebarShortcutKeys);
+  await expect(branchMap).toHaveCount(branchMapWasOpen ? 0 : 1);
+  await page.keyboard.press(rightSidebarShortcutKeys);
+  await expect(branchMap).toHaveCount(branchMapWasOpen ? 1 : 0);
   expect(pageErrors, "global shortcuts must not cause uncaught page errors").toEqual([]);
 });

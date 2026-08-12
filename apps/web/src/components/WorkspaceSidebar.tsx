@@ -80,6 +80,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   onForward,
   open,
   onClose,
+  toggleShortcut,
 }: {
   chats: ChatSummary[];
   projects: ProjectSummary[];
@@ -105,6 +106,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
   onForward: () => void;
   open: boolean;
   onClose: () => void;
+  toggleShortcut: string;
 }) {
   const { t } = useTranslation();
   const newChatShortcut = appShortcutLabel("newChat");
@@ -205,7 +207,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
           className="electron-titlebar flex h-16 items-center gap-1 px-3"
           data-testid="sidebar-titlebar"
         >
-          <ActionTooltip label={t("sidebar.collapse")} side="bottom">
+          <ActionTooltip label={t("sidebar.collapse")} shortcut={toggleShortcut} side="bottom">
             <Button
               className="electron-titlebar-leading text-muted-foreground hover:text-muted-foreground"
               size="icon"

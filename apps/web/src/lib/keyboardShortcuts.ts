@@ -23,6 +23,18 @@ export const appShortcuts = {
     macos: ["meta"],
     windowsLinux: ["control", "shift"],
   },
+  toggleLeftSidebar: {
+    code: "KeyB",
+    key: "B",
+    macos: ["meta"],
+    windowsLinux: ["control"],
+  },
+  toggleRightSidebar: {
+    code: "KeyB",
+    key: "B",
+    macos: ["meta", "alt"],
+    windowsLinux: ["control", "alt"],
+  },
   newProject: {
     code: "KeyA",
     key: "A",

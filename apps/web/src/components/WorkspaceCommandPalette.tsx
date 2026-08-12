@@ -8,6 +8,8 @@ import {
   GitBranch,
   MessageSquarePlus,
   MessageSquareText,
+  PanelLeft,
+  PanelRight,
   Settings,
   Sparkles,
   Workflow,
@@ -31,6 +33,8 @@ type WorkspaceCommandPaletteProps = {
   onOpenProvider: () => void;
   onOpenSettings: () => void;
   onOpenWorkspaceCreate: () => void;
+  onToggleLeftSidebar: () => void;
+  onToggleRightSidebar: () => void;
   onOpenChange: (open: boolean) => void;
   onSelectChat: (chatId: string) => void;
   onSelectWorkspace: (workspaceId: string) => void;
@@ -42,6 +46,8 @@ type WorkspaceCommandPaletteProps = {
     newProject?: string;
     provider?: string;
     thinking?: string;
+    toggleLeftSidebar?: string;
+    toggleRightSidebar?: string;
   };
   view: WorkspaceView;
 };
@@ -59,6 +65,8 @@ export const WorkspaceCommandPalette = memo(function WorkspaceCommandPalette({
   onOpenProvider,
   onOpenSettings,
   onOpenWorkspaceCreate,
+  onToggleLeftSidebar,
+  onToggleRightSidebar,
   onSelectChat,
   onSelectWorkspace,
   onViewChange,
@@ -69,6 +77,20 @@ export const WorkspaceCommandPalette = memo(function WorkspaceCommandPalette({
   const { t } = useTranslation();
   const actions = useMemo<CommandPaletteAction[]>(
     () => [
+      {
+        id: "toggle-left-sidebar",
+        label: t("commandPalette.toggleLeftSidebar"),
+        icon: <PanelLeft />,
+        shortcut: shortcuts.toggleLeftSidebar,
+        onSelect: onToggleLeftSidebar,
+      },
+      {
+        id: "toggle-right-sidebar",
+        label: t("commandPalette.toggleRightSidebar"),
+        icon: <PanelRight />,
+        shortcut: shortcuts.toggleRightSidebar,
+        onSelect: onToggleRightSidebar,
+      },
       {
         id: "new-chat",
         label: t("sidebar.newChat"),
@@ -184,6 +206,8 @@ export const WorkspaceCommandPalette = memo(function WorkspaceCommandPalette({
       onOpenProvider,
       onOpenSettings,
       onOpenWorkspaceCreate,
+      onToggleLeftSidebar,
+      onToggleRightSidebar,
       onSelectChat,
       onSelectWorkspace,
       onViewChange,
