@@ -256,13 +256,20 @@ function registerIpcHandlers() {
 }
 
 function createWindow() {
+  const windowChrome =
+    process.platform === "darwin"
+      ? {
+          titleBarOverlay: { height: 64 },
+          titleBarStyle: "hidden",
+        }
+      : {};
   const window = new BrowserWindow({
     width: 1500,
     height: 920,
     minWidth: 980,
     minHeight: 640,
     title: appName,
-    titleBarStyle: "hiddenInset",
+    ...windowChrome,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

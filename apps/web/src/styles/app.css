@@ -122,6 +122,36 @@ button,
   -webkit-tap-highlight-color: transparent;
 }
 
+.electron-titlebar {
+  --electron-titlebar-left: env(titlebar-area-x, 0px);
+  --electron-titlebar-right: max(
+    0px,
+    calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))
+  );
+
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+}
+
+.electron-titlebar-leading {
+  margin-left: var(--electron-titlebar-left, 0px);
+}
+
+.electron-titlebar-trailing {
+  flex: 0 0 var(--electron-titlebar-right, 0px);
+}
+
+.electron-titlebar-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.electron-titlebar :is(button, a, input, select, textarea, [role="button"], [role="menuitem"]) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 ::selection {
   background: hsl(var(--primary) / 0.22);
 }

@@ -92,7 +92,10 @@ export const BranchMap = memo(function BranchMap({
       className="branch-map-grid fixed inset-y-0 right-0 z-50 flex h-screen w-[min(304px,88vw)] shrink-0 flex-col border-l border-border bg-card shadow-xl xl:relative xl:z-auto xl:w-[var(--branch-map-width)] xl:bg-card/55 xl:shadow-none"
       style={{ "--branch-map-width": `${branchMapWidth}px` } as CSSProperties}
     >
-      <header className="flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:px-5">
+      <header
+        className="electron-titlebar flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:px-5"
+        data-testid="branch-map-titlebar"
+      >
         <GitBranch className="size-4 text-primary" />
         <h2 className="min-w-0 flex-1 text-xs font-semibold">{t("branch.mapTitle")}</h2>
         <ActionTooltip label={t("branch.closeMap")} side="left">
@@ -106,6 +109,7 @@ export const BranchMap = memo(function BranchMap({
             <PanelRight />
           </Button>
         </ActionTooltip>
+        <span aria-hidden="true" className="electron-titlebar-trailing" />
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">

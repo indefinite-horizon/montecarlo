@@ -41,6 +41,13 @@ describe("desktop integration contracts", () => {
     assert.doesNotMatch(preloadSource, /ipcRenderer\.invoke\("provider-secret/);
   });
 
+  it("keeps the custom titlebar scoped to macOS and exposes its native safe area", () => {
+    assert.match(mainSource, /process\.platform === "darwin"/);
+    assert.match(mainSource, /titleBarStyle: "hidden"/);
+    assert.match(mainSource, /titleBarOverlay: \{ height: 64 \}/);
+    assert.doesNotMatch(mainSource, /titleBarStyle: "hiddenInset"/);
+  });
+
   it("forwards the platform new-chat shortcut without opening a browser window", () => {
     assert.match(mainSource, /process\.platform === "darwin"/);
     assert.match(mainSource, /input\.meta && !input\.control/);

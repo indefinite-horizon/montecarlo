@@ -62,10 +62,11 @@ model networks. External provider cases run only when
 
 ## Local Stack Validation
 
-Use `bash scripts/run_local.sh` when validating the full local stack. It
-normalizes env, starts Convex, Vite, and the authenticated model companion, and
-prints every selected URL. Conductor workspaces allocate an isolated companion
-port from the workspace's port range.
+Use `bash scripts/run_local.sh` when validating the desktop stack, or
+`bash scripts/run_local.sh web` for the browser stack. It normalizes env and
+starts Convex plus the selected app; web mode starts the authenticated model
+companion directly, while Electron owns it in desktop mode. Conductor workspaces
+allocate an isolated companion port from the workspace's port range.
 
 Do not bypass this script for full-stack validation. If you only need a narrow
 unit/type/build check, use the smaller command directly.

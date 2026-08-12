@@ -6,7 +6,7 @@ shell.
 ## Local Stack
 
 ```sh
-bash scripts/run_local.sh
+bash scripts/run_local.sh web
 ```
 
 Open the printed Vite URL and verify:
