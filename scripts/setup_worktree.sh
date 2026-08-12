@@ -26,19 +26,24 @@ if [ "$MAIN_REPO" = "$WORKTREE_DIR" ]; then
 fi
 
 ENV_FILE="$MAIN_REPO/.env.local"
-EXAMPLE_ENV_FILE="$MAIN_REPO/.env.example"
 
-if [ ! -f "$ENV_FILE" ]; then
-  if [ ! -f "$EXAMPLE_ENV_FILE" ]; then
-    echo "No .env.local found at $ENV_FILE and no .env.example found at $EXAMPLE_ENV_FILE"
-    exit 1
-  fi
-
-  cp "$EXAMPLE_ENV_FILE" "$ENV_FILE"
-  echo "Created $ENV_FILE from $EXAMPLE_ENV_FILE"
+# Conductor copies matching environment files into the new workspace before it
+# runs setup. Prefer those copies so setup does not depend on the main checkout
+# being available at CONDUCTOR_ROOT_PATH (for example, in remote workspace
+# mirrors). Fall back to the main checkout for older Conductor configurations.
+if [ -f "$WORKTREE_DIR/.env.local" ]; then
+  echo "Using .env.local copied into $WORKTREE_DIR"
+elif [ -f "$ENV_FILE" ]; then
+  cp "$ENV_FILE" "$WORKTREE_DIR/.env.local"
+  echo "Copied .env.local from $MAIN_REPO to $WORKTREE_DIR"
+elif [ -f "$WORKTREE_DIR/.env.example" ]; then
+  cp "$WORKTREE_DIR/.env.example" "$WORKTREE_DIR/.env.local"
+  echo "Created .env.local from .env.example"
+else
+  echo "No .env.local or .env.example available for workspace setup" >&2
+  exit 1
 fi
 
-cp "$ENV_FILE" "$WORKTREE_DIR/.env.local"
 # Remove CONVEX_DEPLOYMENT so the worktree gets its own anonymous backend
 # instead of reusing the main repo's deployment.
 SANITIZED_ENV_FILE="$(mktemp)"
@@ -46,7 +51,7 @@ trap 'rm -f "$SANITIZED_ENV_FILE"' EXIT
 sed '/^CONVEX_DEPLOYMENT=/d' "$WORKTREE_DIR/.env.local" > "$SANITIZED_ENV_FILE"
 mv "$SANITIZED_ENV_FILE" "$WORKTREE_DIR/.env.local"
 trap - EXIT
-echo "Copied .env.local from $MAIN_REPO to $WORKTREE_DIR (stripped CONVEX_DEPLOYMENT)"
+echo "Prepared $WORKTREE_DIR/.env.local (stripped CONVEX_DEPLOYMENT)"
 
 bun install --frozen-lockfile
 bash "$WORKTREE_DIR/scripts/setup_git_hooks.sh"
