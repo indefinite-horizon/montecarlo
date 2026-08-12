@@ -1,17 +1,21 @@
 /** Dev-only branch chip and database command menu. */
 
 import { useAction } from "convex/react";
-import { DatabaseZap, RotateCcw, Trash2, Wrench } from "lucide-react";
+import { DatabaseZap, GripVertical, RotateCcw, Trash2, Wrench } from "lucide-react";
 import { memo, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useEventListener } from "@/hooks/useEventListener";
+import { clampDevToolsPosition } from "@/lib/devToolsMenu";
 import { cn } from "@/lib/utils";
 import { api } from "../../../../convex/_generated/api";
 import { ActionTooltip } from "./ActionTooltip";
 import { Button } from "./ui/button";
 
 type PendingCommand = "wipe" | "reseed" | "wipeAndReseed" | null;
+type MenuPosition = { x: number; y: number };
+
+const VIEWPORT_GUTTER = 8;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -26,8 +30,10 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   const { t } = useTranslation();
   const branchLabel = readDevGitRefLabel();
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<MenuPosition | null>(null);
   const [pendingCommand, setPendingCommand] = useState<PendingCommand>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
   const wipeAll = useAction(api.functions.devTools.wipeAll);
   const reseed = useAction(api.functions.devTools.reseed);
   const wipeAndReseed = useAction(api.functions.devTools.wipeAndReseed);
@@ -39,6 +45,70 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
     },
     { enabled: open },
   );
+
+  useEventListener("resize", () => {
+    const menu = menuRef.current;
+    if (!menu || !position) return;
+    setPosition(
+      clampDevToolsPosition(position, menu.getBoundingClientRect(), {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }),
+    );
+  });
+
+  const handleDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button")) return;
+
+    const menu = menuRef.current;
+    if (!menu) return;
+    const rect = menu.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - (rect.left + rect.width / 2),
+      offsetY: event.clientY - rect.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const handleDragMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    const menu = menuRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !menu) return;
+
+    setPosition(
+      clampDevToolsPosition(
+        { x: event.clientX - drag.offsetX, y: event.clientY - drag.offsetY },
+        menu.getBoundingClientRect(),
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
+    );
+  }, []);
+
+  const handleDragEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
+
+  const handleToggleMenu = useCallback(() => {
+    if (!open) {
+      requestAnimationFrame(() => {
+        const menu = menuRef.current;
+        if (!menu) return;
+        const rect = menu.getBoundingClientRect();
+        setPosition((current) =>
+          clampDevToolsPosition(current ?? { x: rect.left + rect.width / 2, y: rect.top }, rect, {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          }),
+        );
+      });
+    }
+    setOpen(!open);
+  }, [open]);
 
   useEventListener(
     "pointerdown",
@@ -97,9 +167,17 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   return (
     <div
       ref={menuRef}
-      className="pointer-events-none fixed left-1/2 top-2 z-50 flex -translate-x-1/2 flex-col items-center gap-2"
+      className="pointer-events-none fixed z-50 flex -translate-x-1/2 flex-col items-center gap-2"
+      style={{ left: position?.x ?? "50%", top: position?.y ?? VIEWPORT_GUTTER }}
     >
-      <div className="flex items-center gap-1 rounded-md bg-foreground px-2 py-1 font-mono text-[10px] text-background shadow-sm">
+      <div
+        className="pointer-events-auto flex touch-none select-none items-center gap-1 rounded-md bg-foreground px-1.5 py-1 font-mono text-[10px] text-background shadow-sm cursor-grab active:cursor-grabbing"
+        onPointerDown={handleDragStart}
+        onPointerMove={handleDragMove}
+        onPointerUp={handleDragEnd}
+        onPointerCancel={handleDragEnd}
+      >
+        <GripVertical className="size-3 text-background/60" aria-hidden="true" />
         <span className="max-w-56 truncate" title={branchLabel}>
           {branchLabel}
         </span>
@@ -112,7 +190,7 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
             )}
             aria-label={t("devTools.open")}
             aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
+            onClick={handleToggleMenu}
           >
             <Wrench className="size-3" />
           </button>
