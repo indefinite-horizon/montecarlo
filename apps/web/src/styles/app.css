@@ -138,6 +138,17 @@ button,
   margin-left: var(--electron-titlebar-left, 0px);
 }
 
+.electron-titlebar-leading-offset {
+  margin-left: var(--electron-titlebar-left, 0px);
+  transform: translateY(-0.25rem);
+}
+
+@media (min-width: 640px) {
+  .electron-titlebar-leading-offset {
+    margin-left: calc(var(--electron-titlebar-left, 0px) - 0.5rem);
+  }
+}
+
 .electron-titlebar-trailing {
   flex: 0 0 var(--electron-titlebar-right, 0px);
 }

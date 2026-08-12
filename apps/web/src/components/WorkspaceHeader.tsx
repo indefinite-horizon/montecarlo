@@ -52,7 +52,7 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
       <ActionTooltip label={t("sidebar.open")} side="bottom">
         <Button
           className={
-            sidebarOpen ? "electron-titlebar-leading md:hidden" : "electron-titlebar-leading"
+            sidebarOpen ? "electron-titlebar-leading md:hidden" : "electron-titlebar-leading-offset"
           }
           size="icon"
           variant="ghost"
