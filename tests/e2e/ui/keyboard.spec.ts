@@ -125,6 +125,8 @@ test("global shortcuts open commands and cycle thinking without changing views",
   expect(pageErrors, "global shortcuts must not cause uncaught page errors").toEqual([]);
 
   await page.getByRole("button", { name: "Canvas view" }).click();
+  // This is a distinct user action, so wait past the app's duplicate-delivery guard.
+  await page.waitForTimeout(300);
   await page.keyboard.press("Alt+T");
   await expect(page.getByRole("button", { name: "Canvas view" })).toHaveAttribute(
     "aria-pressed",
