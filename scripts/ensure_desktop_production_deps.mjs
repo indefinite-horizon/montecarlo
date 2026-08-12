@@ -75,8 +75,10 @@ export function ensureDesktopProductionDependencies({
   const bunStore = join(repositoryRoot, "node_modules/.bun");
   const linked = [];
   for (const packageName of readDesktopProductionDependencies(desktopRoot)) {
-    if (resolveInstalledPackage(packageName, desktopRoot)) continue;
+    const destination = join(desktopRoot, "node_modules", packageName);
+    if (isUsablePackage(destination)) continue;
     const located =
+      resolveInstalledPackage(packageName, desktopRoot) ??
       resolveInstalledPackage(packageName, repositoryRoot) ??
       findPackageInBunStore(packageName, bunStore);
     if (!located) {

@@ -71,6 +71,7 @@ describe("desktop integration contracts", () => {
     const bunfig = readFileSync(path.resolve(desktopRoot, "../../bunfig.toml"), "utf8");
     assert.equal(desktopPackage.dependencies["electron-updater"], "6.8.9");
     assert.match(bunfig, /linker = "hoisted"/);
+    assert.match(builderConfig, /electronVersion: "43\.1\.1"/);
     assert.match(desktopPackage.scripts.build, /ensure:production-deps/);
     assert.match(desktopPackage.scripts["build:dir"], /ensure:production-deps/);
     assert.match(desktopPackage.scripts["build:smoke:mac"], /ensure:production-deps/);

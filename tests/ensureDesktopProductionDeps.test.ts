@@ -103,6 +103,21 @@ describe("ensureDesktopProductionDependencies", () => {
     expect(ensureDesktopProductionDependencies({ desktopRoot, repositoryRoot: root })).toEqual([]);
   });
 
+  it("links hoisted root packages into the desktop package node_modules", () => {
+    const { root, desktopRoot } = makeFixture();
+    const updater = join(root, "node_modules/electron-updater");
+    const electron = join(root, "node_modules/electron");
+    mkdirSync(updater, { recursive: true });
+    mkdirSync(electron, { recursive: true });
+    writeFileSync(join(updater, "package.json"), JSON.stringify({ name: "electron-updater" }));
+    writeFileSync(join(electron, "package.json"), JSON.stringify({ name: "electron" }));
+
+    expect(ensureDesktopProductionDependencies({ desktopRoot, repositoryRoot: root })).toEqual([
+      join(desktopRoot, "node_modules/electron-updater"),
+      join(desktopRoot, "node_modules/electron"),
+    ]);
+  });
+
   it("fails when the declared production dependency is not installed anywhere", () => {
     const { root, desktopRoot } = makeFixture();
     expect(() =>
