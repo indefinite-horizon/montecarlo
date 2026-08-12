@@ -100,7 +100,6 @@ export const create = mutation({
     publicId: v.optional(v.string()),
     membershipPublicId: v.optional(v.string()),
     name: v.string(),
-    storageMode: workspaceStorageModeValidator,
   },
   returns: workspaceSummaryValidator,
   handler: async (ctx, args) => {
@@ -124,7 +123,7 @@ export const create = mutation({
     const workspaceId = await ctx.db.insert("workspaces", {
       publicId,
       name,
-      storageMode: args.storageMode,
+      storageMode: "local",
       schemaVersion: convexConfig.domain.workspaceSchemaVersion,
       createdByUserId: user._id,
       createdAt: now,
@@ -153,7 +152,7 @@ export const create = mutation({
       id: workspaceId,
       publicId,
       name,
-      storageMode: args.storageMode,
+      storageMode: "local" as const,
       schemaVersion: convexConfig.domain.workspaceSchemaVersion,
       role: "owner" as const,
       membershipStatus: "active" as const,

@@ -6,13 +6,19 @@
   "desktopName": "Monte Carlo",
   "private": true,
   "main": "src/main.cjs",
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
   "scripts": {
+    "prepare:convex": "node ../../scripts/prepare_desktop_convex.mjs",
     "dev": "bunx wait-on tcp:5173 && bunx electron ./src/main.cjs",
     "start": "bunx electron ./src/main.cjs",
-    "build": "bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml",
-    "build:dir": "bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml --dir",
+    "build": "bun run prepare:convex && bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml",
+    "build:dir": "bun run prepare:convex && bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml --dir",
+    "build:smoke:mac": "bun run prepare:convex --platform mac --arch universal && bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml --mac --universal --dir --config.mac.identity=null --config.mac.notarize=false --config.dmg.sign=false",
+    "build:release:mac": "bun run prepare:convex --platform mac --arch universal && bun run --cwd ../web build && bun run --cwd ../runtime build && electron-builder --config electron-builder.yml --mac --universal --publish always",
     "test": "node --test src/*.test.cjs",
-    "typecheck": "node --check src/main.cjs && node --check src/preload.cjs && node --check src/desktop-security.cjs && node --check src/provider-secrets.cjs"
+    "typecheck": "node --check src/main.cjs && node --check src/preload.cjs && node --check src/desktop-private-files.cjs && node --check src/desktop-security.cjs && node --check src/desktop-updater.cjs && node --check src/local-convex-credentials.cjs && node --check src/local-convex.cjs && node --check src/provider-secrets.cjs"
   },
   "devDependencies": {
     "electron": "^43.0.0",

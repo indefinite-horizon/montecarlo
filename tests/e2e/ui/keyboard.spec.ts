@@ -43,7 +43,7 @@ test("a legacy workspace with no chats repairs its root conversation", async ({ 
   const name = `Legacy empty workspace ${Date.now()}`;
   const convex = new ConvexHttpClient(convexUrl);
   convex.setAuth(token);
-  await convex.mutation(api.workspaces.create, { name, storageMode: "local" });
+  await convex.mutation(api.workspaces.create, { name });
 
   await page.getByTestId("workspace-selector").click();
   await page.getByRole("menu", { name: "Workspaces" }).getByText(name, { exact: true }).click();

@@ -333,11 +333,10 @@ export function useConvexConversationData(
   ]);
 
   const createWorkspace = useCallback(
-    async (input: { name: string; storageMode: "local" | "cloud"; initialChatTitle: string }) => {
+    async (input: { name: string; initialChatTitle: string }) => {
       if (!authenticated) return null;
       const createdWorkspace = await createWorkspaceMutation({
         name: input.name,
-        storageMode: input.storageMode,
       });
       const createdChat = await ensureInitialChatMutation({
         workspaceId: createdWorkspace.id,

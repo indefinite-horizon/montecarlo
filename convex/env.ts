@@ -1,6 +1,7 @@
 /** Validates backend environment variables and derives local-dev origins. */
 
 import { cleanEnv, str } from "envalid";
+import { convexConfig } from "./config";
 import { computeDevToolsEnabled } from "./lib/devToolsGate";
 
 export const env = cleanEnv(process.env, {
@@ -59,4 +60,5 @@ export const devAllowedOrigins = [
   ...devOriginPorts.map((port) => `http://127.0.0.1:${port}`),
   "http://localhost:3211",
   "http://127.0.0.1:3211",
+  convexConfig.auth.desktopOrigin,
 ];

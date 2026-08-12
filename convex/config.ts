@@ -13,6 +13,7 @@ const oneDayMs = 24 * 60 * oneMinuteMs;
 
 export const convexConfig = {
   auth: {
+    desktopOrigin: "app://montecarlo",
     magicLink: {
       expiresInSeconds: 5 * 60,
       devLinkTtlMs: 5 * oneMinuteMs,

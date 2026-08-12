@@ -1,0 +1,18 @@
+{
+  "formatVersion": 1,
+  "appId": "chat.montecarlo.desktop",
+  "productName": "Monte Carlo",
+  "executableName": "montecarlo",
+  "convexBackendRelease": "precompiled-2026-08-10-c0cb7ae",
+  "dataLayoutVersion": 1,
+  "minimumReadableDataLayoutVersion": 1,
+  "dataMigrations": [],
+  "updater": {
+    "protocolVersion": 1,
+    "electronUpdaterCompatibility": ">=2.16",
+    "channel": "latest",
+    "provider": "github",
+    "owner": "indefinite-horizon",
+    "repo": "montecarlo-releases"
+  }
+}

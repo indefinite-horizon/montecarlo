@@ -4,12 +4,110 @@
 
 1. The application-owned chat DAG is the source of truth.
 2. Provider credentials never enter portable workspace data.
-3. Subscription harnesses and Ollama execute only on the user's device.
+3. A workspace's persistence and model execution share one mode: entirely local or entirely cloud.
 4. Convex owns authorization and portable metadata; object stores own large bodies and artifacts.
 5. Every exported entity uses a stable public ID and explicit schema version.
 6. A branch can be reconstructed without a provider-native session.
 
-## Runtime boundary
+## Workspace modes
+
+Monte Carlo exposes one workspace-level choice. The mode selects the complete
+persistence and execution boundary; hybrid local/cloud workspaces are not part
+of the product contract.
+
+| Mode | Convex | Message bodies | Model execution |
+| --- | --- | --- | --- |
+| Local | Self-hosted on the user's device | Local filesystem | Local Codex and Claude harnesses, OpenRouter, or Ollama |
+| Cloud | Hosted multi-tenant deployment | Private R2 bucket | Isolated managed sandbox such as Modal |
+
+Local mode is the only mode currently exposed. Development uses the anonymous
+local Convex backend. The distributable Electron build bundles and supervises
+one checksum-pinned self-hosted Convex backend and its matching CLI, deploys the
+packaged functions before loading the renderer, persists state under Electron's
+application-data boundary, and includes the upstream license notice. Nothing
+is downloaded to provision Convex on first launch.
+
+Cloud mode is future work. Do not expose its workspace selector until hosted
+Convex authorization, subscription entitlements, private R2 access, sandbox
+execution, cancellation, metering, and deletion are implemented together.
+Cloud workspaces must remain usable without the user's computer being online.
+
+For future cloud Codex and Claude execution, the user explicitly generates a
+revocable device or noninteractive access token for each provider. Monte Carlo
+must never copy a local CLI credential cache. Tokens belong in an encrypted
+cloud secret boundary, never Convex documents, R2 objects, action arguments,
+renderer persistence, analytics, or logs, and are injected only into the
+authorized workspace sandbox. Provider approval and token terms must be
+confirmed before this flow ships.
+
+The planned enrollment flows are Codex device authorization through
+`codex login --device-auth` and Claude's noninteractive token flow through
+`claude setup-token`, or their provider-approved successors. Enrollment must
+happen against an isolated cloud credential boundary; it must not upload the
+credential files from the user's device.
+
+Local-to-cloud and cloud-to-local transitions are explicit verified transfers,
+not a workspace setting toggle. Transfers preserve public IDs and versioned
+envelopes while copying metadata between Convex deployments and message bodies
+between the filesystem and R2.
+
+## Packaged local data service
+
+The build step downloads the reviewed Convex release named in
+`apps/desktop/convex-bundle/backend-manifest.json`, verifies every archive and
+license digest, and stages both macOS architectures plus an offline deployment
+project under Electron resources. The release is never selected dynamically on
+an end-user machine.
+
+On launch, Electron:
+
+1. decrypts or creates the instance, Better Auth, and blob-attestation secrets
+   through the operating-system credential boundary;
+2. starts the bundled backend on two OS-selected `127.0.0.1` ports with
+   beaconing disabled and client logs redacted;
+3. derives the admin key in memory, synchronizes the local-only backend
+   environment, deploys the bundled functions, and runs the idempotent seed;
+4. passes only the public loopback endpoints to the sandboxed renderer and only
+   the attestation private key to the trusted model runtime.
+
+SQLite, Convex object storage, deployment state, and one rollback snapshot live
+under `app.getPath("userData")/convex`. The admin key is never persisted or
+exposed to the renderer. Function updates snapshot the stopped database before
+deployment and restore it after an interrupted or failed push. A change to the
+Convex binary or data-format version is refused unless a separately implemented
+and tested migration path accompanies it; changing a version number in a
+manifest is not a migration.
+
+This makes application metadata and Ollama-backed execution capable of working
+without a network after installation. Codex, Claude, and OpenRouter still need
+their official local tooling/authentication and whatever network their provider
+requires.
+
+## Desktop updates
+
+The desktop update identity is the stable tuple of application ID, executable
+name, Apple signing team, public update repository, channel, and data-layout
+contract. A successful `main` CI run builds a universal macOS DMG and ZIP,
+signs and notarizes the app and every bundled executable, uploads an invisible
+draft, verifies signatures, notarization, architectures, feed hashes, and
+compatibility metadata, and only then publishes the release.
+
+Electron downloads an applicable update in the background. Only the
+`update-downloaded` event reaches the renderer; once per app session it shows a
+persistent dismissible toast with **See changelog** and **Update**. Update first
+stops the model runtime and Convex cleanly, then calls the updater's atomic
+install-and-relaunch operation.
+
+The compatibility gate tests direct jumps from the previous published
+contract, keeps the feed and application identity immutable, requires versions
+to increase, and blocks an unplanned local data-layout or signing-team change.
+This is a fail-closed compatibility policy, not an unconditional guarantee
+against corrupt disks or upstream defects. A user must manually install the
+first signed updater-capable DMG; software released before it contained an
+updater cannot be upgraded remotely. See [DESKTOP_RELEASE.md](DESKTOP_RELEASE.md)
+for the release runbook.
+
+## Local runtime boundary
 
 The companion binds to loopback, validates origins, and requires a high-entropy bearer token outside explicit development mode. Electron creates a fresh token per launch and sends it through narrow IPC. The browser receives normalized events only:
 
@@ -20,7 +118,7 @@ type RuntimeEvent =
   | { type: "error"; code: string; message: string };
 ```
 
-Codex runs through the official CLI app-server and its own credential cache. Its token-level app-server notifications are normalized into the same runtime event stream as every other provider. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction: their current bridge implementations require a network sandbox, which is the wrong execution location for local subscription credentials.
+Codex runs through the official CLI app-server and its own credential cache. Its token-level app-server notifications are normalized into the same runtime event stream as every other provider. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction.
 
 ## Chat execution
 
@@ -113,7 +211,3 @@ Better Auth owns credentials and sessions. The app-owned `users` row gives Conve
 4. performs every subsequent tenant read through a `workspaceId`-first index.
 
 Internal calls carry explicit authorized actor/workspace context. They do not turn a client-provided user ID into authority.
-
-## Local and cloud modes
-
-The development local mode uses Convex's anonymous local backend. Convex documents this as development-only. The current Electron package does not embed that backend; a distributable offline build must embed or supervise a reviewed self-hosted Convex release and include its license notices. Cloud metadata can use the hosted multi-tenant deployment, but public R2/managed-provider access remains gated on a Better Auth-bound capability gateway. Both modes retain the same domain and migration contracts.

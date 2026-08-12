@@ -539,10 +539,9 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
           <WorkspaceSetup
             loading={controller.loading}
             onClose={() => setWorkspaceSetupOpen(false)}
-            onCreate={async ({ name, storageMode }) => {
+            onCreate={async ({ name }) => {
               const created = await controller.createWorkspace({
                 name,
-                storageMode,
                 initialChatTitle: randomFoodChatName(),
               });
               if (!created) return false;

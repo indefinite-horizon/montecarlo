@@ -1,4 +1,4 @@
-/** Equivalent durable conversation journeys across local and cloud workspace storage. */
+/** Durable conversation journeys through the currently exposed local workspace mode. */
 
 import { expect, type Locator, test } from "@playwright/test";
 import { installRuntimeMock, type RuntimeMock } from "../helpers/runtime";
@@ -19,12 +19,6 @@ const storageCases = [
     label: "local-storage",
     backend: "filesystem",
     status: "Files on this device",
-  },
-  {
-    mode: "cloud",
-    label: "cloud-storage",
-    backend: "r2",
-    status: "Cloud file storage",
   },
 ] as const;
 
@@ -65,7 +59,7 @@ for (const storage of storageCases) {
       100,
     )}[reply:${latestReply}]`;
 
-    await createWorkspace(page, workspaceName, storage.mode);
+    await createWorkspace(page, workspaceName);
     await expect(page.getByText(storage.status, { exact: true })).toBeVisible();
     await createProject(page, projectName);
     await createChat(page, projectName);
