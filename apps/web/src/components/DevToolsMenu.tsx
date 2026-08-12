@@ -6,6 +6,7 @@ import { memo, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useEventListener } from "@/hooks/useEventListener";
+import { useMountEffect } from "@/hooks/useMountEffect";
 import {
   clampDevToolsPosition,
   readDevToolsPosition,
@@ -43,6 +44,17 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   const wipeAll = useAction(api.functions.devTools.wipeAll);
   const reseed = useAction(api.functions.devTools.reseed);
   const wipeAndReseed = useAction(api.functions.devTools.wipeAndReseed);
+
+  useMountEffect(() => {
+    const menu = menuRef.current;
+    if (!menu || !position) return;
+    const nextPosition = clampDevToolsPosition(position, menu.getBoundingClientRect(), {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+    setPosition(nextPosition);
+    writeDevToolsPosition(window.localStorage, nextPosition);
+  });
 
   useEventListener(
     "keydown",
