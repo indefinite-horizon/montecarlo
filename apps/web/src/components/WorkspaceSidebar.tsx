@@ -201,10 +201,13 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
         className="fixed inset-y-0 left-0 z-50 flex h-screen w-[min(264px,calc(100vw-3rem))] shrink-0 flex-col border-r border-border bg-background shadow-xl md:relative md:z-auto md:w-[var(--sidebar-width)] md:bg-secondary/35 md:shadow-none"
         style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
       >
-        <div className="flex h-14 items-center gap-1 px-3">
+        <div
+          className="electron-titlebar flex h-16 items-center gap-1 px-3"
+          data-testid="sidebar-titlebar"
+        >
           <ActionTooltip label={t("sidebar.collapse")} side="bottom">
             <Button
-              className="text-muted-foreground hover:text-muted-foreground"
+              className="electron-titlebar-leading text-muted-foreground hover:text-muted-foreground"
               size="icon"
               variant="ghost"
               aria-label={t("sidebar.collapse")}
@@ -213,7 +216,11 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
               <PanelLeft />
             </Button>
           </ActionTooltip>
-          <span className="flex-1" />
+          <span
+            aria-hidden="true"
+            className="electron-titlebar-drag flex-1 self-stretch"
+            data-testid="sidebar-titlebar-drag-handle"
+          />
           <ActionTooltip label={t("sidebar.back")} side="bottom">
             <Button
               className="text-muted-foreground hover:text-muted-foreground"

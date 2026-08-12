@@ -55,14 +55,13 @@ bun install
 bun run dev
 ```
 
-The web app defaults to `http://localhost:5173`. The local runner initializes an anonymous Convex development deployment and binds the model runtime only to a selected `127.0.0.1` port.
+The local runner starts the Electron app by default, initializes an anonymous Convex development deployment, and binds the model runtime only to a selected `127.0.0.1` port.
 
-To develop the desktop app, use this instead of `bun run dev`; it starts the
-complete Electron stack with renderer hot reload and automatic
-main/preload/runtime restarts:
+The desktop stack includes renderer hot reload and automatic
+main/preload/runtime restarts. To run only the web app instead:
 
 ```sh
-bun run dev:desktop
+bash scripts/run_local.sh web
 ```
 
 Useful checks:

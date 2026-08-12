@@ -12,6 +12,7 @@ source scripts/convex_cli_utils.sh
 
 ENV_FILE="${LOCAL_ENV_FILE:-.env.local}"
 AFTER_START_COMMAND="${LOCAL_AFTER_START_COMMAND:-}"
+APP_TARGET="desktop"
 CONVEX_CLI="${CONVEX_CLI:-bunx convex}"
 LOCAL_BACKEND_PORT="${LOCAL_BACKEND_PORT:-}"
 LOCAL_BACKEND_SITE_PORT="${LOCAL_BACKEND_SITE_PORT:-}"
@@ -23,6 +24,7 @@ LOCAL_RUNTIME_PORT="${LOCAL_RUNTIME_PORT:-}"
 LOCAL_DESKTOP_MODE="${LOCAL_DESKTOP_MODE:-}"
 LOCAL_SUPPRESS_PERIODIC_URL_LOG="${LOCAL_SUPPRESS_PERIODIC_URL_LOG:-}"
 ENV_FILE_SET=false
+APP_TARGET_SET=false
 URL_LOG_PID=""
 DEV_PID=""
 
@@ -87,13 +89,15 @@ trap cleanup EXIT INT TERM
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/run_local.sh [env-file] [--command "<command>"]
+Usage: bash scripts/run_local.sh [desktop|web] [env-file] [--command "<command>"]
 
-Starts a local anonymous Convex + Vite stack. Without --command, the stack
-stays attached until Ctrl+C. With --command, the command runs after both
-services are healthy, then the stack is stopped.
+Starts a local anonymous Convex stack and the selected app. Desktop mode is
+the default. Without --command, the stack stays attached until Ctrl+C. With
+--command, the command runs after Convex and Vite are healthy, then the stack
+is stopped.
 
 Arguments:
+  desktop|web          App to launch. Default: desktop.
   env-file              Env file to update and sync. Default: .env.local.
   --command "<command>" Command to run after the anonymous stack is healthy.
   -h, --help            Show this help.
@@ -132,6 +136,15 @@ while [[ $# -gt 0 ]]; do
       fi
       AFTER_START_COMMAND="$2"
       shift 2
+      ;;
+    desktop|web)
+      if $APP_TARGET_SET; then
+        echo "Error: app target already set to $APP_TARGET; unexpected extra target: $1" >&2
+        exit 1
+      fi
+      APP_TARGET="$1"
+      APP_TARGET_SET=true
+      shift
       ;;
     *)
       if $ENV_FILE_SET; then
@@ -447,7 +460,8 @@ wait_for_convex_ports_free() {
 
 print_urls() {
   echo "Using local anonymous stack:"
-  echo "  Web:         http://localhost:${site_port}"
+  echo "  App:         ${APP_TARGET}"
+  echo "  Renderer:    http://localhost:${site_port}"
   echo "  Convex:      http://127.0.0.1:${backend_port}"
   echo "  Convex site: http://127.0.0.1:${backend_site_port}"
   echo "  Runtime:     http://127.0.0.1:${runtime_port}"
@@ -581,7 +595,7 @@ if [ -z "$DEV_GIT_REF" ]; then
   DEV_GIT_REF="$(git rev-parse --short HEAD 2>/dev/null || true)"
 fi
 WEB_DEV_COMMAND="bun --env-file=\"$ENV_FILE\" run dev:web -- --host 0.0.0.0 --port $frontend_bind_port --strictPort"
-if [ "$LOCAL_DESKTOP_MODE" = "1" ]; then
+if [ "$APP_TARGET" = "desktop" ]; then
   ELECTRON_DEV_COMMAND="ELECTRON_START_URL=http://localhost:${site_port} bun --env-file=\"$ENV_FILE\" scripts/electron_dev_watch.mjs"
   APP_DEV_COMMAND="bunx concurrently --kill-others-on-fail -n web,desktop '$WEB_DEV_COMMAND' '$ELECTRON_DEV_COMMAND'"
 else
@@ -589,7 +603,7 @@ else
   APP_DEV_COMMAND="bunx concurrently --kill-others-on-fail -n web,runtime '$WEB_DEV_COMMAND' '$RUNTIME_DEV_COMMAND'"
 fi
 
-echo "Starting dev stack..."
+echo "Starting $APP_TARGET dev stack..."
 start_periodic_url_log
 VITE_DEV_GIT_BRANCH="$DEV_GIT_REF" \
   $CONVEX_CLI dev \

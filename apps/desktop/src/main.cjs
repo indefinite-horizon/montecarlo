@@ -288,6 +288,13 @@ function registerIpcHandlers() {
 }
 
 function createWindow() {
+  const windowChrome =
+    process.platform === "darwin"
+      ? {
+          titleBarOverlay: { height: 64 },
+          titleBarStyle: "hidden",
+        }
+      : {};
   const additionalArguments = [];
   if (localConvexConfiguration) {
     additionalArguments.push(
@@ -301,7 +308,7 @@ function createWindow() {
     minWidth: 980,
     minHeight: 640,
     title: appName,
-    titleBarStyle: "hiddenInset",
+    ...windowChrome,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,

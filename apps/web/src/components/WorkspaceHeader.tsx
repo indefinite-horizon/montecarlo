@@ -45,10 +45,15 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:px-5">
+    <header
+      className="electron-titlebar z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:px-5"
+      data-testid="workspace-titlebar"
+    >
       <ActionTooltip label={t("sidebar.open")} side="bottom">
         <Button
-          className={sidebarOpen ? "md:hidden" : "-translate-y-1 sm:-ml-2"}
+          className={
+            sidebarOpen ? "electron-titlebar-leading md:hidden" : "electron-titlebar-leading-offset"
+          }
           size="icon"
           variant="ghost"
           aria-label={t("sidebar.open")}
@@ -149,6 +154,7 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
           </Button>
         </ActionTooltip>
       ) : null}
+      <span aria-hidden="true" className="electron-titlebar-trailing" />
     </header>
   );
 });
