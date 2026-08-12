@@ -22,6 +22,7 @@ const SKIP_DIRS = new Set([
   ".codex",
   ".cursor",
   ".dev",
+  ".desktop-resources",
   ".expect",
   ".gemini",
   ".git",
@@ -32,7 +33,11 @@ const SKIP_DIRS = new Set([
   "playwright-report",
   "test-results",
 ]);
-const GENERATED_PATHS = [/^convex\/_generated\//, /^apps\/web\/src\/routeTree\.gen\.ts$/];
+const GENERATED_PATHS = [
+  /^convex\/_generated\//,
+  /^apps\/desktop\/convex-bundle\/package-lock\.json$/,
+  /^apps\/web\/src\/routeTree\.gen\.ts$/,
+];
 
 function toPosix(filePath: string): string {
   return filePath.split(path.sep).join("/");

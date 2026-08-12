@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": "precompiled-2026-08-10-c0cb7ae",
+  "repository": "get-convex/convex-backend",
+  "baseUrl": "https://github.com/get-convex/convex-backend/releases/download/precompiled-2026-08-10-c0cb7ae",
+  "license": {
+    "file": "LICENSE.md",
+    "sha256": "563cea54ba1ad9d2a1b36f4a62b1ebdc3e1dcfb8776a7afee06c99aad5294588"
+  },
+  "targets": {
+    "darwin-arm64": {
+      "archive": "convex-local-backend-aarch64-apple-darwin.zip",
+      "sha256": "95159c96cf9348fc49d94a1fd5bdffb49fe27a5e0442f8787939b4d871ec0b5e",
+      "executable": "convex-local-backend"
+    },
+    "darwin-x64": {
+      "archive": "convex-local-backend-x86_64-apple-darwin.zip",
+      "sha256": "2504571b9f1a4c7123abde534153bc72b4c95d7112662084117b2534f6afabdf",
+      "executable": "convex-local-backend"
+    },
+    "linux-arm64": {
+      "archive": "convex-local-backend-aarch64-unknown-linux-gnu.zip",
+      "sha256": "f420034e15e6a18e0f251b0cb2908fdc8c0fca2ccc49a4a8d55378dd5e129749",
+      "executable": "convex-local-backend"
+    },
+    "linux-x64": {
+      "archive": "convex-local-backend-x86_64-unknown-linux-gnu.zip",
+      "sha256": "25a5c7c6969b36b382a2651a8e44a30452879b5c8194e89f6e972b5857919d46",
+      "executable": "convex-local-backend"
+    },
+    "windows-x64": {
+      "archive": "convex-local-backend-x86_64-pc-windows-msvc.zip",
+      "sha256": "4801e2d2b75df8cafcf2e685bb24e70eb0bf96676eb7de389ef2c60411412be2",
+      "executable": "convex-local-backend.exe"
+    }
+  }
+}

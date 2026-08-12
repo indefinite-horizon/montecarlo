@@ -16,6 +16,12 @@ provider credentials must cross none of them except the runtime that uses them.
 - Every tenant read and write resolves the Better Auth caller and active workspace membership.
 - The local companion accepts only loopback Host headers, exact configured origins, bounded bodies, and a bearer token outside explicit development mode.
 - Electron uses a sandboxed, context-isolated renderer, denies permissions and new windows, opens only credential-free HTTP(S) links in the system browser, and exposes narrow typed IPC only.
+- Packaged Electron binds its bundled Convex backend explicitly to
+  `127.0.0.1`, disables upstream beaconing, redacts server logs sent to clients,
+  and never exposes its instance secret or derived admin key to the renderer.
+- macOS update metadata remains invisible until the universal app, nested
+  executables, DMG, notarization ticket, feed hashes, and compatibility contract
+  pass the release gate.
 - The trusted client verifies the runtime upload receipt, hash, and byte length before requesting manifest availability. This is a local-mode integrity check, not server-side attestation for a future multi-tenant gateway.
 
 ## Sensitive Data
@@ -38,7 +44,8 @@ runtime with the decrypted secret. No IPC method returns secret plaintext.
 Local workspaces can run without a cloud account. This is not a cloud auth
 bypass: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` is honored only when `SITE_URL`
 is a loopback origin. The local Convex deployment is expected to bind to the
-user's machine, and the runtime independently binds to loopback. Never set this
+user's machine; packaged Electron enforces `127.0.0.1`, and the runtime
+independently binds to loopback. Never set this
 flag on a shared or cloud deployment.
 
 ## Provider Boundary

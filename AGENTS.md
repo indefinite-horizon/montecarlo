@@ -8,13 +8,19 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 
 ## Hard Rules
 
-- Never commit secrets. Local model and object-store secrets belong in `.env.runtime.local` or the desktop credential boundary, never in Convex, analytics, renderer persistence, logs, or action arguments.
+- Never commit secrets. Local operator configuration lives in `.env.local`;
+  local model secrets must remain browser-invisible and are excluded from
+  Convex by `scripts/filter_convex_env.sh`. Prefer the desktop credential
+  boundary when available. Never put provider secrets in Convex, analytics,
+  renderer persistence, logs, or action arguments.
 - Keep `.env.example` focused on values an operator must supply or intentionally choose. Group
-  credentials by ownership in this order: cross-boundary Convex-and-runtime credentials,
-  Convex-only secrets, runtime-only secrets, and deployment-only secrets. List each assignment
-  once, keep non-secret configuration in separate owner-specific sections, and mark
-  browser-visible values as public. Do not duplicate tuning knobs or values that already have sane
-  runtime defaults; keep those defaults in config.
+  currently supported local credentials by ownership in this order: cross-boundary
+  Convex-and-runtime credentials, Convex-only secrets, and runtime-only secrets.
+  Do not add future cloud, hosted deployment, managed-provider, or R2 variables
+  until cloud mode ships. List each assignment once, keep non-secret
+  configuration in separate owner-specific sections, and mark browser-visible
+  values as public. Do not duplicate tuning knobs or values that already have
+  sane runtime defaults; keep those defaults in config.
 - Treat `SECRETS.md` as the canonical secret and environment-ownership inventory. Whenever an
   environment variable, credential, token, or runtime ownership boundary is added, renamed,
   removed, or changed, review and update `SECRETS.md` and `.env.example` in the same change.
@@ -26,6 +32,12 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 - Every tenant-owned document carries `workspaceId`; tenant compound indexes begin with it and reads use those indexes.
 - Keep stable public IDs and versioned envelopes at persistence boundaries. Never export Convex `_id` values or absolute local paths as portable identity.
 - Keep branch persistence provider-neutral. Native Codex/Claude forks may optimize a run but do not define the graph.
+- Implement only the local workspace mode for now: local self-hosted Convex,
+  local filesystem objects, and model execution on the user's device. Do not
+  expose a cloud workspace selector or implement a hybrid local/cloud mode.
+  Keep cloud mode as documented future work that ships only when hosted Convex,
+  private R2 storage, subscription enforcement, and isolated cloud Codex/Claude
+  execution are complete together.
 - Use TanStack Router for in-app navigation. Push fully specified paths, including every state-bearing
   query parameter, so browser back and forward restore the complete workspace, chat, branch, and view.
 - Keep in-app Back and Forward controls on an application-owned route stack. Never delegate those
@@ -46,7 +58,6 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 
 ```sh
 cp .env.example .env.local
-cp .env.example .env.runtime.local
 bun install
 bun run dev
 ```
@@ -63,10 +74,9 @@ implementation. Review the existing E2E suite, identify core user flows that
 need coverage, and add, update, consolidate, or remove tests as needed to keep
 the suite MECE.
 
-Whenever adding E2E coverage for a new flow, determine whether the flow touches
-persistence whose behavior or storage boundary differs between local-storage
-and cloud-storage workspaces. If it does, add equivalent E2E coverage for both
-workspace modes.
+Whenever adding E2E coverage for a new flow, cover the currently implemented
+local workspace mode. When cloud mode is implemented, restore equivalent E2E
+coverage for every flow whose persistence or execution boundary differs.
 
 After completing any other implementation work, consult
 [docs/TESTING.md](docs/TESTING.md) to determine whether new or updated tests are
@@ -91,4 +101,5 @@ Add focused coverage for branch graphs, context windows, authorization, portable
 - `docs/DESIGN.md`: visual and interaction rules.
 - `docs/SECURITY.md`: trust boundaries and release checklist.
 - `docs/TESTING.md`: unit, integration, desktop, and browser strategy.
-- `docs/NEW_PROD_DEPLOY.md`: cloud and desktop release requirements.
+- `docs/DESKTOP_RELEASE.md`: standalone macOS packaging and OTA release gates.
+- `docs/NEW_PROD_DEPLOY.md`: future hosted-cloud deployment requirements.

@@ -78,23 +78,10 @@
     "projectLabel": "Probability lab",
     "switcherLabel": "Workspaces",
     "newWorkspace": "New workspace",
-    "setupEyebrow": "Workspace setup",
-    "setupTitle": "Where should message content be stored?",
-    "setupSubtitle": "Choose local-first privacy or cloud sync. You can move it later.",
-    "existingTitle": "Open an existing workspace",
     "localTitle": "On this device",
-    "localDescription": "Convex and model harnesses run on this machine.",
-    "localBulletOne": "Filesystem object storage",
-    "localBulletTwo": "No account or cloud dependency",
     "cloudTitle": "Cloud object storage",
-    "cloudDescription": "Use the multi-tenant Convex deployment across devices.",
-    "cloudBulletOne": "R2 object storage",
-    "cloudBulletTwo": "Secure sync between devices",
     "nameLabel": "Workspace name",
-    "portabilityNote": "Both modes use the same versioned IDs, message envelopes, and blob manifest. Export, verify, and import moves data in either direction without provider-specific history.",
-    "noBilling": "Cloud billing is not enabled yet.",
-    "createLocal": "Create with device storage",
-    "createCloud": "Create with cloud storage"
+    "createLocal": "Create workspace"
   },
   "providers": {
     "choose": "Choose a provider",
@@ -269,6 +256,13 @@
   },
   "runtime": {
     "offline": "The local model runtime is offline. Start the desktop app or `bun run dev:runtime`, then try again."
+  },
+  "updates": {
+    "ready": "Monte Carlo {{version}} is ready",
+    "seeChangelog": "See changelog",
+    "install": "Update",
+    "changelogError": "The changelog could not be opened.",
+    "installError": "The update could not be installed. Try again."
   },
   "devTools": {
     "title": "Dev Tools",

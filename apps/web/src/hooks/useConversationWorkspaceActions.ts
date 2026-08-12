@@ -27,7 +27,7 @@ export function useConversationWorkspaceActions({
   setRequestedBranchId,
 }: ConversationWorkspaceActionsInput) {
   const createWorkspace = useCallback(
-    async (input: { name: string; storageMode: "local" | "cloud"; initialChatTitle: string }) => {
+    async (input: { name: string; initialChatTitle: string }) => {
       if (loading) return false;
       if (!domain.authenticated) return true;
       try {

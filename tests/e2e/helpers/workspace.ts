@@ -12,25 +12,17 @@ export async function openFreshUser(page: Page, prefix = "workspace") {
 export async function createWorkspace(
   page: Page,
   name: string,
-  mode: "local" | "cloud" = "local",
   currentWorkspaceName = "My Workspace",
 ) {
   await workspaceButton(page, currentWorkspaceName).click();
   const menu = page.getByRole("menu", { name: "Workspaces" });
   await expect(menu).toBeVisible();
-  await expect(
-    page.getByRole("dialog", { name: "Where should message content be stored?" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "New workspace" })).toHaveCount(0);
   await menu.getByRole("menuitem", { name: "New workspace", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Where should message content be stored?" });
+  const dialog = page.getByRole("dialog", { name: "New workspace" });
   await expect(dialog).toBeVisible();
-  if (mode === "cloud") {
-    await dialog.getByRole("button", { name: "Cloud object storage", exact: true }).click();
-  }
   await dialog.getByLabel("Workspace name").fill(name);
-  const createButton = dialog.getByRole("button", {
-    name: mode === "local" ? "Create with device storage" : "Create with cloud storage",
-  });
+  const createButton = dialog.getByRole("button", { name: "Create workspace" });
   await expect(createButton).toBeEnabled();
   await createButton.click();
   await expect(dialog).toBeHidden();

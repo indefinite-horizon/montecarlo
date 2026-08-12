@@ -28,7 +28,7 @@ describe("filter_convex_env.sh", () => {
         "MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY=public-key",
         "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY=runtime-private-key",
         "OPENROUTER_API_KEY=provider-secret",
-        "R2_SECRET_ACCESS_KEY=storage-secret",
+        "MONTECARLO_RUNTIME_TOKEN=runtime-secret",
         "CONVEX_DEPLOY_KEY=deployment-secret",
         "VITE_RUNTIME_TOKEN=browser-value",
         "UNREVIEWED_ENVIRONMENT_VALUE=unknown",
@@ -43,7 +43,7 @@ describe("filter_convex_env.sh", () => {
     expect(output).toContain("MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY=public-key");
     expect(output).not.toContain("runtime-private-key");
     expect(output).not.toContain("provider-secret");
-    expect(output).not.toContain("storage-secret");
+    expect(output).not.toContain("runtime-secret");
     expect(output).not.toContain("deployment-secret");
     expect(output).not.toContain("browser-value");
     expect(output).not.toContain("UNREVIEWED_ENVIRONMENT_VALUE");

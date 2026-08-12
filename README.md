@@ -8,12 +8,17 @@ The repository starts from [`richardwu/convex-project-template`](https://github.
 
 - React/Vite SPA with project/chat creation, editable model and compatible-endpoint selection, message composition, selection-to-branch, prompt-only branching, and an interactive branch map.
 - Electron 43 shell with a sandboxed renderer, navigation guards, denied browser permissions, narrow IPC, and an authenticated loopback runtime on a child-attested ephemeral port.
+- Standalone desktop packaging with a pinned self-hosted Convex backend,
+  offline function deployment, encrypted local service credentials, and
+  signed/notarized one-click macOS updates.
 - Provider-neutral local runtime with streamed events for Codex, Claude, OpenRouter, and Ollama.
 - Codex uses the official local CLI app-server and the user's existing Codex/ChatGPT login. Credentials remain owned by Codex and never enter the renderer, Convex, or object storage.
 - Claude uses the official local CLI and the user's existing Claude Pro/Max login. Credentials remain owned by Claude Code and never enter the renderer, Convex, or object storage.
 - Multi-tenant Convex schema for workspaces, memberships, projects, chats, branches, message metadata, blob manifests, and model runs.
 - Versioned portable domain envelopes and validators. No workspace transfer workflow is exposed yet.
-- Local filesystem and cloud R2 are routed per workspace behind the same blob-manifest contract; provider credentials are deliberately outside that contract.
+- Local filesystem persistence is exposed today. The cloud R2 contract remains
+  in the domain model for a future all-hosted workspace mode; provider
+  credentials are deliberately outside that contract.
 
 ## Architecture
 
@@ -30,11 +35,13 @@ React SPA / Electron renderer
                   └── AI SDK 7 ─── Ollama's OpenAI-compatible endpoint
 
 Message bodies / tool artifacts
-        ├── local workspace: filesystem objects
-        └── cloud workspace: R2 objects
+        └── local workspace: filesystem objects
 ```
 
-Convex is the portable control plane, not the model-execution environment. Subscription harnesses and Ollama always run on the user's machine. The browser SPA connects to the companion runtime; the Electron app starts it automatically.
+Only local workspace creation is currently exposed. The target local product
+uses self-hosted Convex, filesystem objects, and model execution on the user's
+machine. Future cloud workspaces will use hosted Convex, private R2, and an
+isolated managed sandbox as one indivisible hosted mode.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for invariants and data flow.
 
@@ -44,14 +51,15 @@ Requirements: Bun 1.3.6, Node 22 or newer, and Chromium for browser tests.
 
 ```sh
 cp .env.example .env.local
-cp .env.example .env.runtime.local
 bun install
 bun run dev
 ```
 
 The web app defaults to `http://localhost:5173`. The local runner initializes an anonymous Convex development deployment and binds the model runtime only to a selected `127.0.0.1` port.
 
-Start the desktop shell after the web stack is healthy:
+To develop the desktop app, use this instead of `bun run dev`; it starts the
+complete Electron stack with renderer hot reload and automatic
+main/preload/runtime restarts:
 
 ```sh
 bun run dev:desktop
@@ -76,15 +84,24 @@ bun run build:runtime
 | OpenRouter | User API key or administrator-provisioned runtime key | Local companion | User keys stay in the local credential boundary; settings or `OPENROUTER_BASE_URL` selects an HTTPS-compatible endpoint, and managed keys are never forwarded to request-selected endpoints. |
 | Claude | Existing Claude Code Pro/Max session | Local only | Requires the official Claude CLI on `PATH` (or `CLAUDE_PATH`). Monte Carlo invokes the CLI but never reads its credential store. |
 
-Runtime-only secrets belong in `.env.runtime.local`, not `.env.local`. The latter is synchronized to the local Convex backend by the development scripts. Never put model-provider secrets in Convex function arguments or documents.
+Local development uses one `.env.local`. The runtime loads the complete file,
+while `scripts/filter_convex_env.sh` ensures only explicitly allowlisted values
+are synchronized to Convex. Never put model-provider secrets in Convex function
+arguments or documents.
 
-## Workspace modes
+## Workspace mode
 
-Local message objects live under Electron's `app.getPath("userData")/workspaces/<public-id>/`. During development, metadata for all local workspaces shares the isolated anonymous Convex backend selected by `scripts/run_local.sh`; tenancy remains enforced by `workspaceId`. The Convex CLI's anonymous local deployment is development-only. The packaged Electron artifact currently requires an external Convex endpoint; shipping a standalone offline metadata backend still requires a reviewed self-hosted Convex distribution and its current license notices.
+Local message objects live under Electron's `app.getPath("userData")/workspaces/<public-id>/`. During development, metadata for all local workspaces shares the isolated anonymous Convex backend selected by `scripts/run_local.sh`; tenancy remains enforced by `workspaceId`. The Convex CLI's anonymous local deployment is development-only. Packaged Electron builds instead carry a checksum-pinned self-hosted Convex binary, CLI, function bundle, and license notice; they create encrypted instance credentials and durable state under Electron's application-data directory. No separate Convex install or external endpoint is required.
 
-Cloud workspace metadata uses the shared multi-tenant Convex deployment and R2-compatible manifests. The companion can route R2 when trusted credentials are configured, but a public multi-tenant storage/provider gateway is not enabled yet; it requires short-lived Better Auth-bound capabilities rather than a browser-visible shared bearer. Every tenant-owned record carries `workspaceId`; public Convex functions verify active membership. Provider credentials never sync with the workspace.
+Cloud workspace creation is intentionally unavailable. It remains future work
+and will ship only as an all-hosted boundary: hosted Convex metadata, private R2
+objects, subscription enforcement, and isolated cloud Codex/Claude execution.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the planned credential
+enrollment and runtime boundary.
 
-The repository retains a versioned portable format and validator, but does not expose local/cloud transfer. A workspace's storage mode is fixed when it is created. Convex `_id` values and absolute local paths are never part of the portable format.
+The repository retains a versioned portable format and validator, but does not
+expose local/cloud transfer. Convex `_id` values and absolute local paths are
+never part of the portable format.
 
 ## Branch semantics
 
@@ -101,11 +118,13 @@ This makes a branch reconstructible on Codex, Claude, OpenRouter, or Ollama with
 
 ## Environment files
 
-- `.env.local`: Convex, Better Auth, browser build, and non-secret development settings.
-- `.env.runtime.local`: model-provider keys, loopback token, R2 credentials, and local runtime settings.
-- `.worktreeinclude`: asks Conductor to copy both gitignored files into new workspaces.
+- `.env.local`: local Convex, browser, and trusted-runtime configuration.
+- `.worktreeinclude`: asks Conductor to copy the gitignored file into new workspaces.
 
-The single checked-in example groups operator-supplied values by owner. Copy it to both local files, then set Convex/web values only in `.env.local` and runtime values only in `.env.runtime.local`. [`SECRETS.md`](SECRETS.md) is the canonical ownership inventory. Production secrets should come from the desktop credential store or the runtime's deployment environment.
+Copy the checked-in example to `.env.local`. The local runner loads that file
+for every local process, but only its allowlisted Convex-owned subset crosses
+into the Convex backend. [`SECRETS.md`](SECRETS.md) is the canonical ownership
+inventory. Packaged credentials should come from the desktop credential store.
 
 Account-free mode is guarded twice: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` must be explicit and `SITE_URL` must resolve to a loopback origin. Cloud deployments must leave that flag unset and require Better Auth membership for every workspace operation.
 
@@ -117,7 +136,8 @@ Account-free mode is guarded twice: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` must
 - [Security](docs/SECURITY.md)
 - [Secrets and environment ownership](SECRETS.md)
 - [Testing](docs/TESTING.md)
-- [Deployment](docs/NEW_PROD_DEPLOY.md)
+- [Future hosted deployment](docs/NEW_PROD_DEPLOY.md)
+- [Desktop releases and OTA updates](docs/DESKTOP_RELEASE.md)
 
 ## Repository workflow
 

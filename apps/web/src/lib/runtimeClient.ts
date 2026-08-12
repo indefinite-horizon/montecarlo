@@ -4,6 +4,8 @@ import type { ChatMessage, ProviderId, ReasoningEffort } from "./conversation";
 
 type DesktopBridge = {
   platform?: string;
+  convexUrl?: string;
+  convexSiteUrl?: string;
   getRuntimeConfig: () => Promise<{ baseUrl: string; token: string }>;
   saveProviderSecret?: (provider: "openrouter", value: string) => void;
   onNewChat?: (callback: () => void) => void;

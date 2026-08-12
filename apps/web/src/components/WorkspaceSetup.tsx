@@ -1,9 +1,8 @@
-/** Lets users create portable local or cloud workspaces. */
+/** Creates a local workspace during the local-only product phase. */
 
-import { ArrowRight, Cloud, Database, HardDrive } from "lucide-react";
+import { ArrowRight, Database } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -15,10 +14,9 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
 }: {
   loading: boolean;
   onClose: () => void;
-  onCreate: (input: { name: string; storageMode: "local" | "cloud" }) => Promise<boolean>;
+  onCreate: (input: { name: string }) => Promise<boolean>;
 }) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<"local" | "cloud">("local");
   const [name, setName] = useState(t("workspace.defaultName"));
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,7 +25,7 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
     if (!normalizedName || submitting) return;
     setSubmitting(true);
     try {
-      if (await onCreate({ name: normalizedName, storageMode: mode })) onClose();
+      if (await onCreate({ name: normalizedName })) onClose();
     } finally {
       setSubmitting(false);
     }
@@ -40,7 +38,7 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
         if (!open && !submitting) onClose();
       }}
     >
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -52,27 +50,12 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
               <Database className="size-5 text-primary" />
             </span>
             <DialogTitle className="min-w-0 flex-1 font-display text-2xl font-bold">
-              {t("workspace.setupTitle")}
+              {t("workspace.newWorkspace")}
             </DialogTitle>
           </DialogHeader>
 
           <div className="p-6">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <ModeCard
-                active={mode === "local"}
-                icon={HardDrive}
-                title={t("workspace.localTitle")}
-                onClick={() => setMode("local")}
-              />
-              <ModeCard
-                active={mode === "cloud"}
-                icon={Cloud}
-                title={t("workspace.cloudTitle")}
-                onClick={() => setMode("cloud")}
-              />
-            </div>
-
-            <div className="mt-5 rounded-lg border border-border bg-card p-4">
+            <div className="rounded-lg border border-border bg-card p-4">
               <label htmlFor="workspace-name" className="text-xs font-semibold">
                 {t("workspace.nameLabel")}
               </label>
@@ -90,41 +73,12 @@ export const WorkspaceSetup = memo(function WorkspaceSetup({
               {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={!name.trim() || submitting || loading}>
-              {mode === "local" ? t("workspace.createLocal") : t("workspace.createCloud")}
+              {t("workspace.createLocal")}
               <ArrowRight />
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
-});
-
-const ModeCard = memo(function ModeCard({
-  active,
-  icon: Icon,
-  title,
-  onClick,
-}: {
-  active: boolean;
-  icon: typeof HardDrive;
-  title: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "rounded-lg border p-4 text-left transition-all hover:-translate-y-px hover:shadow-sm",
-        active ? "border-primary bg-accent/60 ring-1 ring-primary/20" : "border-border bg-card",
-      )}
-      aria-pressed={active}
-      onClick={onClick}
-    >
-      <span className="grid size-9 place-items-center rounded-lg bg-secondary">
-        <Icon className="size-4 text-primary" />
-      </span>
-      <span className="mt-3 block text-sm font-semibold">{title}</span>
-    </button>
   );
 });

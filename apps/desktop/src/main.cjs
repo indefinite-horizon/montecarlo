@@ -1,6 +1,16 @@
 /** Boots the hardened Electron shell and its authenticated local runtime. */
 
-const { app, BrowserWindow, ipcMain, protocol, safeStorage, session, shell } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  protocol,
+  safeStorage,
+  session,
+  shell,
+} = require("electron");
+const { autoUpdater } = require("electron-updater");
 const { spawn } = require("node:child_process");
 const { randomBytes } = require("node:crypto");
 const { mkdirSync } = require("node:fs");
@@ -15,6 +25,8 @@ const {
   resolveDevelopmentRendererUrl,
   resolveRendererAsset,
 } = require("./desktop-security.cjs");
+const { createDesktopUpdater } = require("./desktop-updater.cjs");
+const { createLocalConvexSupervisor } = require("./local-convex.cjs");
 const { createProviderSecretStore, parseProviderSecretUpdate } = require("./provider-secrets.cjs");
 
 protocol.registerSchemesAsPrivileged([
@@ -41,6 +53,11 @@ const runtimeToken = randomBytes(32).toString("base64url");
 const expectedRuntimeStops = new WeakSet();
 const runtimeStopGraceMs = 2_000;
 let isQuitting = false;
+let cleanupComplete = false;
+let cleanupStarted = false;
+let desktopUpdater;
+let localConvexConfiguration;
+let localConvexSupervisor;
 let providerSecretStore;
 let runtimeProcess;
 let runtimeReadyPromise;
@@ -98,6 +115,7 @@ function startRuntime() {
     cwd: isDevelopment ? path.resolve(__dirname, "../../..") : app.getPath("userData"),
     env: {
       ...process.env,
+      ...(localConvexConfiguration?.runtimeEnvironment ?? {}),
       ...providerEnvironment,
       PATH: runtimeExecutablePath(),
       ...(isDevelopment ? {} : { ELECTRON_RUN_AS_NODE: "1" }),
@@ -253,9 +271,30 @@ function registerIpcHandlers() {
         writeDiagnostic("provider_secret_save_failed", "The provider credential was not saved.");
       });
   });
+  ipcMain.handle("desktop-update:get-downloaded", (event) => {
+    assertTrustedIpcSender(event);
+    return desktopUpdater?.getDownloadedUpdate();
+  });
+  ipcMain.handle("desktop-update:open-changelog", async (event) => {
+    assertTrustedIpcSender(event);
+    if (!desktopUpdater) throw new Error("Desktop updates are unavailable on this build.");
+    await desktopUpdater.openChangelog();
+  });
+  ipcMain.handle("desktop-update:install", async (event) => {
+    assertTrustedIpcSender(event);
+    if (!desktopUpdater) throw new Error("Desktop updates are unavailable on this build.");
+    await desktopUpdater.install();
+  });
 }
 
 function createWindow() {
+  const additionalArguments = [];
+  if (localConvexConfiguration) {
+    additionalArguments.push(
+      `--montecarlo-convex-url=${localConvexConfiguration.backendUrl}`,
+      `--montecarlo-convex-site-url=${localConvexConfiguration.siteUrl}`,
+    );
+  }
   const window = new BrowserWindow({
     width: 1500,
     height: 920,
@@ -268,6 +307,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      additionalArguments,
     },
   });
 
@@ -316,6 +356,35 @@ function createWindow() {
   }
 }
 
+async function stopDesktopServices() {
+  await Promise.allSettled([stopRuntime(), localConvexSupervisor?.stop()]);
+}
+
+async function prepareForUpdateInstall() {
+  isQuitting = true;
+  cleanupStarted = true;
+  await stopDesktopServices();
+  cleanupComplete = true;
+}
+
+function broadcastToWindows(channel, value) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(channel, value);
+  }
+}
+
+function configureDesktopUpdater() {
+  if (isDevelopment || process.platform !== "darwin") return;
+  desktopUpdater = createDesktopUpdater({
+    autoUpdater,
+    broadcast: broadcastToWindows,
+    openExternal: (url) => shell.openExternal(url),
+    prepareToInstall: prepareForUpdateInstall,
+    reportDiagnostic: writeDiagnostic,
+  });
+  desktopUpdater.start();
+}
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
@@ -327,32 +396,62 @@ if (!hasSingleInstanceLock) {
     existingWindow.focus();
   });
 
-  app.whenReady().then(async () => {
-    providerSecretStore = createProviderSecretStore({
-      safeStorage,
-      userDataPath: app.getPath("userData"),
-    });
-    session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-      callback(false);
-    });
-    if (!isDevelopment) await protocol.handle("app", handleRendererRequest);
-    registerIpcHandlers();
-    void startRuntime().catch(() => {
-      writeDiagnostic("runtime_not_ready", "The local runtime did not become ready.");
-    });
-    createWindow();
+  app
+    .whenReady()
+    .then(async () => {
+      providerSecretStore = createProviderSecretStore({
+        safeStorage,
+        userDataPath: app.getPath("userData"),
+      });
+      session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+        callback(false);
+      });
+      if (!isDevelopment) await protocol.handle("app", handleRendererRequest);
+      if (!isDevelopment) {
+        localConvexSupervisor = createLocalConvexSupervisor({
+          appVersion: app.getVersion(),
+          resourcesPath: process.resourcesPath,
+          safeStorage,
+          userDataPath: app.getPath("userData"),
+        });
+        localConvexConfiguration = await localConvexSupervisor.start();
+      }
+      registerIpcHandlers();
+      await startRuntime();
+      createWindow();
+      configureDesktopUpdater();
 
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      app.on("activate", () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      });
+    })
+    .catch((error) => {
+      writeDiagnostic("desktop_start_failed", error instanceof Error ? error.message : "unknown");
+      dialog.showErrorBox(
+        "Monte Carlo could not start",
+        error instanceof Error ? error.message : "The local desktop services could not start.",
+      );
+      isQuitting = true;
+      void stopDesktopServices().finally(() => {
+        cleanupComplete = true;
+        app.quit();
+      });
     });
-  });
 
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
   });
 
-  app.on("before-quit", () => {
+  app.on("before-quit", (event) => {
     isQuitting = true;
-    void stopRuntime();
+    desktopUpdater?.dispose();
+    if (cleanupComplete) return;
+    event.preventDefault();
+    if (cleanupStarted) return;
+    cleanupStarted = true;
+    void stopDesktopServices().finally(() => {
+      cleanupComplete = true;
+      app.quit();
+    });
   });
 }

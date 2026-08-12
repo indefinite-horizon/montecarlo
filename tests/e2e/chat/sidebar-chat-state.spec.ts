@@ -90,11 +90,11 @@ test("keeps a chat unread until its completed branch message enters the viewport
   await expect(childBranch.getByTestId("branch-unread-indicator")).toHaveCount(0);
 });
 
-for (const storageMode of ["local", "cloud"] as const) {
+for (const storageMode of ["local"] as const) {
   test(`shows inactive response activity and persists read state in ${storageMode} workspaces`, async ({
     page,
   }) => {
-    await createWorkspace(page, `${storageMode} sidebar state ${Date.now()}`, storageMode);
+    await createWorkspace(page, `${storageMode} sidebar state ${Date.now()}`);
     const respondingChatId = await publicIdForActiveChat(page);
     await createChat(page);
     const otherChatId = await publicIdForActiveChat(page);

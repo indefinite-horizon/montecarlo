@@ -7,17 +7,28 @@ values, token fragments, hashes, credential lengths, or screenshots.
 Update this file and `.env.example` together whenever a credential, environment
 variable, or runtime ownership boundary changes.
 
+`.env.example` documents only the currently supported local product. The
+deployment and future-cloud sections below remain an inventory of dormant code
+and release tooling; their variables are intentionally absent from the local
+example until those product modes ship.
+
 ## Ownership principles
 
 - Convex owns application authentication, OAuth, email, and backend analytics
   credentials.
-- The trusted local runtime owns model-provider and object-store credentials.
-- `.env.local` is the web and Convex input. `.env.runtime.local` is the trusted
-  companion input. `scripts/filter_convex_env.sh` is the machine-readable
-  allowlist that prevents runtime-only values from being uploaded to Convex.
+- The trusted local runtime owns model-provider credentials. The future hosted
+  runtime will own cloud object-store credentials.
+- `.env.local` is the single local development input for the web app, Convex
+  tooling, and trusted runtime. `scripts/filter_convex_env.sh` is the
+  machine-readable allowlist that prevents runtime-only values from being
+  uploaded to the Convex backend.
 - The blob attestation public key is stored in Convex, while its matching private
   key remains in the runtime. `scripts/run_local.sh` generates the pair for local
   development when either half is absent.
+- Packaged Electron generates its Convex instance secret, Better Auth secret,
+  and blob-attestation pair on first launch and encrypts them with Electron
+  `safeStorage`. They are not operator environment variables. The admin key is
+  derived in memory when deploying bundled functions and is never persisted.
 - Codex and Claude subscription credentials remain owned by their official local
   SDK or CLI. Monte Carlo never reads or persists their credential caches.
 - Browser-visible `VITE_*` values are public configuration even when named
@@ -27,7 +38,9 @@ variable, or runtime ownership boundary changes.
 
 ## Cross-boundary credential pair
 
-These values form one key pair but are never stored in the same environment.
+These values form one key pair and share `.env.local` during development, but
+the filter sends only the public key to Convex. The private key is consumed only
+by trusted local processes and is never browser-visible.
 
 | Variable | Secrecy | Owner | Purpose |
 | --- | --- | --- | --- |
@@ -48,8 +61,16 @@ These values form one key pair but are never stored in the same environment.
 | Variable | Purpose |
 | --- | --- |
 | `OPENROUTER_API_KEY` | Optional user-managed OpenRouter calls outside the desktop credential flow |
-| `MONTECARLO_MANAGED_OPENROUTER_API_KEY` | Administrator-provisioned OpenRouter calls in a trusted runtime |
 | `MONTECARLO_RUNTIME_TOKEN` | Authenticates requests to the companion outside development |
+
+## Reserved future cloud runtime secrets
+
+These variables remain recognized by dormant cloud runtime code but are not
+part of `.env.example` or the supported local setup.
+
+| Variable | Purpose |
+| --- | --- |
+| `MONTECARLO_MANAGED_OPENROUTER_API_KEY` | Administrator-provisioned OpenRouter calls in a trusted hosted runtime |
 | `R2_ACCESS_KEY_ID` | R2-compatible object-store access key id |
 | `R2_SECRET_ACCESS_KEY` | R2-compatible object-store secret key |
 
@@ -67,6 +88,25 @@ executables but do not expose either provider's credential store.
 
 These values are CLI or build-runner inputs. They are never uploaded as Convex
 backend variables.
+
+## Desktop release secrets
+
+These values exist only as GitHub Actions secrets in the private source
+repository. They are intentionally absent from `.env.example`, local Convex,
+application resources, and the public update repository.
+
+| Variable | Purpose |
+| --- | --- |
+| `DESKTOP_RELEASE_TOKEN` | Publishes draft and verified releases to the public desktop update repository |
+| `DESKTOP_CSC_LINK` | Developer ID Application signing certificate consumed by electron-builder |
+| `DESKTOP_CSC_KEY_PASSWORD` | Unlocks the desktop signing certificate in CI |
+| `DESKTOP_APPLE_API_KEY_ID` | Selects the App Store Connect notarization key |
+| `DESKTOP_APPLE_API_ISSUER` | Selects the App Store Connect notarization issuer |
+| `DESKTOP_APPLE_API_KEY_P8_BASE64` | Carries the notarization private key into the ephemeral macOS runner |
+
+The public update feed location and release compatibility policy are non-secret
+committed configuration. Do not embed `DESKTOP_RELEASE_TOKEN` in an installed
+application; update reads must remain anonymous against the public repository.
 
 ## Convex non-secret configuration
 
@@ -94,9 +134,6 @@ not operator prompts in `.env.example`.
 | `MONTECARLO_RUNTIME_WORKSPACE_IDS` | Optional workspace allowlist for a locked-down companion |
 | `CODEX_PATH` | Optional official Codex CLI path |
 | `CLAUDE_PATH` | Optional official Claude CLI path |
-| `R2_ENDPOINT` | R2-compatible object-store endpoint |
-| `R2_BUCKET` | R2-compatible object-store bucket |
-| `R2_PREFIX` | Optional object-key prefix |
 | `MONTECARLO_WORKSPACES_DIR` | Optional filesystem object-store root |
 | `OPENROUTER_BASE_URL` | Optional compatible OpenRouter endpoint override |
 | `OLLAMA_BASE_URL` | Optional Ollama-compatible endpoint override |
@@ -104,8 +141,12 @@ not operator prompts in `.env.example`.
 `MONTECARLO_RUNTIME_HOST`, `MONTECARLO_RUNTIME_PORT`,
 `MONTECARLO_RUNTIME_ALLOWED_ORIGINS`, and `MONTECARLO_RUNTIME_DEV` are local
 runner or deployment controls with safe defaults in `apps/runtime/src/config.ts`.
-`MONTECARLO_OBJECT_STORE` defaults to `filesystem`; providing the complete R2
-configuration enables R2 alongside it.
+`MONTECARLO_OBJECT_STORE` defaults to `filesystem`. Future cloud object-store
+credentials are intentionally absent from the local environment contract.
+
+The dormant cloud runtime also recognizes `R2_ENDPOINT`, `R2_BUCKET`, and
+`R2_PREFIX`. They are intentionally absent from `.env.example` until cloud mode
+is implemented.
 
 ## Convex CLI and deployment configuration
 
@@ -137,5 +178,5 @@ rather than Convex backend variables.
 - Rotate `BETTER_AUTH_SECRET` with an explicit session invalidation plan.
 - Rotate the blob attestation key pair together; never expose the private half
   to Convex, browser configuration, logs, or persisted workspace data.
-- Rotate runtime provider and R2 credentials at their owning service, then
-  restart the trusted companion so newly launched processes receive them.
+- Rotate runtime provider credentials at their owning service, then restart the
+  trusted companion so newly launched processes receive them.
