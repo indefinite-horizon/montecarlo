@@ -78,23 +78,10 @@
     "projectLabel": "Laboratoire de probabilités",
     "switcherLabel": "Espaces de travail",
     "newWorkspace": "Nouvel espace de travail",
-    "setupEyebrow": "Configuration de l'espace",
-    "setupTitle": "Où stocker le contenu des messages ?",
-    "setupSubtitle": "Choisissez la confidentialité locale ou la synchronisation cloud. Vous pourrez le déplacer plus tard.",
-    "existingTitle": "Ouvrir un espace existant",
     "localTitle": "Sur cet appareil",
-    "localDescription": "Convex et les moteurs de modèles s'exécutent sur cette machine.",
-    "localBulletOne": "Stockage objet sur le système de fichiers",
-    "localBulletTwo": "Aucun compte ni dépendance cloud",
     "cloudTitle": "Stockage objet cloud",
-    "cloudDescription": "Utilisez le déploiement Convex multi-tenant sur plusieurs appareils.",
-    "cloudBulletOne": "Stockage objet R2",
-    "cloudBulletTwo": "Synchronisation sécurisée entre appareils",
     "nameLabel": "Nom de l'espace",
-    "portabilityNote": "Les deux modes utilisent les mêmes identifiants versionnés, enveloppes de messages et manifestes de blobs. L'export et l'import déplacent les données dans les deux sens.",
-    "noBilling": "La facturation cloud n'est pas encore activée.",
-    "createLocal": "Créer avec stockage local",
-    "createCloud": "Créer avec stockage cloud"
+    "createLocal": "Créer l'espace de travail"
   },
   "providers": {
     "choose": "Choisir un fournisseur",
@@ -269,6 +256,13 @@
   },
   "runtime": {
     "offline": "Le moteur de modèles local est hors ligne. Démarrez l'application ou `bun run dev:runtime`, puis réessayez."
+  },
+  "updates": {
+    "ready": "Monte Carlo {{version}} est prêt",
+    "seeChangelog": "Voir les nouveautés",
+    "install": "Mettre à jour",
+    "changelogError": "Impossible d'ouvrir les nouveautés.",
+    "installError": "Impossible d'installer la mise à jour. Réessayez."
   },
   "devTools": {
     "title": "Outils de développement",

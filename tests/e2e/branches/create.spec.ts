@@ -193,14 +193,10 @@ test("highlighted passage uses the default follow-up when the optional prompt is
   });
 });
 
-for (const storageMode of ["local", "cloud"] as const) {
+for (const storageMode of ["local"] as const) {
   test(`selections beyond the metadata preview persist in ${storageMode} workspaces`, async ({
     page,
   }) => {
-    if (storageMode === "cloud") {
-      const cloudWorkspaceName = `Cloud branch workspace ${Date.now()}`;
-      await createWorkspace(page, cloudWorkspaceName, "cloud", activeWorkspaceName);
-    }
     const lateSelection = `late hydrated anchor ${Date.now()}`;
     const prompt = `${"Earlier hydrated message content. ".repeat(40)}${lateSelection}`;
     await sendMessage(page, prompt, lateSelection);

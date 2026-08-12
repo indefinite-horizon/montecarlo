@@ -17,14 +17,10 @@ import {
 
 let runtime: RuntimeMock;
 
-test.beforeEach(async ({ context, page }, testInfo) => {
+test.beforeEach(async ({ context, page }) => {
   runtime = await installRuntimeMock(context);
   await openFreshUser(page, "conversation");
-  await createWorkspace(
-    page,
-    `Conversation workspace ${Date.now()}`,
-    testInfo.title === "cloud history edit persists the rewritten turn" ? "cloud" : "local",
-  );
+  await createWorkspace(page, `Conversation workspace ${Date.now()}`);
 });
 
 test("sends a message, consumes normalized stream events, and persists both turns", async ({
@@ -150,20 +146,20 @@ test("retry and edit replace a completed turn and truncate subsequent history", 
   await expect(userMessage(page, "Later prompt")).toHaveCount(0);
 });
 
-test("cloud history edit persists the rewritten turn", async ({ page }) => {
-  await sendMessage(page, "Cloud prompt", "Stub response: Cloud prompt");
-  const turn = userMessage(page, "Cloud prompt");
+test("history edit persists the rewritten turn", async ({ page }) => {
+  await sendMessage(page, "Original prompt", "Stub response: Original prompt");
+  const turn = userMessage(page, "Original prompt");
   await turn.hover();
   await turn.getByRole("button", { name: "Edit message" }).click();
   const dialog = page.getByRole("dialog", { name: "Edit message" });
-  await dialog.getByRole("textbox", { name: "Message" }).fill("Edited cloud prompt");
+  await dialog.getByRole("textbox", { name: "Message" }).fill("Edited prompt");
   await dialog.getByRole("button", { name: "Save and retry" }).click();
-  await expect(assistantMessage(page, "Stub response: Edited cloud prompt")).toBeVisible();
+  await expect(assistantMessage(page, "Stub response: Edited prompt")).toBeVisible();
   await expect(dialog).toBeHidden({ timeout: 15_000 });
 
   await page.reload();
-  await expect(userMessage(page, "Cloud prompt")).toHaveCount(0);
-  await expect(userMessage(page, "Edited cloud prompt")).toHaveCount(1);
+  await expect(userMessage(page, "Original prompt")).toHaveCount(0);
+  await expect(userMessage(page, "Edited prompt")).toHaveCount(1);
 });
 
 test("stops an in-progress generation and ignores its late response", async ({ page }) => {

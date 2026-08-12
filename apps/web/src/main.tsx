@@ -6,7 +6,9 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { ConvexReactClient } from "convex/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { useTranslation } from "react-i18next";
 import { Toaster } from "sonner";
+import { DesktopUpdateToast } from "./components/DesktopUpdateToast";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { ThemeContext, useThemeProvider } from "./hooks/useTheme";
 import "./i18n";
@@ -25,12 +27,16 @@ if (reactScanEnabled) {
 }
 
 const packagedDesktop = window.location.protocol === "app:";
-const convexUrl =
-  import.meta.env.VITE_CONVEX_URL ||
-  (import.meta.env.DEV || packagedDesktop ? "http://127.0.0.1:3210" : "");
+const convexUrl = packagedDesktop
+  ? (window.monteCarloDesktop?.convexUrl ?? "")
+  : import.meta.env.VITE_CONVEX_URL || (import.meta.env.DEV ? "http://127.0.0.1:3210" : "");
 
 if (!convexUrl) {
-  throw new Error("VITE_CONVEX_URL is required in production");
+  throw new Error(
+    packagedDesktop
+      ? "The packaged local data service did not provide its endpoint."
+      : "VITE_CONVEX_URL is required in production",
+  );
 }
 
 const appName = getAppName(import.meta.env.DEV);
@@ -85,6 +91,7 @@ function InnerApp() {
 
 function App() {
   const themeCtx = useThemeProvider();
+  const { t } = useTranslation();
 
   return (
     <ThemeContext.Provider value={themeCtx}>
@@ -92,7 +99,11 @@ function App() {
         <ConvexBetterAuthProvider client={convexClient} authClient={authClient}>
           <InnerApp />
         </ConvexBetterAuthProvider>
-        <Toaster theme={themeCtx.resolvedTheme} />
+        <DesktopUpdateToast />
+        <Toaster
+          theme={themeCtx.resolvedTheme}
+          toastOptions={{ closeButtonAriaLabel: t("common.close") }}
+        />
       </AnalyticsProvider>
     </ThemeContext.Provider>
   );

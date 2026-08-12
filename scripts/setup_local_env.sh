@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets Convex environment variables from an env file.
+# Syncs the Convex-owned subset of the shared local environment file.
 # Usage: bash scripts/setup_local_env.sh [path-to-env-file]
 
 set -euo pipefail
@@ -47,8 +47,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Upload only the explicitly documented Convex-owned values. The shared example
-# also contains runtime credentials that must never enter the Convex environment.
+# Upload only the explicitly documented Convex-owned values. The shared local
+# file also contains runtime credentials that must never enter Convex.
 bash "$SCRIPT_DIR/filter_convex_env.sh" "$ENV_FILE" > "$CONVEX_ENV_FILE"
 
 env_file_value() {

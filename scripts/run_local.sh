@@ -11,7 +11,6 @@ cd "$(dirname "$0")/.."
 source scripts/convex_cli_utils.sh
 
 ENV_FILE="${LOCAL_ENV_FILE:-.env.local}"
-RUNTIME_ENV_FILE="${LOCAL_RUNTIME_ENV_FILE:-.env.runtime.local}"
 AFTER_START_COMMAND="${LOCAL_AFTER_START_COMMAND:-}"
 CONVEX_CLI="${CONVEX_CLI:-bunx convex}"
 LOCAL_BACKEND_PORT="${LOCAL_BACKEND_PORT:-}"
@@ -21,6 +20,7 @@ LOCAL_FRONTEND_PORT="${LOCAL_FRONTEND_PORT:-}"
 CONDUCTOR_PORT="${CONDUCTOR_PORT:-}"
 LOCAL_FRONTEND_BIND_PORT="${LOCAL_FRONTEND_BIND_PORT:-}"
 LOCAL_RUNTIME_PORT="${LOCAL_RUNTIME_PORT:-}"
+LOCAL_DESKTOP_MODE="${LOCAL_DESKTOP_MODE:-}"
 LOCAL_SUPPRESS_PERIODIC_URL_LOG="${LOCAL_SUPPRESS_PERIODIC_URL_LOG:-}"
 ENV_FILE_SET=false
 URL_LOG_PID=""
@@ -109,8 +109,9 @@ Environment:
   CONDUCTOR_PORT              Frontend port supplied by Conductor.
   LOCAL_FRONTEND_BIND_PORT    Vite bind port. Defaults to selected frontend port.
   CONVEX_CLI                  Convex CLI command. Default: bunx convex.
-  LOCAL_RUNTIME_ENV_FILE      Runtime env file. Default: .env.runtime.local.
   LOCAL_RUNTIME_PORT          Explicit loopback companion port.
+  LOCAL_DESKTOP_MODE          Set to 1 to run Electron with renderer HMR and
+                              main/preload/runtime process restart watching.
 EOF
 }
 
@@ -146,11 +147,6 @@ done
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "Error: $ENV_FILE not found."
-  exit 1
-fi
-
-if [ ! -f "$RUNTIME_ENV_FILE" ]; then
-  echo "Error: $RUNTIME_ENV_FILE not found. Copy .env.example to it first."
   exit 1
 fi
 
@@ -366,7 +362,7 @@ fs.writeFileSync(configFile, JSON.stringify(config));
 write_selected_ports_to_env() {
   local attestation_key_pair attestation_public_key attestation_private_key
   attestation_public_key="$(env_file_value "MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY")"
-  attestation_private_key="$(env_file_value "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$RUNTIME_ENV_FILE")"
+  attestation_private_key="$(env_file_value "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY")"
   if [ -z "$attestation_public_key" ] || [ -z "$attestation_private_key" ]; then
     attestation_key_pair="$(
       bun -e 'const { publicKey, privateKey } = require("node:crypto").generateKeyPairSync("ec", { namedCurve: "P-256" }); console.log(publicKey.export({ format: "der", type: "spki" }).toString("base64")); console.log(privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"));'
@@ -375,7 +371,7 @@ write_selected_ports_to_env() {
     attestation_private_key="${attestation_key_pair#*$'\n'}"
   fi
   upsert_env_var "MONTECARLO_BLOB_ATTESTATION_PUBLIC_KEY" "$attestation_public_key"
-  upsert_env_var "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$attestation_private_key" "$RUNTIME_ENV_FILE"
+  upsert_env_var "MONTECARLO_BLOB_ATTESTATION_PRIVATE_KEY" "$attestation_private_key"
   upsert_env_var "CONVEX_AGENT_MODE" "anonymous"
   upsert_env_var "CONVEX_URL" "http://127.0.0.1:${backend_port}"
   upsert_env_var "VITE_CONVEX_URL" "http://127.0.0.1:${backend_port}"
@@ -545,7 +541,7 @@ export MONTECARLO_RUNTIME_DEV=1
 export MONTECARLO_RUNTIME_PORT="$runtime_port"
 export MONTECARLO_RUNTIME_ALLOWED_ORIGINS="http://localhost:${site_port},http://127.0.0.1:${frontend_bind_port}"
 export VITE_RUNTIME_URL="http://127.0.0.1:${runtime_port}"
-export VITE_RUNTIME_TOKEN="$(env_file_value "MONTECARLO_RUNTIME_TOKEN" "$RUNTIME_ENV_FILE")"
+export VITE_RUNTIME_TOKEN="$(env_file_value "MONTECARLO_RUNTIME_TOKEN")"
 
 if env_file_has_usable_deployment_selector; then
   echo "Using existing Convex deployment selector from $ENV_FILE."
@@ -585,8 +581,13 @@ if [ -z "$DEV_GIT_REF" ]; then
   DEV_GIT_REF="$(git rev-parse --short HEAD 2>/dev/null || true)"
 fi
 WEB_DEV_COMMAND="bun --env-file=\"$ENV_FILE\" run dev:web -- --host 0.0.0.0 --port $frontend_bind_port --strictPort"
-RUNTIME_DEV_COMMAND="bun --env-file=\"$RUNTIME_ENV_FILE\" run --filter './apps/runtime' dev"
-APP_DEV_COMMAND="bunx concurrently --kill-others-on-fail -n web,runtime '$WEB_DEV_COMMAND' '$RUNTIME_DEV_COMMAND'"
+if [ "$LOCAL_DESKTOP_MODE" = "1" ]; then
+  ELECTRON_DEV_COMMAND="ELECTRON_START_URL=http://localhost:${site_port} bun --env-file=\"$ENV_FILE\" scripts/electron_dev_watch.mjs"
+  APP_DEV_COMMAND="bunx concurrently --kill-others-on-fail -n web,desktop '$WEB_DEV_COMMAND' '$ELECTRON_DEV_COMMAND'"
+else
+  RUNTIME_DEV_COMMAND="bun --env-file=\"$ENV_FILE\" run --filter './apps/runtime' dev"
+  APP_DEV_COMMAND="bunx concurrently --kill-others-on-fail -n web,runtime '$WEB_DEV_COMMAND' '$RUNTIME_DEV_COMMAND'"
+fi
 
 echo "Starting dev stack..."
 start_periodic_url_log

@@ -157,7 +157,6 @@ type DomainApi = {
         publicId?: string;
         membershipPublicId?: string;
         name: string;
-        storageMode: "local" | "cloud";
       },
       WorkspaceItem
     >;

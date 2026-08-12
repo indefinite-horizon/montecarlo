@@ -60,6 +60,10 @@ memory, so provider streaming and durable blob round trips do not use external
 model networks. External provider cases run only when
 `RUN_EXTERNAL_PROVIDER_TESTS=true` and their provider-specific flag is set.
 
+Only local workspace creation is currently exposed. Cloud persistence and
+execution coverage remains deferred until the cloud mode ships as one complete
+hosted boundary.
+
 ## Local Stack Validation
 
 Use `bash scripts/run_local.sh` when validating the full local stack. It
@@ -110,3 +114,14 @@ adapters. Provider-network tests are external tests and must be opt-in.
 Desktop verification should include `node --check`, an unsigned directory
 build on the target platform, custom-protocol navigation, encrypted key save,
 runtime restart, and a renderer check confirming no key readback API exists.
+Release verification additionally requires a clean macOS machine with no Bun,
+Node, or Convex installation available to the application. The release workflow
+uses its own Node test runner to launch the signed package,
+sends and persists a UI message through a deterministic Codex protocol fixture,
+and reloads the conversation. The fixture replaces only the external CLI and
+provider network; do not upload a developer's Codex credential cache to CI.
+First launch and an old-to-current OTA jump must work with networking disabled
+after the update artifacts have been downloaded. The workflow must verify
+universal architectures, nested binary and app signatures, notarization,
+`latest-mac.yml` hashes, monotonic versions, stable signing-team/feed identity,
+and every supported data-layout jump.

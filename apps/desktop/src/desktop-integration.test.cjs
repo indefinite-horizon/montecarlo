@@ -9,6 +9,18 @@ const desktopRoot = path.resolve(__dirname, "..");
 const mainSource = readFileSync(path.join(__dirname, "main.cjs"), "utf8");
 const preloadSource = readFileSync(path.join(__dirname, "preload.cjs"), "utf8");
 const builderConfig = readFileSync(path.join(desktopRoot, "electron-builder.yml"), "utf8");
+const ciWorkflow = readFileSync(
+  path.resolve(desktopRoot, "../../.github/workflows/ci.yml"),
+  "utf8",
+);
+const releaseWorkflow = readFileSync(
+  path.resolve(desktopRoot, "../../.github/workflows/desktop-release.yml"),
+  "utf8",
+);
+const smokeScript = readFileSync(
+  path.resolve(desktopRoot, "../../scripts/smoke_packaged_desktop.sh"),
+  "utf8",
+);
 const runtimeConfigSource = readFileSync(
   path.resolve(desktopRoot, "../runtime/src/config.ts"),
   "utf8",
@@ -31,6 +43,43 @@ describe("desktop integration contracts", () => {
     assert.match(builderConfig, /from: \.\.\/runtime\/dist/);
     assert.match(builderConfig, /to: runtime/);
     assert.match(builderConfig, /"\*\*\/\*"/);
+  });
+
+  it("packages and supervises the offline Convex bundle", () => {
+    assert.match(builderConfig, /from: \.\.\/\.\.\/\.desktop-resources\/convex/);
+    assert.match(builderConfig, /to: convex/);
+    assert.match(builderConfig, /src\/local-convex\.cjs/);
+    assert.match(mainSource, /createLocalConvexSupervisor/);
+    assert.match(mainSource, /localConvexSupervisor\.start\(\)/);
+    assert.match(mainSource, /montecarlo-convex-url/);
+    assert.match(preloadSource, /readLoopbackArgument\("montecarlo-convex-url"\)/);
+  });
+
+  it("exposes only downloaded-update controls and stops services before install", () => {
+    assert.match(builderConfig, /electronUpdaterCompatibility: ">=2\.16"/);
+    assert.match(builderConfig, /generateUpdatesFilesForAllChannels: true/);
+    assert.match(builderConfig, /- dmg/);
+    assert.match(builderConfig, /- zip/);
+    assert.match(mainSource, /desktop-update:get-downloaded/);
+    assert.match(mainSource, /prepareForUpdateInstall/);
+    assert.match(preloadSource, /desktop-update:downloaded/);
+    assert.doesNotMatch(preloadSource, /update-available/);
+  });
+
+  it("runs a persisted packaged-model turn before merge and release", () => {
+    assert.match(ciWorkflow, /desktop-smoke-macos:/);
+    assert.match(ciWorkflow, /actions\/setup-node@v4/);
+    assert.match(ciWorkflow, /build:smoke:mac/);
+    assert.match(ciWorkflow, /bash scripts\/smoke_packaged_desktop\.sh/);
+    assert.match(releaseWorkflow, /bash scripts\/smoke_packaged_desktop\.sh/);
+    assert.match(releaseWorkflow, /actions\/setup-node@v4/);
+    assert.match(smokeScript, /CODEX_PATH="\$fake_codex"/);
+    assert.match(smokeScript, /PACKAGED_DESKTOP_EXECUTABLE="\$executable"/);
+    assert.match(smokeScript, /playwright-core\/lib\/server\/electron\/loader\.js/);
+    assert.doesNotMatch(mainSource, /__playwright_run/);
+    assert.match(smokeScript, /packaged app completes and persists a model turn/);
+    assert.doesNotMatch(ciWorkflow, /CODEX_HOME|auth\.json/);
+    assert.doesNotMatch(releaseWorkflow, /CODEX_HOME|auth\.json/);
   });
 
   it("uses the custom protocol and exposes provider saves only as one-way IPC", () => {

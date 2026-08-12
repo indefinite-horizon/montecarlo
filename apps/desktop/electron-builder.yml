@@ -2,12 +2,18 @@ appId: chat.montecarlo.desktop
 productName: Monte Carlo
 executableName: montecarlo
 asar: true
+electronUpdaterCompatibility: ">=2.16"
+generateUpdatesFilesForAllChannels: true
 directories:
   output: ../../dist/desktop
 files:
   - src/main.cjs
   - src/preload.cjs
   - src/desktop-security.cjs
+  - src/desktop-updater.cjs
+  - src/desktop-private-files.cjs
+  - src/local-convex.cjs
+  - src/local-convex-credentials.cjs
   - src/provider-secrets.cjs
   - package.json
 extraResources:
@@ -19,12 +25,30 @@ extraResources:
     to: runtime
     filter:
       - runtime.cjs
+  - from: ../../.desktop-resources/convex
+    to: convex
+    filter:
+      - "**/*"
 mac:
   category: public.app-category.productivity
   hardenedRuntime: true
+  notarize: true
+  # Both per-architecture packages intentionally contain the complete offline
+  # Convex bundle. These paths therefore hold the same single-architecture
+  # Mach-O in each input app; keep both resource trees instead of asking the
+  # universal merger to lipo each duplicate in place.
+  x64ArchFiles: Contents/Resources/convex/{binaries/darwin-arm64,binaries/darwin-x64,project/node_modules/@esbuild/darwin-arm64,project/node_modules/@esbuild/darwin-x64}/**
+  artifactName: Monte-Carlo-${version}-${arch}.${ext}
+  binaries:
+    - Contents/Resources/convex/binaries/darwin-arm64/convex-local-backend
+    - Contents/Resources/convex/binaries/darwin-x64/convex-local-backend
+    - Contents/Resources/convex/project/node_modules/@esbuild/darwin-arm64/bin/esbuild
+    - Contents/Resources/convex/project/node_modules/@esbuild/darwin-x64/bin/esbuild
   target:
     - dmg
     - zip
+dmg:
+  sign: true
 linux:
   category: Utility
   syncDesktopName: true
@@ -33,3 +57,11 @@ linux:
 win:
   target:
     - nsis
+publish:
+  provider: github
+  owner: indefinite-horizon
+  repo: montecarlo-releases
+  # Draft releases keep a partially uploaded feed invisible. CI publishes the
+  # release only after signature, notarization, metadata, and compatibility gates pass.
+  releaseType: draft
+  channel: latest
