@@ -6,7 +6,11 @@ import { memo, useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useEventListener } from "@/hooks/useEventListener";
-import { clampDevToolsPosition } from "@/lib/devToolsMenu";
+import {
+  clampDevToolsPosition,
+  readDevToolsPosition,
+  writeDevToolsPosition,
+} from "@/lib/devToolsMenu";
 import { cn } from "@/lib/utils";
 import { api } from "../../../../convex/_generated/api";
 import { ActionTooltip } from "./ActionTooltip";
@@ -30,7 +34,9 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   const { t } = useTranslation();
   const branchLabel = readDevGitRefLabel();
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<MenuPosition | null>(null);
+  const [position, setPosition] = useState<MenuPosition | null>(() =>
+    typeof window === "undefined" ? null : readDevToolsPosition(window.localStorage),
+  );
   const [pendingCommand, setPendingCommand] = useState<PendingCommand>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
@@ -49,12 +55,12 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   useEventListener("resize", () => {
     const menu = menuRef.current;
     if (!menu || !position) return;
-    setPosition(
-      clampDevToolsPosition(position, menu.getBoundingClientRect(), {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      }),
-    );
+    const nextPosition = clampDevToolsPosition(position, menu.getBoundingClientRect(), {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    });
+    setPosition(nextPosition);
+    writeDevToolsPosition(window.localStorage, nextPosition);
   });
 
   const handleDragStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -76,13 +82,13 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
     const menu = menuRef.current;
     if (!drag || drag.pointerId !== event.pointerId || !menu) return;
 
-    setPosition(
-      clampDevToolsPosition(
-        { x: event.clientX - drag.offsetX, y: event.clientY - drag.offsetY },
-        menu.getBoundingClientRect(),
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
+    const nextPosition = clampDevToolsPosition(
+      { x: event.clientX - drag.offsetX, y: event.clientY - drag.offsetY },
+      menu.getBoundingClientRect(),
+      { width: window.innerWidth, height: window.innerHeight },
     );
+    setPosition(nextPosition);
+    writeDevToolsPosition(window.localStorage, nextPosition);
   }, []);
 
   const handleDragEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
