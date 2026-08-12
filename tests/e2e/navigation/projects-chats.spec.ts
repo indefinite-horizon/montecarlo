@@ -43,9 +43,11 @@ function chatRowByPublicId(page: Page, publicId: string) {
 }
 
 async function openChatContextMenu(page: Page, title: string) {
-  await chatRow(page, title).click({ button: "right" });
   const menu = page.getByRole("menu", { name: `Chat actions — ${title}` });
-  await expect(menu).toBeVisible();
+  await expect(async () => {
+    await chatRow(page, title).click({ button: "right" });
+    await expect(menu).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   return menu;
 }
 

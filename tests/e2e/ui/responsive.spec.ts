@@ -147,10 +147,9 @@ test("co-located header and composer controls share a hit-target height", async 
   ];
 
   for (const controls of [headerControls, composerControls]) {
-    await Promise.all(controls.map((control) => expect(control).toBeVisible()));
-    const heights = await Promise.all(
-      controls.map(async (control) => (await control.boundingBox())?.height),
-    );
-    expect(new Set(heights)).toEqual(new Set([36]));
+    for (const control of controls) {
+      await expect(control).toBeVisible();
+      await expect(control).toHaveCSS("height", "36px");
+    }
   }
 });
