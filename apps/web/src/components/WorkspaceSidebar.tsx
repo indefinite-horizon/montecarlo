@@ -5,10 +5,8 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
-  Cloud,
   Folder,
   FolderPlus,
-  HardDrive,
   PanelLeft,
   Plus,
   Search,
@@ -24,7 +22,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatSummary, ProjectSummary } from "@/lib/conversation";
-import { appShortcutLabel } from "@/lib/keyboardShortcuts";
+import { appShortcutLabel, workspaceShortcutLabel } from "@/lib/keyboardShortcuts";
 import { organizeSidebarChats } from "@/lib/sidebarChats";
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "./ActionTooltip";
@@ -274,8 +272,8 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
               <DropdownMenuLabel id="workspace-menu-label" className="sr-only">
                 {t("workspace.switcherLabel")}
               </DropdownMenuLabel>
-              {workspaces.map((workspace) => {
-                const StorageIcon = workspace.storageMode === "local" ? HardDrive : Cloud;
+              {workspaces.map((workspace, index) => {
+                const shortcut = workspaceShortcutLabel(index);
                 return (
                   <DropdownMenuItem
                     key={workspace.id}
@@ -283,15 +281,10 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
                     aria-current={workspace.id === workspaceId ? "true" : undefined}
                     onSelect={() => onSelectWorkspace(workspace.id)}
                   >
-                    <StorageIcon className="text-primary" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{workspace.name}</span>
-                      <span className="block truncate text-[10px] text-muted-foreground">
-                        {workspace.storageMode === "local"
-                          ? t("workspace.localTitle")
-                          : t("workspace.cloudTitle")}
-                      </span>
-                    </span>
+                    <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+                    {shortcut ? (
+                      <span className="text-xs text-muted-foreground">{shortcut}</span>
+                    ) : null}
                     {workspace.id === workspaceId ? <Check className="text-primary" /> : null}
                   </DropdownMenuItem>
                 );

@@ -1,7 +1,12 @@
 /** Verifies that shortcut matching and labels stay aligned across platforms. */
 
 import { describe, expect, it } from "vitest";
-import { appShortcutLabel, matchesAppShortcut } from "../../apps/web/src/lib/keyboardShortcuts";
+import {
+  appShortcutLabel,
+  matchesAppShortcut,
+  workspaceShortcutIndex,
+  workspaceShortcutLabel,
+} from "../../apps/web/src/lib/keyboardShortcuts";
 
 function keyboardEvent(
   code: string,
@@ -72,6 +77,18 @@ describe("application keyboard shortcuts", () => {
         "macos",
       ),
     ).toBe(true);
+  });
+
+  it("labels and matches workspace shortcuts for the first nine workspaces", () => {
+    expect(workspaceShortcutLabel(0, "macos")).toBe("⌥1");
+    expect(workspaceShortcutLabel(8, "linux")).toBe("Alt+9");
+    expect(workspaceShortcutLabel(9, "macos")).toBeUndefined();
+    expect(workspaceShortcutIndex(keyboardEvent("Digit1", { altKey: true }))).toBe(0);
+    expect(workspaceShortcutIndex(keyboardEvent("Digit9", { altKey: true }))).toBe(8);
+    expect(
+      workspaceShortcutIndex(keyboardEvent("Digit1", { altKey: true, metaKey: true })),
+    ).toBeUndefined();
+    expect(workspaceShortcutIndex(keyboardEvent("Numpad1", { altKey: true }))).toBeUndefined();
   });
 
   it("rejects extra modifiers and uses Ctrl on Windows and Linux", () => {

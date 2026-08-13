@@ -1,7 +1,7 @@
 /** Composes the three-pane chat workspace, branching controls, and provider boundary. */
 
 import { useSearch } from "@tanstack/react-router";
-import { memo, Suspense, useCallback, useRef, useState } from "react";
+import { memo, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useClearCollapsedTextSelection } from "@/hooks/useClearCollapsedTextSelection";
@@ -82,6 +82,10 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   const [modelEditorOpen, setModelEditorOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [branchMapOpen, setBranchMapOpen] = useState(() => window.innerWidth >= 1280);
+  const workspaceIds = useMemo(
+    () => controller.workspaces.map((workspace) => String(workspace.id)),
+    [controller.workspaces],
+  );
   const createChatInFlightRef = useRef(false);
   const sidebarOverlaysWorkspace = useMediaQuery("(max-width: 767px)");
   const branchMapOverlaysWorkspace = useMediaQuery("(max-width: 1279px)");
@@ -396,6 +400,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     blockingDialogOpen,
     loading: controller.loading,
     workspaceId: controller.workspaceId,
+    workspaceIds,
+    selectWorkspace,
     createNewChat,
     archiveFocusedChat,
     openProviderSelection,

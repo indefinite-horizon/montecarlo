@@ -140,7 +140,6 @@ button,
 
 .electron-titlebar-leading-offset {
   margin-left: var(--electron-titlebar-left, 0px);
-  transform: translateY(-0.25rem);
 }
 
 @media (min-width: 640px) {

@@ -9,6 +9,8 @@ import { createWorkspace, openFreshUser, userMessage } from "../helpers/workspac
 const primaryModifier = process.platform === "darwin" ? "Meta" : "Control";
 const newChatShortcutLabel = process.platform === "darwin" ? "⌘N" : "Ctrl+Shift+N";
 const thinkingShortcutLabel = process.platform === "darwin" ? "⌥T" : "Alt+T";
+const firstWorkspaceShortcutLabel = process.platform === "darwin" ? "⌥1" : "Alt+1";
+const secondWorkspaceShortcutLabel = process.platform === "darwin" ? "⌥2" : "Alt+2";
 const leftSidebarShortcutKeys = process.platform === "darwin" ? "Meta+B" : "Control+B";
 const rightSidebarShortcutKeys = process.platform === "darwin" ? "Meta+Alt+B" : "Control+Alt+B";
 
@@ -27,6 +29,22 @@ test("a bootstrapped workspace enables the composer and accepts typing", async (
   await composer.click();
   await composer.fill("The repaired workspace accepts input");
   await expect(composer).toHaveValue("The repaired workspace accepts input");
+});
+
+test("workspace shortcuts switch among the first nine workspaces", async ({ page }) => {
+  const selector = page.getByTestId("workspace-selector");
+  await selector.click();
+  const workspaceMenu = page.getByRole("menu", { name: "Workspaces" });
+  await expect(workspaceMenu.getByText(firstWorkspaceShortcutLabel, { exact: true })).toBeVisible();
+  await expect(
+    workspaceMenu.getByText(secondWorkspaceShortcutLabel, { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press("Alt+1");
+  await expect(selector).toContainText("My Workspace");
+  await page.keyboard.press("Alt+2");
+  await expect(selector).toContainText("Keyboard workspace");
 });
 
 test("a legacy workspace with no chats repairs its root conversation", async ({ page }) => {
@@ -168,8 +186,13 @@ test("global shortcuts open commands and cycle thinking without changing views",
   await expect(chatRows).toHaveCount(before + 1);
 
   const leftSidebar = page.getByRole("navigation", { name: "Projects and chats" });
+  const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar" });
+  const collapseSidebarBox = await collapseSidebar.boundingBox();
   await page.keyboard.press(leftSidebarShortcutKeys);
   await expect(leftSidebar).toHaveCount(0);
+  const openSidebar = page.getByRole("button", { name: "Open sidebar" });
+  const openSidebarBox = await openSidebar.boundingBox();
+  expect(collapseSidebarBox?.y).toBe(openSidebarBox?.y);
 
   const branchMap = page.getByRole("complementary", { name: "Branch map" });
   const branchMapWasOpen = (await branchMap.count()) > 0;

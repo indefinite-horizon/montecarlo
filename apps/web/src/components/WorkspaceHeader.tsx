@@ -83,10 +83,7 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
             <ChevronRight className="size-4 shrink-0 text-muted-foreground/70" />
           </>
         ) : null}
-        <h1
-          className="truncate font-display text-[17px] font-semibold tracking-[-0.015em]"
-          data-testid="chat-breadcrumb-title"
-        >
+        <h1 className="truncate text-sm font-semibold" data-testid="chat-breadcrumb-title">
           {activeChatTitle}
         </h1>
       </div>

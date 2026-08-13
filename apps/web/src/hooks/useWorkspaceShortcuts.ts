@@ -1,15 +1,17 @@
 /** Connects global and desktop shortcuts to workspace actions. */
 
 import { type Dispatch, type SetStateAction, useCallback, useEffect } from "react";
-import { type AppShortcutId, matchesAppShortcut } from "@/lib/keyboardShortcuts";
+import { matchesAppShortcut, workspaceShortcutIndex } from "@/lib/keyboardShortcuts";
 
 type BooleanSetter = Dispatch<SetStateAction<boolean>>;
-let lastShortcut: { id: AppShortcutId; time: number } | undefined;
+let lastShortcut: { id: string; time: number } | undefined;
 
 export function useWorkspaceShortcuts({
   blockingDialogOpen,
   loading,
   workspaceId,
+  workspaceIds,
+  selectWorkspace,
   createNewChat,
   archiveFocusedChat,
   openProviderSelection,
@@ -23,6 +25,8 @@ export function useWorkspaceShortcuts({
   blockingDialogOpen: boolean;
   loading: boolean;
   workspaceId?: string;
+  workspaceIds: string[];
+  selectWorkspace: (workspaceId: string) => void;
   createNewChat: () => Promise<boolean>;
   archiveFocusedChat: () => Promise<void>;
   openProviderSelection: () => void;
@@ -33,7 +37,7 @@ export function useWorkspaceShortcuts({
   setProjectCreateOpen: BooleanSetter;
   setProviderMenuOpen: BooleanSetter;
 }) {
-  const runShortcut = useCallback((id: AppShortcutId, action: () => void) => {
+  const runShortcut = useCallback((id: string, action: () => void) => {
     const time = performance.now();
     if (lastShortcut?.id === id && time - lastShortcut.time < 250) return;
     lastShortcut = { id, time };
@@ -44,6 +48,15 @@ export function useWorkspaceShortcuts({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || blockingDialogOpen) return;
+
+      const workspaceIndex = workspaceShortcutIndex(event);
+      const targetWorkspaceId =
+        workspaceIndex === undefined ? undefined : workspaceIds[workspaceIndex];
+      if (targetWorkspaceId) {
+        event.preventDefault();
+        runShortcut(`workspace:${workspaceIndex}`, () => selectWorkspace(targetWorkspaceId));
+        return;
+      }
 
       if (matchesAppShortcut(event, "commandPalette")) {
         event.preventDefault();
@@ -120,8 +133,10 @@ export function useWorkspaceShortcuts({
     setCommandPaletteOpen,
     setProjectCreateOpen,
     setProviderMenuOpen,
+    selectWorkspace,
     toggleLeftSidebar,
     toggleRightSidebar,
+    workspaceIds,
     workspaceId,
   ]);
 
