@@ -96,6 +96,15 @@ test("creates a project and a persistent chat inside it", async ({ page }) => {
   expect(Math.max(...actionCenters) - Math.min(...actionCenters)).toBeLessThan(1);
   await expect(page.getByTestId("chat-breadcrumb-project")).toHaveText("Research");
   await expect(page.getByTestId("chat-breadcrumb-title")).toHaveText(chatTitle);
+  const breadcrumbTypography = await Promise.all(
+    ["chat-breadcrumb-project", "chat-breadcrumb-title"].map((testId) =>
+      page.getByTestId(testId).evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { fontFamily: style.fontFamily, fontSize: style.fontSize };
+      }),
+    ),
+  );
+  expect(breadcrumbTypography[0]).toEqual(breadcrumbTypography[1]);
 
   await page.reload();
   await expect(

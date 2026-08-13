@@ -239,6 +239,8 @@
     "persistence": "Les messages sont conservés dans Convex ; le contenu volumineux reste dans le stockage objet."
   },
   "commandPalette": {
+    "toggleLeftSidebar": "Afficher ou masquer la barre latérale gauche",
+    "toggleRightSidebar": "Afficher ou masquer la barre latérale droite",
     "label": "Menu des commandes",
     "placeholder": "Rechercher des commandes, discussions et espaces…",
     "empty": "Aucune commande correspondante",

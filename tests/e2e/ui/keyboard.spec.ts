@@ -8,8 +8,11 @@ import { createWorkspace, openFreshUser, userMessage } from "../helpers/workspac
 
 const primaryModifier = process.platform === "darwin" ? "Meta" : "Control";
 const newChatShortcutLabel = process.platform === "darwin" ? "⌘N" : "Ctrl+Shift+N";
-const newChatShortcutKeys = process.platform === "darwin" ? "Meta+N" : "Control+Shift+N";
 const thinkingShortcutLabel = process.platform === "darwin" ? "⌥T" : "Alt+T";
+const firstWorkspaceShortcutLabel = process.platform === "darwin" ? "⌥1" : "Alt+1";
+const secondWorkspaceShortcutLabel = process.platform === "darwin" ? "⌥2" : "Alt+2";
+const leftSidebarShortcutKeys = process.platform === "darwin" ? "Meta+B" : "Control+B";
+const rightSidebarShortcutKeys = process.platform === "darwin" ? "Meta+Alt+B" : "Control+Alt+B";
 
 test.beforeEach(async ({ context, page }) => {
   await installRuntimeMock(context);
@@ -26,6 +29,23 @@ test("a bootstrapped workspace enables the composer and accepts typing", async (
   await composer.click();
   await composer.fill("The repaired workspace accepts input");
   await expect(composer).toHaveValue("The repaired workspace accepts input");
+});
+
+test("workspace shortcuts switch among the first nine workspaces", async ({ page }) => {
+  await createWorkspace(page, "Shortcut target workspace", "Keyboard workspace");
+  const selector = page.getByTestId("workspace-selector");
+  await selector.click();
+  const workspaceMenu = page.getByRole("menu", { name: "Workspaces" });
+  await expect(workspaceMenu.getByText(firstWorkspaceShortcutLabel, { exact: true })).toBeVisible();
+  await expect(
+    workspaceMenu.getByText(secondWorkspaceShortcutLabel, { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press("Alt+1");
+  await expect(selector).toContainText("Keyboard workspace");
+  await page.keyboard.press("Alt+2");
+  await expect(selector).toContainText("Shortcut target workspace");
 });
 
 test("a legacy workspace with no chats repairs its root conversation", async ({ page }) => {
@@ -124,6 +144,8 @@ test("global shortcuts open commands and cycle thinking without changing views",
   expect(pageErrors, "global shortcuts must not cause uncaught page errors").toEqual([]);
 
   await page.getByRole("button", { name: "Canvas view" }).click();
+  // This is a distinct user action, so wait past the app's duplicate-delivery guard.
+  await page.waitForTimeout(300);
   await page.keyboard.press("Alt+T");
   await expect(page.getByRole("button", { name: "Canvas view" })).toHaveAttribute(
     "aria-pressed",
@@ -147,7 +169,38 @@ test("global shortcuts open commands and cycle thinking without changing views",
     .getByRole("navigation", { name: "Projects and chats" })
     .getByTestId("chat-row");
   const before = await chatRows.count();
-  await page.keyboard.press(newChatShortcutKeys);
+  await page.evaluate(() => {
+    const macos = /mac|iphone|ipad|ipod/iu.test(`${navigator.platform} ${navigator.userAgent}`);
+    for (let index = 0; index < 20; index += 1) {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          code: "KeyN",
+          key: "n",
+          metaKey: macos,
+          ctrlKey: !macos,
+          shiftKey: !macos,
+        }),
+      );
+    }
+  });
   await expect(chatRows).toHaveCount(before + 1);
+
+  const leftSidebar = page.getByRole("navigation", { name: "Projects and chats" });
+  const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar" });
+  const collapseSidebarBox = await collapseSidebar.boundingBox();
+  await page.keyboard.press(leftSidebarShortcutKeys);
+  await expect(leftSidebar).toHaveCount(0);
+  const openSidebar = page.getByRole("button", { name: "Open sidebar" });
+  const openSidebarBox = await openSidebar.boundingBox();
+  if (!collapseSidebarBox || !openSidebarBox) {
+    throw new Error("Could not measure sidebar toggle positions.");
+  }
+  expect(Math.abs(collapseSidebarBox.y - openSidebarBox.y)).toBeLessThanOrEqual(1);
+
+  const branchMap = page.getByRole("complementary", { name: "Branch map" });
+  const branchMapWasOpen = (await branchMap.count()) > 0;
+  await page.keyboard.press(rightSidebarShortcutKeys);
+  await expect(branchMap).toHaveCount(branchMapWasOpen ? 0 : 1);
   expect(pageErrors, "global shortcuts must not cause uncaught page errors").toEqual([]);
 });

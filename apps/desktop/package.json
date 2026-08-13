@@ -12,7 +12,7 @@
   "scripts": {
     "prepare:convex": "node ../../scripts/prepare_desktop_convex.mjs",
     "ensure:production-deps": "node ../../scripts/ensure_desktop_production_deps.mjs",
-    "dev": "bunx wait-on tcp:5173 && bunx electron ./src/main.cjs",
+    "dev": "bash ../../scripts/dev_desktop.sh",
     "start": "bunx electron ./src/main.cjs",
     "build": "bun run prepare:convex && bun run --cwd ../web build && bun run --cwd ../runtime build && bun run ensure:production-deps && electron-builder --config electron-builder.yml",
     "build:dir": "bun run prepare:convex && bun run --cwd ../web build && bun run --cwd ../runtime build && bun run ensure:production-deps && electron-builder --config electron-builder.yml --dir",

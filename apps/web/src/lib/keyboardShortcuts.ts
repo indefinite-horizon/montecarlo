@@ -23,6 +23,18 @@ export const appShortcuts = {
     macos: ["meta"],
     windowsLinux: ["control", "shift"],
   },
+  toggleLeftSidebar: {
+    code: "KeyB",
+    key: "B",
+    macos: ["meta"],
+    windowsLinux: ["control"],
+  },
+  toggleRightSidebar: {
+    code: "KeyB",
+    key: "B",
+    macos: ["meta", "alt"],
+    windowsLinux: ["control", "alt"],
+  },
   newProject: {
     code: "KeyA",
     key: "A",
@@ -102,6 +114,30 @@ export function shortcutLabel(
 
 export function appShortcutLabel(id: AppShortcutId, platform = detectShortcutPlatform()): string {
   return shortcutLabel(appShortcuts[id], platform);
+}
+
+export function workspaceShortcutLabel(
+  index: number,
+  platform = detectShortcutPlatform(),
+): string | undefined {
+  if (!Number.isInteger(index) || index < 0 || index > 8) return undefined;
+  return shortcutLabel(
+    {
+      code: `Digit${index + 1}`,
+      key: String(index + 1),
+      macos: ["alt"],
+      windowsLinux: ["alt"],
+    },
+    platform,
+  );
+}
+
+export function workspaceShortcutIndex(
+  event: Pick<KeyboardEvent, "altKey" | "code" | "ctrlKey" | "metaKey" | "shiftKey">,
+): number | undefined {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return undefined;
+  const match = /^Digit([1-9])$/u.exec(event.code);
+  return match ? Number(match[1]) - 1 : undefined;
 }
 
 export function matchesShortcut(

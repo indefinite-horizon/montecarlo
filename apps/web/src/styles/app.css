@@ -140,7 +140,6 @@ button,
 
 .electron-titlebar-leading-offset {
   margin-left: var(--electron-titlebar-left, 0px);
-  transform: translateY(-0.25rem);
 }
 
 @media (min-width: 640px) {
@@ -159,6 +158,11 @@ button,
 }
 
 .electron-titlebar :is(button, a, input, select, textarea, [role="button"], [role="menuitem"]) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.electron-no-drag {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }

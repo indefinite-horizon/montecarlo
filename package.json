@@ -15,7 +15,7 @@
     "_dev": "concurrently -n web,convex,runtime \"bun run dev:web\" \"bun run dev:convex\" \"bun run dev:runtime\"",
     "dev:web": "bun run --filter './apps/web' dev",
     "dev:runtime": "MONTECARLO_RUNTIME_DEV=1 bun --env-file=.env.local run --filter './apps/runtime' dev",
-    "dev:desktop": "LOCAL_DESKTOP_MODE=1 bash scripts/run_local.sh",
+    "dev:desktop": "LOCAL_DESKTOP_MODE=1 bash scripts/run_local.sh desktop",
     "dev:desktop:shell": "bun run --filter './apps/desktop' dev",
     "dev:convex": "convex dev --run init",
     "deploy:convex": "convex deploy",

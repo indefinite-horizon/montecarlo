@@ -3,7 +3,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const workspaceSwitchHandlers = new WeakMap();
-const newChatHandlers = new WeakMap();
+let newChatHandler;
 const updateDownloadedHandlers = new WeakMap();
 
 function readLoopbackArgument(name) {
@@ -31,7 +31,6 @@ function readLoopbackArgument(name) {
     return undefined;
   }
 }
-
 contextBridge.exposeInMainWorld("monteCarloDesktop", {
   platform: process.platform,
   convexUrl: readLoopbackArgument("montecarlo-convex-url"),
@@ -58,17 +57,16 @@ contextBridge.exposeInMainWorld("monteCarloDesktop", {
     workspaceSwitchHandlers.delete(callback);
   },
   onNewChat: (callback) => {
-    const existingHandler = newChatHandlers.get(callback);
-    if (existingHandler) ipcRenderer.removeListener("new-chat", existingHandler);
-    const handler = () => callback();
-    ipcRenderer.on("new-chat", handler);
-    newChatHandlers.set(callback, handler);
+    // Context-isolated callback proxies are not guaranteed to preserve identity across bridge
+    // calls. This channel has one application consumer, so replace its listener atomically.
+    if (newChatHandler) ipcRenderer.removeListener("new-chat", newChatHandler);
+    newChatHandler = () => callback();
+    ipcRenderer.on("new-chat", newChatHandler);
   },
-  offNewChat: (callback) => {
-    const handler = newChatHandlers.get(callback);
-    if (!handler) return;
-    ipcRenderer.removeListener("new-chat", handler);
-    newChatHandlers.delete(callback);
+  offNewChat: () => {
+    if (!newChatHandler) return;
+    ipcRenderer.removeListener("new-chat", newChatHandler);
+    newChatHandler = undefined;
   },
   onUpdateDownloaded: (callback) => {
     const existingHandler = updateDownloadedHandlers.get(callback);
