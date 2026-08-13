@@ -301,7 +301,12 @@ if [[ "$deployment_environment" == prod ]]; then
   fi
 fi
 
-resolve_secret convex_deploy_key CONVEX_DEPLOY_KEY "Convex $deployment_environment deploy key"
+if [[ "$deployment_environment" == prod ]]; then
+  resolve_secret convex_deploy_key CONVEX_DEPLOY_KEY \
+    "Convex production deploy key (needs deployment:deploy, deployment:data:view, and deployment:env:write)"
+else
+  resolve_secret convex_deploy_key CONVEX_DEPLOY_KEY "Convex preview deploy key"
+fi
 resolve_secret resend_api_key RESEND_API_KEY "Resend $deployment_environment API key"
 resolve_required resend_from_email RESEND_FROM_EMAIL "Verified Resend sender email"
 if [[ "$deployment_environment" == prod ]]; then

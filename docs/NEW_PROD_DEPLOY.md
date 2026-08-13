@@ -83,6 +83,23 @@ Create a Convex deploy key for the production deployment and set it in Vercel:
 
 - `CONVEX_DEPLOY_KEY`: controls which Convex deployment `scripts/vercel_build.sh` deploys to.
 
+When creating the production key, do not use the dashboard **Deploy only**
+preset. Production `npx convex deploy` queries table sizes before dropping
+indexes and then writes `APP_RELEASE_CHANNEL` and `GIT_SHA`, so the key must
+include:
+
+- `deployment:deploy`
+- `deployment:data:view`
+- `deployment:env:write`
+
+A deploy-only key fails the Vercel production build with
+`You do not have permission to perform this operation (deployment:data:view)`.
+Preview deploy keys skip that index check, which is why preview builds can
+succeed with a narrower key. Mint a production key from a logged-in checkout
+with `bunx convex deployment token create vercel-production --deployment prod`
+or enable the actions above in the Convex dashboard, then upload it with
+`bash scripts/set_vercel_deploy_env.sh prod`.
+
 Do not commit deploy keys or provider secrets. The Vercel build script deploys
 Convex and then builds the web app.
 
