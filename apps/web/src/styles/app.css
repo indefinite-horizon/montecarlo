@@ -162,6 +162,11 @@ button,
   app-region: no-drag;
 }
 
+.electron-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 ::selection {
   background: hsl(var(--primary) / 0.22);
 }

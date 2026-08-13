@@ -40,7 +40,12 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   );
   const [pendingCommand, setPendingCommand] = useState<PendingCommand>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
+    position: MenuPosition;
+  } | null>(null);
   const wipeAll = useAction(api.functions.devTools.wipeAll);
   const reseed = useAction(api.functions.devTools.reseed);
   const wipeAndReseed = useAction(api.functions.devTools.wipeAndReseed);
@@ -85,6 +90,7 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
       pointerId: event.pointerId,
       offsetX: event.clientX - (rect.left + rect.width / 2),
       offsetY: event.clientY - rect.top,
+      position: { x: rect.left + rect.width / 2, y: rect.top },
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }, []);
@@ -99,12 +105,14 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
       menu.getBoundingClientRect(),
       { width: window.innerWidth, height: window.innerHeight },
     );
+    drag.position = nextPosition;
     setPosition(nextPosition);
-    writeDevToolsPosition(window.localStorage, nextPosition);
   }, []);
 
   const handleDragEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
+    const drag = dragRef.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    writeDevToolsPosition(window.localStorage, drag.position);
     dragRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -185,11 +193,11 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
   return (
     <div
       ref={menuRef}
-      className="pointer-events-none fixed z-50 flex -translate-x-1/2 flex-col items-center gap-2"
+      className="electron-no-drag pointer-events-none fixed z-50 flex -translate-x-1/2 flex-col items-center gap-2"
       style={{ left: position?.x ?? "50%", top: position?.y ?? VIEWPORT_GUTTER }}
     >
       <div
-        className="pointer-events-auto flex touch-none select-none items-center gap-1 rounded-md bg-foreground px-1.5 py-1 font-mono text-[10px] text-background shadow-sm cursor-grab active:cursor-grabbing"
+        className="electron-no-drag pointer-events-auto flex touch-none select-none items-center gap-1 rounded-md bg-foreground px-1.5 py-1 font-mono text-[10px] text-background shadow-sm cursor-grab active:cursor-grabbing"
         onPointerDown={handleDragStart}
         onPointerMove={handleDragMove}
         onPointerUp={handleDragEnd}
@@ -203,11 +211,12 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
           <button
             type="button"
             className={cn(
-              "pointer-events-auto ml-1 rounded p-0.5 transition-colors hover:bg-background/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-background",
+              "electron-no-drag pointer-events-auto ml-1 rounded p-0.5 transition-colors hover:bg-background/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-background",
               open && "bg-background/20",
             )}
             aria-label={t("devTools.open")}
             aria-expanded={open}
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={handleToggleMenu}
           >
             <Wrench className="size-3" />
@@ -216,7 +225,7 @@ export const DevToolsMenu = memo(function DevToolsMenu() {
       </div>
 
       {open ? (
-        <div className="pointer-events-auto w-[min(calc(100vw-1rem),24rem)] rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+        <div className="electron-no-drag pointer-events-auto w-[min(calc(100vw-1rem),24rem)] rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-lg">
           <p className="mb-3 text-sm font-semibold">{t("devTools.title")}</p>
           <div className="flex flex-col gap-2">
             <DevToolsCommand

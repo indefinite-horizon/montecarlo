@@ -25,6 +25,12 @@ const runtimeConfigSource = readFileSync(
   path.resolve(desktopRoot, "../runtime/src/config.ts"),
   "utf8",
 );
+const devLauncher = readFileSync(path.resolve(desktopRoot, "../../scripts/dev_desktop.sh"), "utf8");
+const appCss = readFileSync(path.resolve(desktopRoot, "../web/src/styles/app.css"), "utf8");
+const devToolsMenu = readFileSync(
+  path.resolve(desktopRoot, "../web/src/components/DevToolsMenu.tsx"),
+  "utf8",
+);
 
 describe("desktop integration contracts", () => {
   it("launches the runtime's real source and packaged entrypoints with its origin variable", () => {
@@ -110,6 +116,20 @@ describe("desktop integration contracts", () => {
     assert.match(mainSource, /titleBarStyle: "hidden"/);
     assert.match(mainSource, /titleBarOverlay: \{ height: 64 \}/);
     assert.doesNotMatch(mainSource, /titleBarStyle: "hiddenInset"/);
+  });
+
+  it("opens the development renderer using the local stack port precedence", () => {
+    assert.match(devLauncher, /SITE_PORT:-\$\{LOCAL_FRONTEND_PORT:-\$\{CONDUCTOR_PORT:-5173\}\}/);
+    assert.match(devLauncher, /ELECTRON_START_URL:-http:\/\/localhost:/);
+    assert.match(devLauncher, /bunx wait-on "\$ELECTRON_START_URL"/);
+  });
+
+  it("keeps the draggable development menu interactive in Electron titlebars", () => {
+    assert.match(appCss, /\.electron-no-drag/);
+    assert.match(devToolsMenu, /className="electron-no-drag pointer-events-none fixed/);
+    assert.match(devToolsMenu, /className="electron-no-drag pointer-events-auto flex touch-none/);
+    assert.match(devToolsMenu, /"electron-no-drag pointer-events-auto ml-1 rounded/);
+    assert.match(devToolsMenu, /onPointerDown=\{\(event\) => event\.stopPropagation\(\)\}/);
   });
 
   it("forwards the platform new-chat shortcut without opening a browser window", () => {
