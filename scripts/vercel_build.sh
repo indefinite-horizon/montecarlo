@@ -28,7 +28,12 @@ PREVIEW_BUILD_CMD='export VITE_CONVEX_URL="$CONVEX_URL" VITE_CONVEX_SITE_URL="$C
 
 if [ "${VERCEL_ENV:-}" = "production" ]; then
   echo "==> Production deploy: deploying Convex + building frontend"
-  bunx convex deploy --typecheck enable --cmd 'bun run build:web'
+  # Production `convex deploy` compares indexes and queries table sizes before
+  # dropping any. Vercel is non-interactive, so confirm large-index deletion
+  # here. The production CONVEX_DEPLOY_KEY must include deployment:deploy,
+  # deployment:data:view, and deployment:env:write; deploy-only keys fail the
+  # table-size check with deployment:data:view.
+  bunx convex deploy --typecheck enable --allow-deleting-large-indexes --cmd 'bun run build:web'
   echo "==> Setting APP_RELEASE_CHANNEL=$APP_RELEASE_CHANNEL on production"
   bunx convex env set APP_RELEASE_CHANNEL "$APP_RELEASE_CHANNEL"
   echo "==> Setting GIT_SHA=$APP_COMMIT_SHA on production"

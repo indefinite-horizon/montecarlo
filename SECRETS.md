@@ -83,7 +83,7 @@ executables but do not expose either provider's credential store.
 
 | Variable | Purpose |
 | --- | --- |
-| `CONVEX_DEPLOY_KEY` | Authorizes a Vercel build or operator command to deploy Convex |
+| `CONVEX_DEPLOY_KEY` | Authorizes a Vercel build or operator command to deploy Convex. Production keys must allow `deployment:deploy`, `deployment:data:view`, and `deployment:env:write`; deploy-only keys fail the production index check. |
 | `CONVEX_SELF_HOSTED_ADMIN_KEY` | Authenticates the Convex CLI to an optional self-hosted deployment |
 
 These values are CLI or build-runner inputs. They are never uploaded as Convex
