@@ -6,6 +6,7 @@ import {
   _electron as electron,
   expect,
   type Locator,
+  type Page,
   test,
 } from "@playwright/test";
 import { assistantMessage, userMessage } from "../helpers/workspace";
@@ -53,6 +54,23 @@ async function firstWindow(options?: { timeout?: number }) {
   return app.firstWindow(options);
 }
 
+async function reloadRenderer(page: Page) {
+  if (!app) throw new Error("Electron did not launch.");
+  page.once("dialog", (dialog) => {
+    void dialog.accept().catch(() => undefined);
+  });
+  const loadEvent = page.waitForEvent("load", { timeout: 120_000 }).catch(() => undefined);
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (!window || window.isDestroyed()) throw new Error("No Electron window is open.");
+    window.webContents.reload();
+  });
+  await loadEvent;
+  const reloaded = page.isClosed() ? await firstWindow({ timeout: 180_000 }) : page;
+  await expect(reloaded.getByTestId("workspace-app")).toBeVisible({ timeout: 120_000 });
+  return reloaded;
+}
+
 test("starts an authenticated companion and renders the workspace", async () => {
   const page = await firstWindow({ timeout: 180_000 });
   await expect(page.getByTestId("workspace-app")).toBeVisible();
@@ -92,9 +110,9 @@ test("packaged app completes and persists a model turn", async () => {
   });
   await expect(send).toBeVisible({ timeout: 60_000 });
 
-  await page.reload();
-  await expect(userMessage(page, prompt)).toHaveCount(1, { timeout: 60_000 });
-  await expect(assistantMessage(page, response)).toHaveCount(1, {
+  const reloaded = await reloadRenderer(page);
+  await expect(userMessage(reloaded, prompt)).toHaveCount(1, { timeout: 60_000 });
+  await expect(assistantMessage(reloaded, response)).toHaveCount(1, {
     timeout: 60_000,
   });
 });

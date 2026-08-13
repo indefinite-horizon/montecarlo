@@ -322,6 +322,11 @@ function createWindow() {
     if (isAllowedExternalUrl(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
+  window.webContents.on("will-prevent-unload", (event) => {
+    // Convex registers beforeunload to flush writes; a native leave-site dialog
+    // would block renderer reloads in the packaged app and its smoke test.
+    event.preventDefault();
+  });
   window.webContents.on("will-navigate", (event, url) => {
     if (!isTrustedRendererUrl(url)) event.preventDefault();
   });

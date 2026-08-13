@@ -2,6 +2,7 @@ appId: chat.montecarlo.desktop
 productName: Monte Carlo
 executableName: montecarlo
 asar: true
+electronVersion: "43.1.1"
 electronUpdaterCompatibility: ">=2.16"
 generateUpdatesFilesForAllChannels: true
 directories:
