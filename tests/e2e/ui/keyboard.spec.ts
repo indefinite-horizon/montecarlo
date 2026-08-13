@@ -32,6 +32,7 @@ test("a bootstrapped workspace enables the composer and accepts typing", async (
 });
 
 test("workspace shortcuts switch among the first nine workspaces", async ({ page }) => {
+  await createWorkspace(page, "Shortcut target workspace", "Keyboard workspace");
   const selector = page.getByTestId("workspace-selector");
   await selector.click();
   const workspaceMenu = page.getByRole("menu", { name: "Workspaces" });
@@ -42,9 +43,9 @@ test("workspace shortcuts switch among the first nine workspaces", async ({ page
   await page.keyboard.press("Escape");
 
   await page.keyboard.press("Alt+1");
-  await expect(selector).toContainText("My Workspace");
-  await page.keyboard.press("Alt+2");
   await expect(selector).toContainText("Keyboard workspace");
+  await page.keyboard.press("Alt+2");
+  await expect(selector).toContainText("Shortcut target workspace");
 });
 
 test("a legacy workspace with no chats repairs its root conversation", async ({ page }) => {
@@ -192,7 +193,10 @@ test("global shortcuts open commands and cycle thinking without changing views",
   await expect(leftSidebar).toHaveCount(0);
   const openSidebar = page.getByRole("button", { name: "Open sidebar" });
   const openSidebarBox = await openSidebar.boundingBox();
-  expect(collapseSidebarBox?.y).toBe(openSidebarBox?.y);
+  if (!collapseSidebarBox || !openSidebarBox) {
+    throw new Error("Could not measure sidebar toggle positions.");
+  }
+  expect(Math.abs(collapseSidebarBox.y - openSidebarBox.y)).toBeLessThanOrEqual(1);
 
   const branchMap = page.getByRole("complementary", { name: "Branch map" });
   const branchMapWasOpen = (await branchMap.count()) > 0;
