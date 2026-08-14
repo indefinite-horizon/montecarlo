@@ -99,11 +99,12 @@ describe("run lease reload recovery", () => {
   });
 
   it("drops malformed records and tolerates unavailable storage", () => {
+    const validLease = lease();
     const storage = memoryStorage(
       JSON.stringify({
         version: 1,
         entries: [
-          { ...lease(), ownerDocumentId: "previous-document", orphaned: true },
+          { ...validLease, ownerDocumentId: "previous-document", orphaned: true },
           {
             ...lease({ runPublicId: 42 as never }),
             ownerDocumentId: "previous-document",
@@ -112,7 +113,7 @@ describe("run lease reload recovery", () => {
         ],
       }),
     );
-    expect(claimOrphanedRunLeases(storage, "current-document")).toEqual([lease()]);
+    expect(claimOrphanedRunLeases(storage, "current-document")).toEqual([validLease]);
 
     const blockedStorage = {
       getItem: () => {

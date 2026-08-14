@@ -202,7 +202,7 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
         style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
       >
         <div
-          className="electron-titlebar flex h-12 items-center gap-1 px-3 [&_button]:size-8 [&_button_svg]:size-4"
+          className="electron-titlebar flex h-12 items-center gap-1 px-3 [&_button]:size-9 [&_button_svg]:size-4"
           data-testid="sidebar-titlebar"
         >
           {/* Keep this toggle's position synchronized with the open-sidebar toggle in WorkspaceHeader. */}

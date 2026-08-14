@@ -18,6 +18,7 @@ import { MessageOutputActions } from "./MessageOutputActions";
 import { MessageScrollerItem } from "./ui/message-scroller";
 
 export const ChatTranscript = memo(function ChatTranscript({
+  actionsDisabled,
   branchOrigin,
   childBranchesByMessageId,
   messages,
@@ -26,6 +27,7 @@ export const ChatTranscript = memo(function ChatTranscript({
   onSelectBranch,
   onSelectText,
 }: {
+  actionsDisabled: boolean;
   branchOrigin?: { branchId: string; parentBranchId: string; createdAt: number };
   childBranchesByMessageId: ReadonlyMap<string, ChatBranch[]>;
   messages: ChatMessage[];
@@ -62,6 +64,7 @@ export const ChatTranscript = memo(function ChatTranscript({
             scrollAnchor={message.role === "user"}
           >
             <Message
+              actionsDisabled={actionsDisabled}
               message={message}
               onEditMessage={onEditMessage}
               onRetryMessage={onRetryMessage}
@@ -88,12 +91,14 @@ export const ChatTranscript = memo(function ChatTranscript({
 });
 
 const Message = memo(function Message({
+  actionsDisabled,
   message,
   onEditMessage,
   onRetryMessage,
   onSelectText,
   retrySource,
 }: {
+  actionsDisabled: boolean;
   message: ChatMessage;
   onEditMessage: (message: ChatMessage, content: string) => Promise<boolean>;
   onRetryMessage: (message: ChatMessage) => Promise<boolean>;
@@ -112,6 +117,7 @@ const Message = memo(function Message({
           {message.content}
         </div>
         <MessageOutputActions
+          actionsDisabled={actionsDisabled}
           className="justify-end"
           message={message}
           onEdit={(content) => onEditMessage(message, content)}
@@ -147,6 +153,7 @@ const Message = memo(function Message({
         }
       />
       <MessageOutputActions
+        actionsDisabled={actionsDisabled}
         message={message}
         onRetry={retrySource ? () => onRetryMessage(retrySource) : undefined}
       />

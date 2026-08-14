@@ -188,7 +188,7 @@ function ThreadScrollMemoryBridge({
   viewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const { scrollToEnd, scrollToMessage } = useMessageScroller();
-  const restoredRef = useRef(!initialBookmark);
+  const restoredRef = useRef(false);
   const restoreFrameRef = useRef<number | null>(null);
   const onBookmarkChangeRef = useRef(onBookmarkChange);
   onBookmarkChangeRef.current = onBookmarkChange;
@@ -227,8 +227,8 @@ function ThreadScrollMemoryBridge({
 
   // lint-allow: no-direct-use-effect — restore only after the opening content has hydrated.
   useLayoutEffect(() => {
-    if (!contentMounted || !contentReady || restoredRef.current || !initialBookmark) return;
-    if (initialBookmark.kind === "follow-latest") {
+    if (!contentMounted || !contentReady || restoredRef.current) return;
+    if (initialBookmark?.kind === "follow-latest") {
       if (scrollToEnd({ behavior: "auto" })) restoredRef.current = true;
       return;
     }
@@ -240,9 +240,11 @@ function ThreadScrollMemoryBridge({
       restoreFrameRef.current = null;
       const viewport = viewportRef.current;
       if (!viewport || restoredRef.current) return;
-      const target = Array.from(viewport.querySelectorAll<HTMLElement>("[data-message-id]")).find(
-        (item) => item.dataset.messageId === initialBookmark.messageId,
-      );
+      const target = initialBookmark
+        ? Array.from(viewport.querySelectorAll<HTMLElement>("[data-message-id]")).find(
+            (item) => item.dataset.messageId === initialBookmark.messageId,
+          )
+        : Array.from(viewport.querySelectorAll<HTMLElement>('[data-scroll-anchor="true"]')).at(-1);
       if (!target) {
         // The remembered message can disappear after a data change. Fall back
         // to the latest content instead of leaving the reader at the temporary
@@ -257,8 +259,12 @@ function ThreadScrollMemoryBridge({
         contentStyle?.paddingBlockStart || contentStyle?.paddingTop || "0",
       );
       const scrollMargin =
-        initialBookmark.offset - (Number.isFinite(paddingStart) ? paddingStart : 0);
-      scrollToMessage(initialBookmark.messageId, {
+        initialBookmark?.kind === "message-anchor"
+          ? initialBookmark.offset - (Number.isFinite(paddingStart) ? paddingStart : 0)
+          : PREVIOUS_ITEM_PEEK;
+      const messageId = target.dataset.messageId;
+      if (!messageId) return;
+      scrollToMessage(messageId, {
         align: "start",
         behavior: "auto",
         scrollMargin,

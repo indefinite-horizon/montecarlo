@@ -121,7 +121,7 @@ export const BranchMap = memo(function BranchMap({
       style={{ "--branch-map-width": `${branchMapWidth}px` } as CSSProperties}
     >
       <header
-        className="electron-titlebar flex h-12 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:px-5 [&_button]:size-8 [&_button_svg]:size-4"
+        className="electron-titlebar flex h-12 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:px-5 [&_button]:size-9 [&_button_svg]:size-4"
         data-testid="branch-map-titlebar"
       >
         <GitBranch className="size-4 text-primary" />

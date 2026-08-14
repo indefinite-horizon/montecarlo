@@ -124,6 +124,8 @@ export async function createPromptBranch(page: Page, prompt: string) {
 }
 
 export async function selectAssistantText(page: Page, text: string) {
+  const retry = page.getByRole("button", { name: "Retry", exact: true }).last();
+  if ((await retry.count()) > 0) await expect(retry).toBeEnabled();
   const document = page.locator('[role="document"]').filter({ hasText: text }).last();
   await document.evaluate((element, selectedText) => {
     const walker = window.document.createTreeWalker(element, NodeFilter.SHOW_TEXT);

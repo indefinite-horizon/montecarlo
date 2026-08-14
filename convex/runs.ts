@@ -469,14 +469,10 @@ export const cancelLease = mutation({
         index.eq("workspaceId", workspace._id).eq("publicId", runPublicId),
       )
       .unique();
-    if (
-      !run ||
-      run.requestedByUserId !== user._id ||
-      run.status !== "running" ||
-      run.leaseHandoffAt === undefined
-    ) {
+    if (!run || run.requestedByUserId !== user._id) {
       throw runNoLongerActiveError();
     }
+    if (run.status !== "running") return summarizeRun(run);
     const branch = await ctx.db.get(run.branchId);
     if (
       !branch ||

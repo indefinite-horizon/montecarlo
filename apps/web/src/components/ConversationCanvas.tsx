@@ -600,6 +600,7 @@ const BranchCanvasNode = memo(function BranchCanvasNode({ data }: NodeProps<Bran
               scrollAnchor={message.role === "user"}
             >
               <CanvasMessage
+                actionsDisabled={data.running}
                 message={message}
                 onEdit={
                   message.role === "user"

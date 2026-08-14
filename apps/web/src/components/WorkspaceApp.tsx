@@ -99,7 +99,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   const activeBranchRunning = isBranchRunning(activeBranch, controller.branchActivityNow);
   const transcriptStreaming = controller.messages.some((message) => message.isStreaming);
   const transcriptContentReady =
-    !controller.loading && isThreadOpeningContentReady(controller.messages);
+    !controller.loading &&
+    (activeBranch?.openingContentReady ?? isThreadOpeningContentReady(controller.messages));
   const activeChat = controller.chats.find((chat) => chat.id === controller.activeChatId);
   const latestCompletedMessagePublicId = activeChat?.latestCompletedMessagePublicId;
   const latestCompletedMessage = latestCompletedMessagePublicId
@@ -411,6 +412,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
           <>
             <WorkspaceThread
               activeBranch={activeBranch}
+              actionsDisabled={activeBranchRunning}
               branches={controller.branches}
               contentReady={transcriptContentReady}
               initialScrollBookmark={initialThreadScrollBookmark}

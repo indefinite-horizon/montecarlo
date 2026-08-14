@@ -15,6 +15,7 @@ import { MessageScrollerItem } from "./ui/message-scroller";
 
 export const WorkspaceThread = memo(function WorkspaceThread({
   activeBranch,
+  actionsDisabled,
   branches,
   contentReady,
   initialScrollBookmark,
@@ -32,6 +33,7 @@ export const WorkspaceThread = memo(function WorkspaceThread({
   threadId,
 }: {
   activeBranch?: ChatBranch;
+  actionsDisabled: boolean;
   branches: ChatBranch[];
   contentReady: boolean;
   initialScrollBookmark?: ThreadScrollBookmark;
@@ -85,6 +87,7 @@ export const WorkspaceThread = memo(function WorkspaceThread({
         </MessageScrollerItem>
       ) : null}
       <ChatTranscript
+        actionsDisabled={actionsDisabled}
         branchOrigin={
           activeBranch?.parentBranchId
             ? {

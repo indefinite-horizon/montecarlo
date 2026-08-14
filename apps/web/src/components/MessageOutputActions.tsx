@@ -43,11 +43,13 @@ export function formatFullDate(createdAt: number, locale: string) {
 }
 
 export const MessageOutputActions = memo(function MessageOutputActions({
+  actionsDisabled = false,
   className,
   message,
   onEdit,
   onRetry,
 }: {
+  actionsDisabled?: boolean;
   className?: string;
   message: ChatMessage;
   onEdit?: (content: string) => Promise<boolean>;
@@ -119,6 +121,7 @@ export const MessageOutputActions = memo(function MessageOutputActions({
           <Button
             aria-label={t("chat.retryMessage")}
             className="size-7 p-0 text-muted-foreground hover:text-foreground"
+            disabled={actionsDisabled}
             onClick={() => void onRetry()}
             size="icon"
             variant="ghost"
@@ -132,6 +135,7 @@ export const MessageOutputActions = memo(function MessageOutputActions({
           <Button
             aria-label={t("chat.editMessage")}
             className="size-7 p-0 text-muted-foreground hover:text-foreground"
+            disabled={actionsDisabled}
             onClick={() => {
               setDraft(message.content);
               setEditing(true);
@@ -183,7 +187,12 @@ export const MessageOutputActions = memo(function MessageOutputActions({
                   {t("common.cancel")}
                 </Button>
                 <Button
-                  disabled={!draft.trim() || draft.trim() === message.content.trim() || submitting}
+                  disabled={
+                    actionsDisabled ||
+                    !draft.trim() ||
+                    draft.trim() === message.content.trim() ||
+                    submitting
+                  }
                   type="submit"
                 >
                   {t("chat.saveAndRetry")}

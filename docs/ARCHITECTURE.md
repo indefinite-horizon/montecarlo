@@ -169,10 +169,11 @@ lease claim share one Convex transaction, so concurrent starts on the same
 branch conflict while sibling branches can stream independently. The initiating
 renderer renews an expiring lease with a private capability; a crashed renderer
 therefore cannot leave the branch permanently locked, and a different run
-cannot append output or clear its ownership. On a clean reload, the old
-document uses that in-memory capability to mark an explicit server handoff;
-session storage retains only stable public IDs so the replacement document can
-release the handed-off run without persisting credential material.
+cannot append output or clear its ownership. On reload, the old document marks
+its tab-scoped session record as orphaned; session storage retains only stable
+public IDs so the replacement document can release the abandoned run without
+persisting credential material. Cancellation still re-authorizes workspace
+membership, the requesting user, and the branch's current run identity.
 
 ## Chat graph
 
