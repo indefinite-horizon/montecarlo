@@ -1,6 +1,15 @@
 /** Displays the chat's branch DAG and switches the active line of inquiry. */
 
-import { GitBranch, LoaderCircle, PanelRight, Plus } from "lucide-react";
+import {
+  GitBranch,
+  Link2,
+  LoaderCircle,
+  Mail,
+  MailOpen,
+  PanelRight,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import {
   type CSSProperties,
   memo,
@@ -10,10 +19,17 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { ChatBranch } from "@/lib/conversation";
+import { type ChatBranch, isBranchRunning } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "./ActionTooltip";
 import { Button } from "./ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "./ui/context-menu";
 
 const DEFAULT_BRANCH_MAP_WIDTH = 304;
 const MIN_BRANCH_MAP_WIDTH = 256;
@@ -32,18 +48,28 @@ function storedBranchMapWidth(): number {
 export const BranchMap = memo(function BranchMap({
   branches,
   activeBranchId,
+  activityNow,
   unreadBranchId,
   onSelect,
   onCreate,
+  onCopyLink,
+  onDelete,
+  onRename,
+  onSetUnread,
   open,
   onClose,
   toggleShortcut,
 }: {
   branches: ChatBranch[];
   activeBranchId: string;
+  activityNow: number;
   unreadBranchId?: string;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  onCopyLink: (id: string) => void;
+  onDelete: (id: string) => void;
+  onRename: (id: string) => void;
+  onSetUnread: (id: string, unread: boolean) => void;
   open: boolean;
   onClose: () => void;
   toggleShortcut: string;
@@ -95,11 +121,12 @@ export const BranchMap = memo(function BranchMap({
       style={{ "--branch-map-width": `${branchMapWidth}px` } as CSSProperties}
     >
       <header
-        className="electron-titlebar flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:px-5"
+        className="electron-titlebar flex h-12 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:px-5 [&_button]:size-8 [&_button_svg]:size-4"
         data-testid="branch-map-titlebar"
       >
         <GitBranch className="size-4 text-primary" />
-        <h2 className="min-w-0 flex-1 text-xs font-semibold">{t("branch.mapTitle")}</h2>
+        <h2 className="min-w-0 flex-1 text-sm font-semibold">{t("branch.mapTitle")}</h2>
+        {/* Keep this toggle's position synchronized with the open-branch-map toggle in WorkspaceHeader. */}
         <ActionTooltip label={t("branch.closeMap")} shortcut={toggleShortcut} side="left">
           <Button
             size="icon"
@@ -117,14 +144,13 @@ export const BranchMap = memo(function BranchMap({
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="relative space-y-2.5">
           {branches.map((branch) => {
-            const waitingForResponse = branch.messages.some(
-              (message) => message.isStreaming || message.runStatus === "running",
-            );
+            const waitingForResponse = isBranchRunning(branch, activityNow);
             const unread = branch.id === unreadBranchId;
+            const branchUnread = branch.isUnread || unread;
             return (
               <div
                 key={branch.id}
-                className="relative"
+                className="group/branch relative"
                 style={{ marginLeft: `${Math.min(branch.depth, 5) * 18}px` }}
               >
                 {branch.depth ? (
@@ -133,67 +159,102 @@ export const BranchMap = memo(function BranchMap({
                     aria-hidden="true"
                   />
                 ) : null}
-                <button
-                  type="button"
-                  data-testid="branch-map-row"
-                  data-branch-depth={branch.depth}
-                  data-unread={unread ? "true" : "false"}
-                  className={cn(
-                    "relative w-full rounded-lg border bg-card px-3 py-2.5 text-left shadow-sm transition-all hover:-translate-y-px hover:shadow-md",
-                    branch.id === activeBranchId
-                      ? "border-primary ring-1 ring-primary/25"
-                      : "border-border",
-                  )}
-                  onClick={() => onSelect(branch.id)}
-                  aria-busy={waitingForResponse}
-                  aria-current={branch.id === activeBranchId ? "true" : undefined}
-                >
-                  <span
-                    className={cn(
-                      "absolute -left-1.5 top-3.5 size-2.5 rounded-full border-2 border-card",
-                      branch.id === activeBranchId ? "bg-primary" : "bg-border",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "block truncate pr-5 text-[11px]",
-                      unread
-                        ? "font-semibold text-foreground"
-                        : "font-normal text-muted-foreground",
-                    )}
-                    data-testid="branch-map-title"
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <button
+                      type="button"
+                      data-testid="branch-map-row"
+                      data-branch-depth={branch.depth}
+                      data-unread={branchUnread ? "true" : "false"}
+                      className={cn(
+                        "relative w-full rounded-lg border bg-card px-3 py-2.5 text-left shadow-sm transition-all hover:-translate-y-px hover:shadow-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                        branch.id === activeBranchId
+                          ? "border-primary ring-1 ring-primary/25"
+                          : "border-border",
+                      )}
+                      onClick={() => onSelect(branch.id)}
+                      aria-busy={waitingForResponse}
+                      aria-current={branch.id === activeBranchId ? "true" : undefined}
+                    >
+                      <span
+                        className={cn(
+                          "absolute -left-1.5 top-3.5 size-2.5 rounded-full border-2 border-card",
+                          branch.id === activeBranchId ? "bg-primary" : "bg-border",
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "block truncate pr-5 text-sm",
+                          branchUnread
+                            ? "font-semibold text-foreground"
+                            : "font-normal text-muted-foreground",
+                        )}
+                        data-testid="branch-map-title"
+                      >
+                        {branch.title}
+                      </span>
+                      {waitingForResponse ? (
+                        <LoaderCircle
+                          aria-hidden="true"
+                          className="absolute right-3 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-primary transition-opacity group-hover/branch:opacity-0 group-focus-within/branch:opacity-0"
+                          data-testid="branch-response-spinner"
+                        />
+                      ) : branchUnread ? (
+                        <span
+                          aria-hidden="true"
+                          className="absolute right-3 top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary transition-opacity group-hover/branch:opacity-0 group-focus-within/branch:opacity-0"
+                          data-testid="branch-unread-indicator"
+                        />
+                      ) : null}
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent
+                    className="w-52"
+                    data-testid="branch-context-menu"
+                    aria-label={t("branch.actionsNamed", { title: branch.title })}
                   >
-                    {branch.title}
-                  </span>
-                  {waitingForResponse ? (
-                    <LoaderCircle
-                      aria-hidden="true"
-                      className="absolute right-3 top-1/2 size-3.5 -translate-y-1/2 animate-spin text-primary"
-                      data-testid="branch-response-spinner"
-                    />
-                  ) : unread ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute right-3 top-1/2 size-2 -translate-y-1/2 rounded-full bg-primary"
-                      data-testid="branch-unread-indicator"
-                    />
-                  ) : null}
-                </button>
+                    <ContextMenuItem onSelect={() => onSetUnread(branch.id, !branchUnread)}>
+                      {branchUnread ? <MailOpen /> : <Mail />}
+                      {t(branchUnread ? "branch.markRead" : "branch.markUnread")}
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onRename(branch.id)}>
+                      <Pencil />
+                      {t("sidebar.rename")}
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onCopyLink(branch.id)}>
+                      <Link2 />
+                      {t("sidebar.copyLink")}
+                    </ContextMenuItem>
+                    {branch.parentBranchId ? (
+                      <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem variant="destructive" onSelect={() => onDelete(branch.id)}>
+                          <Trash2 />
+                          {t("branch.delete")}
+                        </ContextMenuItem>
+                      </>
+                    ) : null}
+                  </ContextMenuContent>
+                </ContextMenu>
+                <ActionTooltip label={t("branch.new")} side="left">
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground opacity-100 outline-none transition-[color,background-color,opacity] hover:bg-background/80 hover:text-muted-foreground focus-visible:bg-background/80 focus-visible:text-muted-foreground md:opacity-0 md:group-hover/branch:opacity-100 md:group-focus-within/branch:opacity-100"
+                    aria-label={t("branch.new")}
+                    data-testid="branch-map-create"
+                    disabled={waitingForResponse}
+                    onClick={() => {
+                      onSelect(branch.id);
+                      onCreate();
+                    }}
+                  >
+                    <GitBranch className="size-3.5" />
+                  </button>
+                </ActionTooltip>
               </div>
             );
           })}
         </div>
-
-        <Button
-          className="mt-4 w-full border-dashed"
-          size="sm"
-          variant="outline"
-          disabled={branches.length === 0}
-          onClick={onCreate}
-        >
-          <Plus />
-          {t("branch.new")}
-        </Button>
       </div>
 
       <hr

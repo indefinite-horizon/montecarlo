@@ -3,7 +3,11 @@
 import { expect, test } from "@playwright/test";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
-import { installRuntimeMock } from "../helpers/runtime";
+import {
+  type ControlledRuntimeStream,
+  installControlledRuntimeStream,
+  installRuntimeMock,
+} from "../helpers/runtime";
 import { createWorkspace, openFreshUser, userMessage } from "../helpers/workspace";
 
 const primaryModifier = process.platform === "darwin" ? "Meta" : "Control";
@@ -14,8 +18,11 @@ const secondWorkspaceShortcutLabel = process.platform === "darwin" ? "⌥2" : "A
 const leftSidebarShortcutKeys = process.platform === "darwin" ? "Meta+B" : "Control+B";
 const rightSidebarShortcutKeys = process.platform === "darwin" ? "Meta+Alt+B" : "Control+Alt+B";
 
+let controlledStream: ControlledRuntimeStream;
+
 test.beforeEach(async ({ context, page }) => {
   await installRuntimeMock(context);
+  controlledStream = await installControlledRuntimeStream(context, "[e2e:composer-stop]");
   await openFreshUser(page, "keyboard");
   await createWorkspace(page, `Keyboard workspace ${Date.now()}`);
 });
@@ -29,6 +36,39 @@ test("a bootstrapped workspace enables the composer and accepts typing", async (
   await composer.click();
   await composer.fill("The repaired workspace accepts input");
   await expect(composer).toHaveValue("The repaired workspace accepts input");
+});
+
+test("keeps a draft editable while streaming and stops without deleting it", async ({ page }) => {
+  const composer = page.getByPlaceholder("Ask a follow-up or start a new direction…");
+  const streamingPrompt = `Hold this response open ${controlledStream.marker}`;
+  const nextDraft = "Keep this draft for the next turn";
+
+  await composer.fill(streamingPrompt);
+  await page.getByRole("button", { name: "Send message" }).click();
+  await controlledStream.waitForRequest(page);
+  await expect(page.getByRole("button", { name: "Stop generation" })).toBeVisible();
+
+  await expect(composer).toBeEnabled();
+  await composer.fill(nextDraft);
+  await expect(composer).toHaveValue(nextDraft);
+  await expect(page.getByRole("button", { name: "Send message" })).toHaveCount(0);
+
+  await composer.press("Enter");
+  await expect(composer).toHaveValue(nextDraft);
+  await expect(userMessage(page, nextDraft)).toHaveCount(0);
+
+  const stopShortcut = await page.evaluate(() => {
+    const macos = /mac|iphone|ipad|ipod/iu.test(`${navigator.platform} ${navigator.userAgent}`);
+    return macos ? "Meta+Shift+Backspace" : "Control+Shift+Backspace";
+  });
+  await composer.press(stopShortcut);
+
+  await expect(page.getByRole("button", { name: "Stop generation" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
+  await expect(composer).toBeFocused();
+  await expect(composer).toHaveValue(nextDraft);
+  await expect(userMessage(page, streamingPrompt)).toBeVisible();
+  await expect(userMessage(page, nextDraft)).toHaveCount(0);
 });
 
 test("workspace shortcuts switch among the first nine workspaces", async ({ page }) => {

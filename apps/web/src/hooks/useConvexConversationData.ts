@@ -9,7 +9,6 @@ import {
   type ChatSummary,
   isThreadOpeningContentReady,
   type ProviderId,
-  type ReasoningEffort,
 } from "@/lib/conversation";
 import {
   lineageIds,
@@ -17,21 +16,16 @@ import {
   projectsFromItems,
   titleForBranch,
 } from "@/lib/convexConversationMapping";
+import { domainApi, type MessagePage, type WorkspaceItem } from "@/lib/convexDomainApi";
 import {
-  domainApi,
-  type MessageItem,
-  type MessagePage,
-  type RunItem,
-  type WorkspaceItem,
-} from "@/lib/convexDomainApi";
-import {
-  encodeMessageEnvelope,
-  MESSAGE_ENVELOPE_CONTENT_TYPE,
-  putRuntimeBlob,
-} from "@/lib/runtimeClient";
+  browserSessionStorage,
+  markCurrentDocumentActive,
+  markOwnedRunLeasesOrphaned,
+} from "@/lib/runLeaseRecovery";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { sharedConfig } from "../../../../lib/config";
+import { useDurableTurnMutations } from "./useDurableTurnMutations";
 import { useMessageContentHydration } from "./useMessageContentHydration";
 
 export function useConvexConversationData(
@@ -193,9 +187,12 @@ export function useConvexConversationData(
       return {
         id: String(branch.id),
         publicId: branch.publicId,
+        activeRunId: branch.activeRunId ? String(branch.activeRunId) : undefined,
+        activeRunLeaseExpiresAt: branch.activeRunLeaseExpiresAt,
         parentBranchId: branch.parentBranchId ? String(branch.parentBranchId) : undefined,
         contextMessageIds: branch.contextMessageIds.map(String),
         title: titleForBranch(branch, tree.chat.title),
+        isUnread: branch.isUnread,
         depth: branch.depth,
         createdAt: branch.createdAt,
         anchor:
@@ -234,13 +231,20 @@ export function useConvexConversationData(
   const ensureInitialChatMutation = useMutation(domainApi.chats.ensureInitial);
   const createBranchMutation = useMutation(domainApi.branches.create);
   const completeBranchAutoTitleMutation = useMutation(domainApi.branches.completeAutoTitle);
+  const renameBranchMutation = useMutation(domainApi.branches.rename);
+  const markBranchUnreadMutation = useMutation(domainApi.branches.markUnread);
+  const markBranchReadMutation = useMutation(domainApi.branches.markRead);
   const reserveBlobMutation = useMutation(domainApi.blobManifests.reserve);
   const markBlobAvailableMutation = useMutation(domainApi.blobManifests.markAvailable);
   const appendMessageMutation = useMutation(domainApi.messages.append);
   const truncateFromUserMessageMutation = useMutation(
     domainApi.messageHistory.truncateFromUserMessage,
   );
-  const createRunMutation = useMutation(domainApi.runs.create);
+  const deleteBranchSubtreeMutation = useMutation(domainApi.messageHistory.deleteBranchSubtree);
+  const startTurnMutation = useMutation(domainApi.runs.startTurn);
+  const renewRunLeaseMutation = useMutation(domainApi.runs.renewLease);
+  const handoffRunLeaseMutation = useMutation(domainApi.runs.handoffLease);
+  const cancelRunLeaseMutation = useMutation(domainApi.runs.cancelLease);
   const completeRunMutation = useMutation(domainApi.runs.complete);
   const bootstrapAttemptsRef = useRef(new Set<string>());
   const bootstrapFailuresRef = useRef(new Map<string, number>());
@@ -475,6 +479,30 @@ export function useConvexConversationData(
     [completeBranchAutoTitleMutation, workspace],
   );
 
+  const renameBranch = useCallback(
+    async (branchId: string, title: string) => {
+      if (!workspace) return false;
+      return renameBranchMutation({
+        workspaceId: workspace.id,
+        branchId: branchId as Id<"chat_branches">,
+        title,
+      });
+    },
+    [renameBranchMutation, workspace],
+  );
+
+  const setBranchUnread = useCallback(
+    async (branchId: string, unread: boolean) => {
+      if (!workspace) return false;
+      const mutation = unread ? markBranchUnreadMutation : markBranchReadMutation;
+      return mutation({
+        workspaceId: workspace.id,
+        branchId: branchId as Id<"chat_branches">,
+      });
+    },
+    [markBranchReadMutation, markBranchUnreadMutation, workspace],
+  );
+
   const claimAutoTitle = useCallback(
     async (chatId: string, claimToken: string, provider?: ProviderId, model?: string) => {
       if (!workspace) return null;
@@ -514,104 +542,54 @@ export function useConvexConversationData(
     [completeAutoTitleMutation, workspace],
   );
 
-  const persistMessage = useCallback(
-    async (input: {
-      branchId: string;
-      clientId: string;
-      role: "system" | "user" | "assistant";
-      content: string;
-      runId?: Id<"agent_runs">;
-      replyToMessageId?: Id<"messages">;
-    }): Promise<MessageItem | null> => {
-      if (!workspace || !chat) return null;
-      const preview = input.content
-        .trim()
-        .slice(0, sharedConfig.domain.limits.contentPreviewLength);
-      if (!preview) return null;
-      const envelope = await encodeMessageEnvelope(input.content);
-      const reserved = await reserveBlobMutation({
-        workspaceId: workspace.id,
-        backend: workspace.storageMode === "local" ? "filesystem" : "r2",
-        envelopeVersion: 1,
-        contentType: MESSAGE_ENVELOPE_CONTENT_TYPE,
-        byteLength: envelope.byteLength,
-        sha256: envelope.sha256,
-      });
-      if (reserved.status !== "available") {
-        const attestation = await putRuntimeBlob({
-          manifestId: String(reserved.id),
-          objectKey: reserved.objectKey,
-          backend: reserved.backend,
-          data: envelope.data,
-          byteLength: envelope.byteLength,
-          sha256: envelope.sha256,
-        });
-        const available = await markBlobAvailableMutation({
-          workspaceId: workspace.id,
-          manifestId: reserved.id,
-          attestation,
-        });
-        if (available.status !== "available") {
-          throw new Error("Message content did not become available.");
-        }
-      }
-      return appendMessageMutation({
-        workspaceId: workspace.id,
-        chatId: chat.id,
-        branchId: input.branchId as Id<"chat_branches">,
-        publicId: `message_${input.clientId}`,
-        role: input.role,
-        contentRef: reserved.publicId,
-        contentPreview: preview,
-        runId: input.runId,
-        replyToMessageId: input.replyToMessageId,
-      });
-    },
-    [appendMessageMutation, chat, markBlobAvailableMutation, reserveBlobMutation, workspace],
-  );
+  const {
+    completeRun,
+    handoffOwnedRunLeases,
+    persistMessage,
+    recoverOrphanedRunLeases,
+    renewRunLease,
+    startTurn,
+  } = useDurableTurnMutations({
+    workspace: workspace as WorkspaceItem | undefined,
+    chatId: chat?.id,
+    reserveBlob: reserveBlobMutation,
+    markBlobAvailable: markBlobAvailableMutation,
+    appendMessage: appendMessageMutation,
+    startTurnMutation,
+    renewRunLeaseMutation,
+    handoffRunLeaseMutation,
+    cancelRunLeaseMutation,
+    completeRunMutation,
+  });
 
-  const createRun = useCallback(
-    async (input: {
-      branchId: string;
-      provider: ProviderId;
-      model: string;
-      inputMessageId?: Id<"messages">;
-      reasoningEffort: ReasoningEffort;
-      fastMode: boolean;
-    }): Promise<RunItem | null> => {
-      if (!workspace || !chat) return null;
-      return createRunMutation({
-        workspaceId: workspace.id,
-        chatId: chat.id,
-        branchId: input.branchId as Id<"chat_branches">,
-        inputMessageId: input.inputMessageId,
-        runtime: input.provider === "codex" ? "harness" : "model",
-        provider: input.provider,
-        model: input.model,
-        reasoningEffort: input.reasoningEffort,
-        fastMode: input.fastMode,
-      });
-    },
-    [chat, createRunMutation, workspace],
-  );
+  // lint-allow: no-direct-use-effect — claim only leases from the previous document after reload.
+  useEffect(() => {
+    if (!authenticated) return;
+    void recoverOrphanedRunLeases();
+    const retry = window.setInterval(() => {
+      void recoverOrphanedRunLeases();
+    }, sharedConfig.runs.heartbeatIntervalMs / 2);
+    return () => window.clearInterval(retry);
+  }, [authenticated, recoverOrphanedRunLeases]);
 
-  const completeRun = useCallback(
-    async (
-      run: RunItem,
-      status: "succeeded" | "failed" | "canceled",
-      outputMessageId?: Id<"messages">,
-    ) => {
-      if (!workspace) return;
-      await completeRunMutation({
-        workspaceId: workspace.id,
-        runId: run.id,
-        status,
-        outputMessageId,
-        ...(status === "failed" ? { errorCode: "runtime_unavailable" } : {}),
-      });
-    },
-    [completeRunMutation, workspace],
-  );
+  // lint-allow: no-direct-use-effect — hand leases to the next document only on real unload.
+  useEffect(() => {
+    if (!authenticated) return;
+    const markForReloadRecovery = (event: PageTransitionEvent) => {
+      if (event.persisted) return;
+      markOwnedRunLeasesOrphaned(browserSessionStorage());
+      void handoffOwnedRunLeases();
+    };
+    const restoreDocumentOwnership = () => {
+      markCurrentDocumentActive(browserSessionStorage());
+    };
+    window.addEventListener("pagehide", markForReloadRecovery);
+    window.addEventListener("pageshow", restoreDocumentOwnership);
+    return () => {
+      window.removeEventListener("pagehide", markForReloadRecovery);
+      window.removeEventListener("pageshow", restoreDocumentOwnership);
+    };
+  }, [authenticated, handoffOwnedRunLeases]);
 
   const truncateFromUserMessage = useCallback(
     async (messagePublicId: string) => {
@@ -623,6 +601,18 @@ export function useConvexConversationData(
       });
     },
     [chat, truncateFromUserMessageMutation, workspace],
+  );
+
+  const deleteBranchSubtree = useCallback(
+    async (branchId: string) => {
+      if (!workspace || !chat) return null;
+      return deleteBranchSubtreeMutation({
+        workspaceId: workspace.id,
+        chatId: chat.id,
+        branchId: branchId as Id<"chat_branches">,
+      });
+    },
+    [chat, deleteBranchSubtreeMutation, workspace],
   );
 
   const activeBranchId = tree
@@ -663,8 +653,9 @@ export function useConvexConversationData(
     createBranch,
     createChat,
     createProject,
-    createRun,
+    startTurn,
     createWorkspace,
+    deleteBranchSubtree,
     durableBranchIds,
     durableMessageIds,
     hasConversation: Boolean(workspace && chat && tree),
@@ -680,8 +671,11 @@ export function useConvexConversationData(
       Boolean(chat && tree === undefined) ||
       messagePagesLoading,
     persistMessage,
+    renewRunLease,
     projects,
     markChatUnread,
+    renameBranch,
+    setBranchUnread,
     markChatRead,
     renameChat,
     releaseAutoTitle,

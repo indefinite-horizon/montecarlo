@@ -2,7 +2,11 @@
 
 import { describe, expect, it } from "vitest";
 import type { ProjectSummary } from "../../apps/web/src/lib/conversation";
-import { organizeSidebarChats, type SidebarChat } from "../../apps/web/src/lib/sidebarChats";
+import {
+  archiveSuccessor,
+  organizeSidebarChats,
+  type SidebarChat,
+} from "../../apps/web/src/lib/sidebarChats";
 
 const projects: ProjectSummary[] = [
   { id: "project-a", name: "Project A", color: "blue" },
@@ -111,5 +115,36 @@ describe("organizeSidebarChats", () => {
 
     expect(ids(before.projectless)).toEqual(["newer", "older"]);
     expect(ids(after.projectless)).toEqual(["newer", "older"]);
+  });
+});
+
+describe("archiveSuccessor", () => {
+  it("chooses the following chat from the archived chat's own section", () => {
+    const chats = [
+      chat("pinned-first", 100, { isPinned: true }),
+      chat("project-first", 90, { projectId: "project-a" }),
+      chat("loose-first", 80),
+      chat("project-next", 70, { projectId: "project-a" }),
+      chat("loose-next", 60),
+      chat("pinned-next", 50, { isPinned: true, projectId: "project-b" }),
+    ];
+
+    expect(archiveSuccessor(chats, projects, "pinned-first")?.id).toBe("pinned-next");
+    expect(archiveSuccessor(chats, projects, "project-first")?.id).toBe("project-next");
+    expect(archiveSuccessor(chats, projects, "loose-first")?.id).toBe("loose-next");
+  });
+
+  it("falls back to the previous chat when archiving the last row in a section", () => {
+    const chats = [
+      chat("project-first", 20, { projectId: "project-a" }),
+      chat("project-last", 10, { projectId: "project-a" }),
+      chat("newest-elsewhere", 100),
+    ];
+
+    expect(archiveSuccessor(chats, projects, "project-last")?.id).toBe("project-first");
+  });
+
+  it("returns no successor when the section has no other chat", () => {
+    expect(archiveSuccessor([chat("only-chat", 10)], projects, "only-chat")).toBeUndefined();
   });
 });

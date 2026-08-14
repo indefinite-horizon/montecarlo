@@ -8,6 +8,8 @@ import {
   moveWorkspaceRouteHistory,
   pushWorkspaceRoute,
   reconcileWorkspaceRoute,
+  rememberedWorkspaceRouteForChat,
+  rememberWorkspaceRoute,
   replaceWorkspaceRoute,
   type WorkspaceRouteSearch,
 } from "../../apps/web/src/lib/workspaceRouteHistory";
@@ -111,5 +113,19 @@ describe("workspace route history", () => {
     expect(atFirst.index).toBe(0);
     expect(canGoForwardInWorkspaceHistory(atFirst)).toBe(true);
     expect(reconcileWorkspaceRoute(atFirst, second).index).toBe(1);
+  });
+
+  it("remembers the latest branch and view separately for each chat", () => {
+    const chatAThread = route("chat-a", { branch: "branch-a-1" });
+    const chatACanvas = route("chat-a", { branch: "branch-a-2", view: "canvas" });
+    const chatBThread = route("chat-b", { branch: "branch-b-1" });
+    const memory = rememberWorkspaceRoute(
+      rememberWorkspaceRoute(rememberWorkspaceRoute(new Map(), chatAThread), chatACanvas),
+      chatBThread,
+    );
+
+    expect(rememberedWorkspaceRouteForChat(memory, "workspace-1", "chat-a")).toEqual(chatACanvas);
+    expect(rememberedWorkspaceRouteForChat(memory, "workspace-1", "chat-b")).toEqual(chatBThread);
+    expect(rememberedWorkspaceRouteForChat(memory, "workspace-2", "chat-a")).toBeUndefined();
   });
 });

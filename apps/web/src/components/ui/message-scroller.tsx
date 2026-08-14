@@ -83,7 +83,7 @@ function MessageScrollerViewport({
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
       className={cn(
-        "size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain [contain:content] [scrollbar-gutter:stable] data-autoscrolling:[scrollbar-width:none]",
+        "size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain [contain:content] [container-type:inline-size] [scrollbar-gutter:stable] data-autoscrolling:[scrollbar-width:none]",
         className,
       )}
       onPointerDown={onPointerDown}

@@ -202,12 +202,13 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
         style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
       >
         <div
-          className="electron-titlebar flex h-16 items-center gap-1 px-3"
+          className="electron-titlebar flex h-12 items-center gap-1 px-3 [&_button]:size-8 [&_button_svg]:size-4"
           data-testid="sidebar-titlebar"
         >
+          {/* Keep this toggle's position synchronized with the open-sidebar toggle in WorkspaceHeader. */}
           <ActionTooltip label={t("sidebar.collapse")} shortcut={toggleShortcut} side="bottom">
             <Button
-              className="electron-titlebar-leading text-muted-foreground hover:text-muted-foreground"
+              className="electron-titlebar-leading-snug text-muted-foreground hover:text-muted-foreground"
               size="icon"
               variant="ghost"
               aria-label={t("sidebar.collapse")}
@@ -300,13 +301,13 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
 
         <div className="space-y-1 px-3 pb-4">
           <Button
-            className="group w-full justify-start bg-transparent px-3 text-sm text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
-            variant="ghost"
+            className="group w-full justify-start px-3"
+            variant="quiet"
             aria-label={t("sidebar.newChat")}
             onClick={() => onCreateChat()}
           >
             <Plus className="text-muted-foreground" />
-            <span className="flex-1 text-left text-sm" data-testid="sidebar-create-label">
+            <span className="flex-1 text-left" data-testid="sidebar-create-label">
               {t("sidebar.create")}
             </span>
             <span
@@ -317,13 +318,13 @@ export const WorkspaceSidebar = memo(function WorkspaceSidebar({
             </span>
           </Button>
           <Button
-            className="group w-full justify-start bg-transparent px-3 text-sm text-muted-foreground shadow-none hover:bg-accent hover:text-foreground"
-            variant="ghost"
+            className="group w-full justify-start px-3"
+            variant="quiet"
             aria-label={t("sidebar.searchCommands")}
             onClick={onOpenCommandPalette}
           >
             <Search className="text-muted-foreground" />
-            <span className="flex-1 text-left text-sm" data-testid="sidebar-search-label">
+            <span className="flex-1 text-left" data-testid="sidebar-search-label">
               {t("sidebar.search")}
             </span>
             <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">

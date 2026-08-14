@@ -2,8 +2,8 @@
 
 import { v } from "convex/values";
 import { sharedConfig } from "../lib/config";
-import type { Doc } from "./_generated/dataModel";
-import { mutation } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { type MutationCtx, mutation } from "./_generated/server";
 import { convexConfig } from "./config";
 import {
   createPublicId,
@@ -13,6 +13,7 @@ import {
   selectionMatchesStoredMessage,
 } from "./lib/domainValidation";
 import { branchAnchorTypeValidator, branchSelectionValidator } from "./lib/domainValidators";
+import { hasActiveRunOnBranch } from "./lib/runLeases";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
 
 const branchNodeValidator = v.object({
@@ -27,6 +28,7 @@ const branchNodeValidator = v.object({
   anchorSelection: v.optional(branchSelectionValidator),
   anchorPrompt: v.optional(v.string()),
   title: v.string(),
+  isUnread: v.boolean(),
   contextMessageIds: v.array(v.id("messages")),
   contextPreview: v.optional(v.string()),
   depth: v.number(),
@@ -53,6 +55,9 @@ export const create = mutation({
     const parent = await ctx.db.get(args.parentBranchId);
     if (!parent || parent.workspaceId !== args.workspaceId || parent.chatId !== args.chatId) {
       throw new Error("Parent branch not found in this chat.");
+    }
+    if (await hasActiveRunOnBranch(ctx, parent, Date.now())) {
+      throw new Error("Wait for this branch's response to finish before branching.");
     }
     if (parent.depth >= convexConfig.domain.limits.maxBranchDepth) {
       throw new Error("Maximum branch depth reached.");
@@ -188,6 +193,7 @@ export const create = mutation({
       contextPreview,
       depth: parent.depth + 1,
       nextMessageOrdinal: 0,
+      runLeaseVersion: 1,
       createdByUserId: user._id,
       createdAt: now,
     });
@@ -205,6 +211,7 @@ export const create = mutation({
       anchorSelection: selection,
       anchorPrompt: prompt,
       title,
+      isUnread: false,
       contextMessageIds,
       contextPreview,
       depth: parent.depth + 1,
@@ -239,4 +246,94 @@ export const completeAutoTitle = mutation({
     await ctx.db.patch(branch._id, { title });
     return true;
   },
+});
+
+export const rename = mutation({
+  args: {
+    workspaceId: v.id("workspaces"),
+    branchId: v.id("chat_branches"),
+    title: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    await requireWorkspacePermission(ctx, args.workspaceId, "content:write");
+    const branch = await ctx.db.get(args.branchId);
+    if (!branch || branch.workspaceId !== args.workspaceId || !branch.parentBranchId) return false;
+    const title = requireText(
+      args.title,
+      "Branch title",
+      convexConfig.domain.limits.chatTitleLength,
+    );
+    await ctx.db.patch(branch._id, { title });
+    return true;
+  },
+});
+
+async function updateUnreadBranch(
+  ctx: MutationCtx,
+  workspaceId: Id<"workspaces">,
+  branchId: Id<"chat_branches">,
+  unread: boolean,
+) {
+  const { user } = await requireWorkspacePermission(ctx, workspaceId, "content:personalize");
+  const branch = await ctx.db.get(branchId);
+  if (!branch || branch.workspaceId !== workspaceId) return false;
+  const current = await ctx.db
+    .query("chat_user_states")
+    .withIndex("by_workspace_user_chat", (index) =>
+      index.eq("workspaceId", workspaceId).eq("userId", user._id).eq("chatId", branch.chatId),
+    )
+    .unique();
+  const ids = new Set(current?.unreadBranchPublicIds ?? []);
+  if (unread) ids.add(branch.publicId);
+  else ids.delete(branch.publicId);
+  const now = Date.now();
+  const chat = await ctx.db.get(branch.chatId);
+  const latestCompletedMessage = chat?.latestCompletedMessageId
+    ? await ctx.db.get(chat.latestCompletedMessageId)
+    : null;
+  const marksLatestRead = !unread && latestCompletedMessage?.branchId === branch._id;
+  if (current) {
+    await ctx.db.patch(current._id, {
+      unreadBranchPublicIds: [...ids],
+      ...(unread
+        ? { lastReadMessageId: undefined, lastReadMessagePublicId: undefined }
+        : marksLatestRead
+          ? {
+              lastReadMessageId: latestCompletedMessage._id,
+              lastReadMessagePublicId: latestCompletedMessage.publicId,
+            }
+          : {}),
+      updatedAt: now,
+    });
+  } else {
+    await ctx.db.insert("chat_user_states", {
+      publicId: createPublicId("chatstate"),
+      workspaceId,
+      chatId: branch.chatId,
+      userId: user._id,
+      unreadBranchPublicIds: [...ids],
+      ...(marksLatestRead
+        ? {
+            lastReadMessageId: latestCompletedMessage._id,
+            lastReadMessagePublicId: latestCompletedMessage.publicId,
+          }
+        : {}),
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  return true;
+}
+
+export const markUnread = mutation({
+  args: { workspaceId: v.id("workspaces"), branchId: v.id("chat_branches") },
+  returns: v.boolean(),
+  handler: (ctx, args) => updateUnreadBranch(ctx, args.workspaceId, args.branchId, true),
+});
+
+export const markRead = mutation({
+  args: { workspaceId: v.id("workspaces"), branchId: v.id("chat_branches") },
+  returns: v.boolean(),
+  handler: (ctx, args) => updateUnreadBranch(ctx, args.workspaceId, args.branchId, false),
 });

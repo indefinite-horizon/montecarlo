@@ -309,6 +309,129 @@ describe("RuntimeServer", () => {
     expect(parseSse(raw)).toContainEqual({ type: "finish", finishReason: "cancelled" });
   });
 
+  it("keeps an overlapping stream active when another run is cancelled", async () => {
+    let releaseSurvivor: (() => void) | undefined;
+    const survivorRelease = new Promise<void>((resolve) => {
+      releaseSurvivor = resolve;
+    });
+    let survivorAborted = false;
+    const runner = mockRunner({
+      run: async function* (input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent> {
+        const prompt = input.messages.at(-1)?.content ?? "unknown";
+        yield { type: "text-delta", delta: `${prompt}-started` };
+
+        if (prompt === "cancelled-run") {
+          await new Promise<void>((resolve) => {
+            if (signal.aborted) resolve();
+            else signal.addEventListener("abort", () => resolve(), { once: true });
+          });
+          return;
+        }
+
+        await new Promise<void>((resolve) => {
+          const onAbort = () => {
+            survivorAborted = true;
+            resolve();
+          };
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
+          signal.addEventListener("abort", onAbort, { once: true });
+          void survivorRelease.then(() => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+          });
+        });
+        if (signal.aborted) return;
+        yield { type: "text-delta", delta: `${prompt}-finished` };
+        yield { type: "finish", finishReason: "stop" };
+      },
+    });
+    const { baseURL } = await start([runner]);
+    const startChat = (prompt: string) =>
+      fetch(`${baseURL}/v1/chat`, {
+        method: "POST",
+        headers: { ...requestHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...chatBody(),
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+    const [cancelledResponse, survivorResponse] = await Promise.all([
+      startChat("cancelled-run"),
+      startChat("surviving-run"),
+    ]);
+    const cancelledReader = cancelledResponse.body?.getReader();
+    const survivorReader = survivorResponse.body?.getReader();
+    expect(cancelledReader).toBeDefined();
+    expect(survivorReader).toBeDefined();
+
+    const decoder = new TextDecoder();
+    const readThroughRunId = async (
+      reader: ReadableStreamDefaultReader<Uint8Array> | undefined,
+    ): Promise<{ raw: string; runId: string }> => {
+      let raw = "";
+      while (!raw.includes('"runId"')) {
+        const chunk = await reader?.read();
+        if (chunk?.done === true || chunk === undefined) break;
+        raw += decoder.decode(chunk.value, { stream: true });
+      }
+      const runId = /"runId":"([0-9a-f-]{36})"/.exec(raw)?.[1];
+      expect(runId).toBeDefined();
+      return { raw, runId: runId ?? "" };
+    };
+    const [cancelledStart, survivorStart] = await Promise.all([
+      readThroughRunId(cancelledReader),
+      readThroughRunId(survivorReader),
+    ]);
+    expect(cancelledStart.runId).not.toBe(survivorStart.runId);
+
+    const overlappingHealth = await fetch(`${baseURL}/v1/health`, {
+      headers: requestHeaders(),
+    });
+    await expect(overlappingHealth.json()).resolves.toMatchObject({ activeOperations: 2 });
+
+    const cancellation = await fetch(`${baseURL}/v1/runs/${cancelledStart.runId}/cancel`, {
+      method: "POST",
+      headers: requestHeaders(),
+    });
+    expect(cancellation.status).toBe(202);
+
+    let cancelledRaw = cancelledStart.raw;
+    while (true) {
+      const chunk = await cancelledReader?.read();
+      if (chunk?.done === true || chunk === undefined) break;
+      cancelledRaw += decoder.decode(chunk.value, { stream: true });
+    }
+    expect(parseSse(cancelledRaw)).toContainEqual({
+      type: "finish",
+      finishReason: "cancelled",
+    });
+    expect(survivorAborted).toBe(false);
+
+    const survivorHealth = await fetch(`${baseURL}/v1/health`, { headers: requestHeaders() });
+    await expect(survivorHealth.json()).resolves.toMatchObject({ activeOperations: 1 });
+
+    releaseSurvivor?.();
+    let survivorRaw = survivorStart.raw;
+    while (true) {
+      const chunk = await survivorReader?.read();
+      if (chunk?.done === true || chunk === undefined) break;
+      survivorRaw += decoder.decode(chunk.value, { stream: true });
+    }
+    expect(parseSse(survivorRaw)).toEqual([
+      expect.objectContaining({
+        type: "start",
+        runId: survivorStart.runId,
+        provider: "openrouter",
+      }),
+      { type: "text-delta", delta: "surviving-run-started" },
+      { type: "text-delta", delta: "surviving-run-finished" },
+      { type: "finish", finishReason: "stop" },
+    ]);
+  });
+
   it("exposes Codex status and streams the official device-login connector", async () => {
     const descriptor: ProviderDescriptor = {
       id: "codex",

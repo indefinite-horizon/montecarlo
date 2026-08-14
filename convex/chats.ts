@@ -605,6 +605,13 @@ export const getTree = query({
       .order("asc")
       .take(limit + 1);
     const selectedBranches = branches.slice(0, limit);
+    const userState = await ctx.db
+      .query("chat_user_states")
+      .withIndex("by_workspace_user_chat", (index) =>
+        index.eq("workspaceId", args.workspaceId).eq("userId", user._id).eq("chatId", chat._id),
+      )
+      .unique();
+    const unreadBranchPublicIds = new Set(userState?.unreadBranchPublicIds ?? []);
 
     if (args.targetBranchPublicId) {
       const targetBranchPublicId = requireText(
@@ -638,7 +645,7 @@ export const getTree = query({
 
     return {
       chat: await toChatSummary(ctx, chat, user._id),
-      branches: selectedBranches.map(toBranchNode),
+      branches: selectedBranches.map((branch) => toBranchNode(branch, unreadBranchPublicIds)),
       truncated: branches.length > limit,
     };
   },

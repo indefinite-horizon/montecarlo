@@ -50,13 +50,14 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
 
   return (
     <header
-      className="electron-titlebar z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:px-5"
+      className="electron-titlebar z-30 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-xl sm:px-5 [&>button]:size-8 [&>button_svg]:size-4"
       data-testid="workspace-titlebar"
     >
+      {/* Keep this toggle's position synchronized with the collapse-sidebar toggle in WorkspaceSidebar. */}
       <ActionTooltip label={t("sidebar.open")} shortcut={sidebarShortcut} side="bottom">
         <Button
           className={
-            sidebarOpen ? "electron-titlebar-leading md:hidden" : "electron-titlebar-leading-offset"
+            sidebarOpen ? "electron-titlebar-leading md:hidden" : "electron-titlebar-leading-snug"
           }
           size="icon"
           variant="ghost"
@@ -88,11 +89,11 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
         </h1>
       </div>
 
-      <fieldset className="flex h-10 items-center rounded-lg border border-border bg-secondary/45 p-px">
+      <fieldset className="flex h-8 items-center rounded-lg border border-border bg-secondary/45 p-px">
         <legend className="sr-only">{t("canvas.viewMode")}</legend>
         <ActionTooltip label={t("canvas.threadView")} side="bottom">
           <Button
-            className="h-9 px-2.5"
+            className="h-7 gap-1.5 px-2 [&_svg]:size-3.5"
             size="sm"
             variant={view === "thread" ? "secondary" : "ghost"}
             aria-pressed={view === "thread"}
@@ -105,7 +106,7 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
         </ActionTooltip>
         <ActionTooltip label={t("canvas.canvasView")} side="bottom">
           <Button
-            className="h-9 px-2.5"
+            className="h-7 gap-1.5 px-2 [&_svg]:size-3.5"
             size="sm"
             variant={view === "canvas" ? "secondary" : "ghost"}
             aria-pressed={view === "canvas"}
@@ -142,7 +143,8 @@ export const WorkspaceHeader = memo(function WorkspaceHeader({
           <Settings />
         </Button>
       </ActionTooltip>
-      {view === "thread" && !branchMapOpen ? (
+      {!branchMapOpen ? (
+        // Keep this toggle's position synchronized with the close-branch-map toggle in BranchMap.
         <ActionTooltip label={t("branch.mapTitle")} shortcut={branchMapShortcut} side="bottom">
           <Button
             size="icon"

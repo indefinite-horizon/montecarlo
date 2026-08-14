@@ -38,6 +38,8 @@ export const chatSummaryValidator = v.object({
 export const branchNodeValidator = v.object({
   id: v.id("chat_branches"),
   publicId: v.string(),
+  activeRunId: v.optional(v.id("agent_runs")),
+  activeRunLeaseExpiresAt: v.optional(v.number()),
   parentBranchId: v.optional(v.id("chat_branches")),
   anchorType: branchAnchorTypeValidator,
   anchorSourceBranchId: v.optional(v.id("chat_branches")),
@@ -45,6 +47,7 @@ export const branchNodeValidator = v.object({
   anchorSelection: v.optional(branchSelectionValidator),
   anchorPrompt: v.optional(v.string()),
   title: v.optional(v.string()),
+  isUnread: v.boolean(),
   contextMessageIds: v.array(v.id("messages")),
   contextPreview: v.optional(v.string()),
   depth: v.number(),
@@ -68,10 +71,12 @@ export function isProviderId(value: string | undefined): value is ProviderId {
   return providerIds.includes(value as ProviderId);
 }
 
-export function toBranchNode(branch: Doc<"chat_branches">) {
+export function toBranchNode(branch: Doc<"chat_branches">, unreadBranchPublicIds?: Set<string>) {
   return {
     id: branch._id,
     publicId: branch.publicId,
+    activeRunId: branch.activeRunId,
+    activeRunLeaseExpiresAt: branch.activeRunLeaseExpiresAt,
     parentBranchId: branch.parentBranchId,
     anchorType: branch.anchorType,
     anchorSourceBranchId: branch.anchorSourceBranchId,
@@ -79,6 +84,7 @@ export function toBranchNode(branch: Doc<"chat_branches">) {
     anchorSelection: branch.anchorSelection,
     anchorPrompt: branch.anchorPrompt,
     title: branch.title,
+    isUnread: unreadBranchPublicIds?.has(branch.publicId) ?? false,
     contextMessageIds: branch.contextMessageIds,
     contextPreview: branch.contextPreview,
     depth: branch.depth,
@@ -220,6 +226,7 @@ export async function insertChat(
     contextMessageIds: [],
     depth: 0,
     nextMessageOrdinal: 0,
+    runLeaseVersion: 1,
     createdByUserId: input.createdByUserId,
     createdAt: now,
   });

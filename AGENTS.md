@@ -53,6 +53,9 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 - Treat keyboard shortcuts as first-class UX: show platform-correct shortcut hints, preserve accessible click or menu equivalents, and add broadly useful actions to the Cmd/Ctrl+K palette unless they are context-specific or unsafe to invoke globally.
 - Icon-only action buttons must have an accessible name and a hover/focus tooltip. Show the shortcut at the right side of the tooltip when one exists.
 - Co-located buttons, segmented controls, and toggles must use the same visible height and hit-target size unless a documented hierarchy requires otherwise.
+- Before changing UI typography, colors, component choice, or component styling,
+  consult `docs/DESIGN.md`. Follow its shared typography scale and button
+  hierarchy, and extend shared primitives before introducing repeated one-off styles.
 
 ## Development
 

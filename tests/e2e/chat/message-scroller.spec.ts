@@ -7,7 +7,11 @@ import {
   installRuntimeMock,
 } from "../helpers/runtime";
 import {
+  activeChatRow,
   assistantMessage,
+  childBranchRow,
+  createChat,
+  createPromptBranch,
   createWorkspace,
   openFreshUser,
   sendMessage,
@@ -55,6 +59,78 @@ async function waitForStableScroll(viewport: Locator) {
       { intervals: [75] },
     )
     .toBeGreaterThanOrEqual(2);
+}
+
+async function setReaderScrollPosition(viewport: Locator, fraction: number) {
+  const target = await viewport.evaluate((element, targetFraction) => {
+    const scroller = element as HTMLElement;
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    element.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: -1 }));
+    scroller.scrollTop = max * targetFraction;
+    element.dispatchEvent(new Event("scroll", { bubbles: true }));
+    return max * targetFraction;
+  }, fraction);
+  await expect
+    .poll(async () => Math.abs((await scrollMetrics(viewport)).scrollTop - target))
+    .toBeLessThan(2);
+  await waitForStableScroll(viewport);
+}
+
+async function visibleMessageAnchor(viewport: Locator) {
+  return viewport.evaluate((element) => {
+    const viewportRect = element.getBoundingClientRect();
+    const item = Array.from(element.querySelectorAll<HTMLElement>("[data-message-id]")).find(
+      (candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        return rect.height > 0 && rect.bottom > viewportRect.top && rect.top < viewportRect.bottom;
+      },
+    );
+    if (!item?.dataset.messageId) throw new Error("Could not find a visible message anchor.");
+    return {
+      messageId: item.dataset.messageId,
+      offset: item.getBoundingClientRect().top - viewportRect.top,
+    };
+  });
+}
+
+async function messageAnchorOffset(viewport: Locator, messageId: string) {
+  return viewport.evaluate((element, targetMessageId) => {
+    const item = Array.from(element.querySelectorAll<HTMLElement>("[data-message-id]")).find(
+      (candidate) => candidate.dataset.messageId === targetMessageId,
+    );
+    if (!item) throw new Error(`Could not find restored message anchor: ${targetMessageId}`);
+    return item.getBoundingClientRect().top - element.getBoundingClientRect().top;
+  }, messageId);
+}
+
+async function waitForMessageAnchor(viewport: Locator, messageId: string) {
+  await expect
+    .poll(() =>
+      viewport
+        .locator("[data-message-id]")
+        .evaluateAll(
+          (items, targetMessageId) =>
+            items.some((item) => (item as HTMLElement).dataset.messageId === targetMessageId),
+          messageId,
+        ),
+    )
+    .toBe(true);
+}
+
+async function expectWorkspaceLocation(
+  page: Page,
+  expected: { branch?: string; chat?: string; view?: string },
+) {
+  await expect
+    .poll(() => {
+      const search = new URL(page.url()).searchParams;
+      const actual: { branch?: string | null; chat?: string | null; view?: string | null } = {};
+      if (expected.branch !== undefined) actual.branch = search.get("branch");
+      if (expected.chat !== undefined) actual.chat = search.get("chat");
+      if (expected.view !== undefined) actual.view = search.get("view");
+      return actual;
+    })
+    .toEqual(expected);
 }
 
 function messageItem(log: Locator, message: Locator) {
@@ -239,4 +315,120 @@ test("anchors new turns, honors selection intent, and resumes following at lates
   await controlledStream.finish(page);
   await expect(log).not.toHaveAttribute("aria-busy", "true");
   await expect(page.getByRole("button", { name: "Send message" })).toBeVisible();
+});
+
+test("restores reader position independently for each branch and chat", async ({ page }) => {
+  const firstChatId = await activeChatRow(page).getAttribute("data-chat-id");
+  if (!firstChatId) throw new Error("The first chat row was missing its public ID.");
+  await seedOverflowingTranscript(page);
+  const firstRootBranchId = new URL(page.url()).searchParams.get("branch");
+  if (!firstRootBranchId) throw new Error("The first chat route was missing its root branch.");
+
+  const viewport = page.getByTestId("transcript-scroller");
+  const jumpToLatest = page.getByRole("button", { name: "Scroll to latest" });
+  await expect.poll(async () => (await scrollMetrics(viewport)).remaining).toBeGreaterThan(100);
+  await jumpToLatest.click();
+  await expect.poll(async () => (await scrollMetrics(viewport)).remaining).toBeLessThan(2);
+
+  await createPromptBranch(page, "Remembered child position");
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("branch"))
+    .not.toBe(firstRootBranchId);
+  const childBranchId = new URL(page.url()).searchParams.get("branch");
+  if (!childBranchId || childBranchId === firstRootBranchId) {
+    throw new Error("The child branch route was incomplete.");
+  }
+  if ((await jumpToLatest.getAttribute("data-active")) === "true") await jumpToLatest.click();
+  await expect.poll(async () => (await scrollMetrics(viewport)).remaining).toBeLessThan(2);
+
+  const rootBranchRow = page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]');
+  const childRow = childBranchRow(page, "Remembered child position");
+  const childPrompt = `Resume following after restore ${controlledStream.marker}`;
+  await page.getByPlaceholder("Ask a follow-up or start a new direction…").fill(childPrompt);
+  await page.getByRole("button", { name: "Send message" }).click();
+  await controlledStream.waitForRequest(page);
+  await controlledStream.releaseText(page, streamSection("CHILD_INITIAL", 8));
+  await expect(assistantMessage(page, "CHILD_INITIAL_END")).toBeVisible();
+  await setReaderScrollPosition(viewport, 0.4);
+  await expect(jumpToLatest).toHaveAttribute("data-active", "true");
+
+  await rootBranchRow.click();
+  await expect(rootBranchRow).toHaveAttribute("aria-current", "true");
+  await childRow.click();
+  await expect(childRow).toHaveAttribute("aria-current", "true");
+  await expect(jumpToLatest).toHaveAttribute("data-active", "true");
+  await jumpToLatest.evaluate((button) => (button as HTMLButtonElement).click());
+  await expect.poll(async () => (await scrollMetrics(viewport)).remaining).toBeLessThan(2);
+
+  await rootBranchRow.click();
+  await expect(rootBranchRow).toHaveAttribute("aria-current", "true");
+  await controlledStream.releaseText(page, streamSection("CHILD_WHILE_AWAY"));
+  await childRow.click();
+  await expect(childRow).toHaveAttribute("aria-current", "true");
+  await expect(assistantMessage(page, "CHILD_WHILE_AWAY_END")).toBeVisible();
+  await expect.poll(async () => (await scrollMetrics(viewport)).remaining).toBeLessThan(2);
+  await controlledStream.finish(page);
+
+  await rootBranchRow.click();
+  await expect(rootBranchRow).toHaveAttribute("aria-current", "true");
+  await expectWorkspaceLocation(page, { branch: firstRootBranchId });
+  await setReaderScrollPosition(viewport, 0.35);
+  const firstChatAnchor = await visibleMessageAnchor(viewport);
+
+  await childRow.click();
+  await expect(childRow).toHaveAttribute("aria-current", "true");
+  await expectWorkspaceLocation(page, { branch: childBranchId });
+  await expect.poll(async () => (await scrollMetrics(viewport)).remaining).toBeLessThan(2);
+
+  await rootBranchRow.click();
+  await expect(rootBranchRow).toHaveAttribute("aria-current", "true");
+  await expectWorkspaceLocation(page, { branch: firstRootBranchId });
+  await waitForMessageAnchor(viewport, firstChatAnchor.messageId);
+  await expect
+    .poll(async () =>
+      Math.abs(
+        (await messageAnchorOffset(viewport, firstChatAnchor.messageId)) - firstChatAnchor.offset,
+      ),
+    )
+    .toBeLessThan(5);
+
+  await createChat(page);
+  const secondChatId = await activeChatRow(page).getAttribute("data-chat-id");
+  if (!secondChatId) throw new Error("The second chat row was missing its public ID.");
+  await expectWorkspaceLocation(page, { chat: secondChatId });
+  await seedOverflowingTranscript(page);
+  const secondRootBranchId = new URL(page.url()).searchParams.get("branch");
+  if (!secondRootBranchId) throw new Error("The second chat route was missing its root branch.");
+  await setReaderScrollPosition(viewport, 0.7);
+  const secondChatAnchor = await visibleMessageAnchor(viewport);
+
+  await page.locator(`[data-testid="chat-row"][data-chat-id="${firstChatId}"]`).click();
+  await expectWorkspaceLocation(page, {
+    branch: firstRootBranchId,
+    chat: firstChatId,
+    view: "thread",
+  });
+  await waitForMessageAnchor(viewport, firstChatAnchor.messageId);
+  await expect
+    .poll(async () =>
+      Math.abs(
+        (await messageAnchorOffset(viewport, firstChatAnchor.messageId)) - firstChatAnchor.offset,
+      ),
+    )
+    .toBeLessThan(5);
+
+  await page.locator(`[data-testid="chat-row"][data-chat-id="${secondChatId}"]`).click();
+  await expectWorkspaceLocation(page, {
+    branch: secondRootBranchId,
+    chat: secondChatId,
+    view: "thread",
+  });
+  await waitForMessageAnchor(viewport, secondChatAnchor.messageId);
+  await expect
+    .poll(async () =>
+      Math.abs(
+        (await messageAnchorOffset(viewport, secondChatAnchor.messageId)) - secondChatAnchor.offset,
+      ),
+    )
+    .toBeLessThan(5);
 });

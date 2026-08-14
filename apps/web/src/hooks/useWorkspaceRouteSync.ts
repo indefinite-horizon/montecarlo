@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import {
+  type CompleteWorkspaceRouteSearch,
   canGoBackInWorkspaceHistory,
   canGoForwardInWorkspaceHistory,
   createWorkspaceRouteHistory,
@@ -17,6 +18,8 @@ import {
   moveWorkspaceRouteHistory,
   pushWorkspaceRoute,
   reconcileWorkspaceRoute,
+  rememberedWorkspaceRouteForChat,
+  rememberWorkspaceRoute,
   replaceWorkspaceRoute,
   type WorkspaceRouteHistory,
   type WorkspaceRouteSearch,
@@ -56,6 +59,9 @@ export function useWorkspaceRouteSync({
     createWorkspaceRouteHistory(routeSearch),
   );
   const appRouteHistoryRef = useRef(appRouteHistory);
+  const chatRouteMemoryRef = useRef<ReadonlyMap<string, CompleteWorkspaceRouteSearch>>(
+    rememberWorkspaceRoute(new Map(), routeSearch),
+  );
   const commitAppRouteHistory = useCallback((history: WorkspaceRouteHistory) => {
     if (history === appRouteHistoryRef.current) return;
     appRouteHistoryRef.current = history;
@@ -72,6 +78,7 @@ export function useWorkspaceRouteSync({
     (search: WorkspaceRouteSearch, replace = false) => {
       workspaceSelectionRequestRef.current += 1;
       const nextRouteKey = workspaceRouteKey(search);
+      chatRouteMemoryRef.current = rememberWorkspaceRoute(chatRouteMemoryRef.current, search);
       pendingRouteKeyRef.current = nextRouteKey === routeKey ? undefined : nextRouteKey;
       expectRoute(nextRouteKey);
       if (isCompleteWorkspaceRoute(search)) {
@@ -90,6 +97,7 @@ export function useWorkspaceRouteSync({
       const result = moveWorkspaceRouteHistory(appRouteHistoryRef.current, delta);
       if (!result.route) return;
       commitAppRouteHistory(result.history);
+      chatRouteMemoryRef.current = rememberWorkspaceRoute(chatRouteMemoryRef.current, result.route);
       workspaceSelectionRequestRef.current += 1;
       const nextRouteKey = workspaceRouteKey(result.route);
       pendingRouteKeyRef.current = nextRouteKey === routeKey ? undefined : nextRouteKey;
@@ -102,6 +110,11 @@ export function useWorkspaceRouteSync({
   );
   const goBack = useCallback(() => moveInAppHistory(-1), [moveInAppHistory]);
   const goForward = useCallback(() => moveInAppHistory(1), [moveInAppHistory]);
+  const latestRouteForChat = useCallback(
+    (workspace: string, chat: string) =>
+      rememberedWorkspaceRouteForChat(chatRouteMemoryRef.current, workspace, chat),
+    [],
+  );
 
   // lint-allow: no-direct-use-effect — route changes restore persisted workspace selection.
   useEffect(() => {
@@ -120,6 +133,10 @@ export function useWorkspaceRouteSync({
           view: routeSearch.view,
         } satisfies WorkspaceRouteSearch;
         if (isCompleteWorkspaceRoute(currentRoute)) {
+          chatRouteMemoryRef.current = rememberWorkspaceRoute(
+            chatRouteMemoryRef.current,
+            currentRoute,
+          );
           commitAppRouteHistory(reconcileWorkspaceRoute(appRouteHistoryRef.current, currentRoute));
         }
       }
@@ -229,6 +246,7 @@ export function useWorkspaceRouteSync({
 
   return {
     navigateToRoute,
+    latestRouteForChat,
     goBack,
     goForward,
     canGoBack: canGoBackInWorkspaceHistory(appRouteHistory),

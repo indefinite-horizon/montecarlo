@@ -31,6 +31,18 @@ const devToolsMenu = readFileSync(
   path.resolve(desktopRoot, "../web/src/components/DevToolsMenu.tsx"),
   "utf8",
 );
+const workspaceSidebar = readFileSync(
+  path.resolve(desktopRoot, "../web/src/components/WorkspaceSidebar.tsx"),
+  "utf8",
+);
+const workspaceHeader = readFileSync(
+  path.resolve(desktopRoot, "../web/src/components/WorkspaceHeader.tsx"),
+  "utf8",
+);
+const branchMap = readFileSync(
+  path.resolve(desktopRoot, "../web/src/components/BranchMap.tsx"),
+  "utf8",
+);
 
 describe("desktop integration contracts", () => {
   it("launches the runtime's real source and packaged entrypoints with its origin variable", () => {
@@ -114,8 +126,12 @@ describe("desktop integration contracts", () => {
   it("keeps the custom titlebar scoped to macOS and exposes its native safe area", () => {
     assert.match(mainSource, /process\.platform === "darwin"/);
     assert.match(mainSource, /titleBarStyle: "hidden"/);
-    assert.match(mainSource, /titleBarOverlay: \{ height: 64 \}/);
+    assert.match(mainSource, /titleBarOverlay: \{ height: 48 \}/);
+    assert.match(mainSource, /trafficLightPosition: \{ x: 16, y: 16 \}/);
     assert.doesNotMatch(mainSource, /titleBarStyle: "hiddenInset"/);
+    assert.match(workspaceSidebar, /electron-titlebar flex h-12/);
+    assert.match(workspaceHeader, /electron-titlebar z-30 flex h-12/);
+    assert.match(branchMap, /electron-titlebar flex h-12/);
   });
 
   it("opens the development renderer using the local stack port precedence", () => {
@@ -126,6 +142,9 @@ describe("desktop integration contracts", () => {
 
   it("keeps the draggable development menu interactive in Electron titlebars", () => {
     assert.match(appCss, /\.electron-no-drag/);
+    assert.match(appCss, /\.electron-titlebar-leading-snug/);
+    assert.match(workspaceSidebar, /className="electron-titlebar-leading-snug/);
+    assert.match(workspaceHeader, /: "electron-titlebar-leading-snug"/);
     assert.match(devToolsMenu, /className="electron-no-drag pointer-events-none fixed/);
     assert.match(devToolsMenu, /className="electron-no-drag pointer-events-auto flex touch-none/);
     assert.match(devToolsMenu, /"electron-no-drag pointer-events-auto ml-1 rounded/);

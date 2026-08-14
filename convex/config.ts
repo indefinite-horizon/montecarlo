@@ -37,6 +37,11 @@ export const convexConfig = {
     },
   },
   domain: {
+    runs: {
+      leaseTtlMs: 3 * sharedConfig.runs.heartbeatIntervalMs,
+      legacyRunStaleAfterMs: oneDayMs,
+      legacyMigrationBatchSize: 32,
+    },
     chatNaming: {
       claimLeaseMs: 5 * oneMinuteMs,
     },

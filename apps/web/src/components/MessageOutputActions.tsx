@@ -4,6 +4,7 @@ import { Check, Clock3, Copy, Pencil, RotateCcw } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { copyText } from "@/lib/clipboard";
 import type { ChatMessage } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "./ActionTooltip";
@@ -63,7 +64,7 @@ export const MessageOutputActions = memo(function MessageOutputActions({
 
   const copyOutput = async () => {
     try {
-      await navigator.clipboard.writeText(message.content);
+      await copyText(message.content);
       setCopied(true);
       toast.success(t("chat.outputCopied"));
       window.setTimeout(() => setCopied(false), 2_000);

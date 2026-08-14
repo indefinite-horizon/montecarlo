@@ -6,6 +6,7 @@ import {
   activeChatRow,
   createChat,
   createProject,
+  createPromptBranch,
   createWorkspace,
   openFreshUser,
   sendMessage,
@@ -131,6 +132,37 @@ test("creates an unfiled chat that remains outside every project", async ({ page
   expect(projectlessBox.y).toBeLessThan(projectBox.y);
 });
 
+test("restores each chat's last branch and conversation view", async ({ page }) => {
+  const firstTitle = await createWorkspace(page, "Remembered chat locations");
+  await createPromptBranch(page, "Remember this branch");
+  const firstChatId = await chatRow(page, firstTitle).getAttribute("data-chat-id");
+  const firstBranchId = new URL(page.url()).searchParams.get("branch");
+  if (!firstChatId || !firstBranchId) throw new Error("The first chat route was incomplete.");
+
+  await page.getByRole("button", { name: "Canvas view", exact: true }).click();
+  const secondTitle = await createChat(page);
+  const secondChatId = await chatRow(page, secondTitle).getAttribute("data-chat-id");
+  const secondBranchId = new URL(page.url()).searchParams.get("branch");
+  if (!secondChatId || !secondBranchId) throw new Error("The second chat route was incomplete.");
+  await page.getByRole("button", { name: "Thread view", exact: true }).click();
+
+  await chatRow(page, firstTitle).getByRole("button", { name: firstTitle, exact: true }).click();
+  await expect
+    .poll(() => {
+      const search = new URL(page.url()).searchParams;
+      return [search.get("chat"), search.get("branch"), search.get("view")];
+    })
+    .toEqual([firstChatId, firstBranchId, "canvas"]);
+
+  await chatRow(page, secondTitle).getByRole("button", { name: secondTitle, exact: true }).click();
+  await expect
+    .poll(() => {
+      const search = new URL(page.url()).searchParams;
+      return [search.get("chat"), search.get("branch"), search.get("view")];
+    })
+    .toEqual([secondChatId, secondBranchId, "thread"]);
+});
+
 test("paginates aligned chat groups and toggles project contents", async ({ page }) => {
   await createWorkspace(page, "Paginated workspace");
   for (let index = 0; index < 5; index += 1) await createChat(page);
@@ -232,6 +264,22 @@ test("archives a chat from its sidebar icon and keeps it hidden after reload", a
 
   await page.reload();
   await expect(page.locator(`[data-chat-id="${archivedPublicId}"]`)).toHaveCount(0);
+});
+
+test("archiving the active chat advances within its sidebar section", async ({ page }) => {
+  const oldestTitle = await createWorkspace(page, "Archive successor workspace");
+  const middleTitle = await createChat(page);
+  await createChat(page);
+  const oldestPublicId = await chatRow(page, oldestTitle).getAttribute("data-chat-id");
+  if (!oldestPublicId) throw new Error("The successor chat was missing its public ID.");
+
+  const middleRow = chatRow(page, middleTitle);
+  await middleRow.getByRole("button", { name: middleTitle, exact: true }).click();
+  await middleRow.hover();
+  await middleRow.getByRole("button", { name: `Archive ${middleTitle}`, exact: true }).click();
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("chat")).toBe(oldestPublicId);
+  await expect(page.getByTestId("chat-breadcrumb-title")).toHaveText(oldestTitle);
 });
 
 test("row hotkeys are menu-scoped while the archive shortcut remains global", async ({ page }) => {

@@ -14,9 +14,16 @@ import {
   messageRoleValidator,
   runStatusValidator,
 } from "./lib/domainValidators";
+import {
+  ACTIVE_BRANCH_RUN_ERROR,
+  hasActiveRunOnBranch,
+  RUN_LEASE_VERSION,
+  requireRunLeaseCapability,
+  runNoLongerActiveError,
+} from "./lib/runLeases";
 import { requireWorkspacePermission } from "./lib/workspaceAuth";
 
-const messageSummaryValidator = v.object({
+export const messageSummaryValidator = v.object({
   id: v.id("messages"),
   publicId: v.string(),
   workspaceId: v.id("workspaces"),
@@ -146,6 +153,7 @@ export const append = mutation({
     contentPreview: v.string(),
     replyToMessageId: v.optional(v.id("messages")),
     runId: v.optional(v.id("agent_runs")),
+    leaseCapability: v.optional(v.string()),
   },
   returns: messageSummaryValidator,
   handler: async (ctx, args) => {
@@ -164,6 +172,7 @@ export const append = mutation({
     let provider: string | undefined;
     let model: string | undefined;
     let runStatus: "running" | undefined;
+    const now = Date.now();
     if (args.runId) {
       const run = await ctx.db.get(args.runId);
       if (
@@ -171,14 +180,36 @@ export const append = mutation({
         run.workspaceId !== args.workspaceId ||
         run.chatId !== args.chatId ||
         run.branchId !== args.branchId ||
-        run.status !== "running"
+        run.requestedByUserId !== user._id ||
+        run.status !== "running" ||
+        run.leaseHandoffAt !== undefined
       ) {
         throw new Error("Active run not found for this message.");
       }
       if (args.role === "assistant" || args.role === "tool") {
+        await requireRunLeaseCapability(run, args.leaseCapability);
+        const modernOwner = run.leaseCapabilityHash !== undefined;
+        if (modernOwner || branch.runLeaseVersion === RUN_LEASE_VERSION) {
+          if (
+            branch.activeRunId !== run._id ||
+            branch.activeRunLeaseExpiresAt === undefined ||
+            branch.activeRunLeaseExpiresAt <= now
+          ) {
+            throw runNoLongerActiveError();
+          }
+        }
         provider = run.provider;
         model = run.model;
         runStatus = "running";
+      } else {
+        throw new Error("Only assistant and tool messages may identify a run.");
+      }
+    } else {
+      if (await hasActiveRunOnBranch(ctx, branch, now)) {
+        throw new Error(ACTIVE_BRANCH_RUN_ERROR);
+      }
+      if (args.role === "user") {
+        throw new Error("User turns must be started atomically.");
       }
     }
     if (args.replyToMessageId) {
@@ -224,7 +255,6 @@ export const append = mutation({
       throw new Error("Branch message ordinal is exhausted.");
     }
 
-    const now = Date.now();
     const ordinal = branch.nextMessageOrdinal;
     const messageId = await ctx.db.insert("messages", {
       publicId,
@@ -254,13 +284,6 @@ export const append = mutation({
             latestCompletedMessagePublicId: publicId,
             latestCompletedAt: now,
           }
-        : {}),
-      ...(args.role === "user" ? { lastUserMessageAt: now } : {}),
-      ...(args.role === "user" &&
-      chat.autoTitleStatus !== undefined &&
-      chat.autoTitleStatus !== "generated" &&
-      chat.autoTitleInputMessageId === undefined
-        ? { autoTitleInputMessageId: messageId }
         : {}),
     });
 

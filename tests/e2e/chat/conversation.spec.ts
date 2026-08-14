@@ -100,6 +100,30 @@ test("sends a message, consumes normalized stream events, and persists both turn
   await expect(reloadedOutputActions.getByTestId("message-model").locator("svg")).toHaveCount(1);
 });
 
+test("copies model output when the Clipboard API rejects the write", async ({ context, page }) => {
+  const output = "Stub response: Copy this model output";
+  await sendMessage(page, "Copy this model output", output);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        readText: navigator.clipboard.readText.bind(navigator.clipboard),
+        writeText: () => Promise.reject(new DOMException("Clipboard blocked", "NotAllowedError")),
+      },
+    });
+  });
+
+  const assistantTurn = page
+    .getByRole("article", { name: "Monte Carlo", exact: true })
+    .filter({ has: assistantMessage(page, output) });
+  await assistantTurn.hover();
+  await assistantTurn.getByRole("button", { name: "Copy output" }).click();
+
+  await expect(page.getByText("Output copied.", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(output);
+});
+
 test("retry and edit replace a completed turn and truncate subsequent history", async ({
   page,
 }) => {
@@ -170,7 +194,10 @@ test("stops an in-progress generation and ignores its late response", async ({ p
   await expect.poll(() => conversationRequests(runtime).length).toBe(1);
   await page.getByRole("button", { name: "Stop generation" }).click();
   await expect(page.getByRole("button", { name: "Send message" })).toBeVisible();
-  await expect(userMessage(page, prompt)).toBeVisible();
+  const canceledUserTurn = userMessage(page, prompt);
+  await expect(canceledUserTurn).toBeVisible();
+  await canceledUserTurn.hover();
+  await expect(canceledUserTurn.getByRole("button", { name: "Retry" })).toBeVisible();
   await page.waitForTimeout(2_200);
   await expect(assistantMessage(page, "Stub response: Cancel this generation")).toHaveCount(0);
   expect(conversationRequests(runtime)).toHaveLength(1);
@@ -187,7 +214,10 @@ test("provider error preserves the user turn and allows a later successful send"
   await sendMessage(page, failedPrompt);
   const errorToast = page.getByText("local model runtime is offline", { exact: false });
   await expect(errorToast).toBeVisible();
-  await expect(userMessage(page, failedPrompt)).toBeVisible();
+  const failedUserTurn = userMessage(page, failedPrompt);
+  await expect(failedUserTurn).toBeVisible();
+  await failedUserTurn.hover();
+  await expect(failedUserTurn.getByRole("button", { name: "Retry" })).toBeVisible();
   await page.getByPlaceholder("Ask a follow-up or start a new direction…").click();
   await expect(errorToast).toBeHidden({ timeout: 10_000 });
 

@@ -4,9 +4,11 @@ import { toast } from "sonner";
 import { startAutomaticChatTitle } from "@/lib/autoChatTitle";
 import {
   type BranchAnchor,
+  branchSubtreeIds,
   type ChatBranch,
   type ChatMessage,
-  hasStreamingMessage,
+  hasRunningBranchInSubtree,
+  isBranchRunning,
   type ProviderId,
   type ReasoningEffort,
   visibleMessages,
@@ -15,16 +17,15 @@ import { branchTitle, contextSnapshot, updateBranchTitle } from "@/lib/conversat
 import type { MessageItem } from "@/lib/convexDomainApi";
 import { demoChats, demoProjects, demoWorkspace } from "@/lib/demoConversation";
 import { initialProviderModels, saveSelectedProviderModel } from "@/lib/providerConfig";
-import { streamRuntimeChat } from "@/lib/runtimeClient";
-import { buildRuntimeContext } from "@/lib/runtimeContext";
 import { useAutomaticChatTitle } from "./useAutomaticChatTitle";
+import { useBranchActivity } from "./useBranchActivity";
 import {
   demoMode,
   type PendingBranchTurn,
-  type ReplayContext,
   useAddSessionBranch,
   useConversationSessionState,
 } from "./useConversationSessionState";
+import { useConversationTurnRunner } from "./useConversationTurnRunner";
 import { useConversationWorkspaceActions } from "./useConversationWorkspaceActions";
 import { useConvexConversationData } from "./useConvexConversationData";
 export function useConversationController(
@@ -39,7 +40,9 @@ export function useConversationController(
 ) {
   const [demoActiveChatId, setDemoActiveChatId] = useState(demoChats[0]?.id ?? "");
   const [requestedBranchId, setRequestedBranchId] = useState("branch-root");
-  const [pendingBranchTurn, setPendingBranchTurn] = useState<PendingBranchTurn>();
+  const [pendingBranchTurns, setPendingBranchTurns] = useState<Record<string, PendingBranchTurn>>(
+    {},
+  );
   const [provider, setProvider] = useState<ProviderId>("codex");
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("medium");
   const [fastMode, setFastMode] = useState(false);
@@ -60,7 +63,6 @@ export function useConversationController(
     requestedChatPublicId,
     requestedBranchPublicId,
   );
-  const abortRef = useRef<AbortController | undefined>(undefined);
   const startedBranchTurnsRef = useRef(new Set<string>());
   const messagePersistenceRef = useRef(new Map<string, Promise<MessageItem | null>>());
   const persistedMessageIdsRef = useRef(new Map<string, string>());
@@ -98,6 +100,8 @@ export function useConversationController(
     domainChats: domain.chats,
     durable,
   });
+  const branchActivity = useBranchActivity(branches);
+  const branchActivityNow = branchActivity.activityNow;
   const activeBranchId =
     branches.find((branch) => branch.id === requestedBranchId)?.id ??
     domain.activeBranchId ??
@@ -123,6 +127,7 @@ export function useConversationController(
       if (!resolvedAnchor.prompt.trim() && !resolvedAnchor.selectedText?.trim()) return false;
       const parent = branches.find((branch) => branch.id === parentBranchId);
       if (!parent) return false;
+      if (isBranchRunning(parent, branchActivityNow)) return false;
 
       if (durable) {
         let sourceMessageId = resolvedAnchor.sourceMessageId;
@@ -180,10 +185,11 @@ export function useConversationController(
             release: async () => true,
           });
           if (persistedAnchor.prompt.trim()) {
-            setPendingBranchTurn({
+            const pending = {
               branchId: String(created.id),
               prompt: persistedAnchor.prompt.trim(),
-            });
+            };
+            setPendingBranchTurns((current) => ({ ...current, [pending.branchId]: pending }));
           }
           return { id: String(created.id), publicId: created.publicId };
         } catch {
@@ -221,7 +227,8 @@ export function useConversationController(
       });
       setRequestedBranchId(id);
       if (resolvedAnchor.prompt.trim()) {
-        setPendingBranchTurn({ branchId: id, prompt: resolvedAnchor.prompt.trim() });
+        const pending = { branchId: id, prompt: resolvedAnchor.prompt.trim() };
+        setPendingBranchTurns((current) => ({ ...current, [pending.branchId]: pending }));
       }
       return { id, publicId: id };
     },
@@ -229,6 +236,7 @@ export function useConversationController(
       activeBranchId,
       addSessionBranch,
       branches,
+      branchActivityNow,
       defaultSelectionBranchPrompt,
       domain,
       durable,
@@ -240,265 +248,37 @@ export function useConversationController(
     ],
   );
 
-  const sendMessage = useCallback(
-    async (prompt: string, replay?: ReplayContext) => {
-      if (loading || (!durable && !demoMode)) return;
-      const text = prompt.trim();
-      if (!text) return;
-      const branchId = replay?.branchId ?? activeBranchId;
-      const chatId = activeChatId;
-      const runFastMode = provider === "codex" && fastMode;
-      const runProvider = provider;
-      const runModel = providerModels[provider];
-      const runtimeMessages = buildRuntimeContext(
-        replay?.contextMessages ?? messages,
-        replay?.anchor ?? branches.find((branch) => branch.id === branchId)?.anchor,
-      );
-      const userId = crypto.randomUUID();
-      const userMessage: ChatMessage = {
-        id: userId,
-        publicId: `message_${userId}`,
-        branchId,
-        role: "user",
-        content: text,
-        contentReady: true,
-        createdAt: Date.now(),
-      };
-      const assistantId = crypto.randomUUID();
-      const assistantMessage: ChatMessage = {
-        id: assistantId,
-        publicId: `message_${assistantId}`,
-        branchId,
-        role: "assistant",
-        content: "",
-        contentReady: true,
-        createdAt: Date.now() + 1,
-        provider: runProvider,
-        model: runModel,
-        runStatus: "running",
-        isStreaming: true,
-      };
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const releaseController = () => {
-        if (abortRef.current === controller) abortRef.current = undefined;
-      };
-      setChatRunning(chatId, assistantId, true);
-      appendMessages(branchId, [userMessage, assistantMessage]);
-
-      const persistedSessionBranch = activeSessionBranches.some(
-        (entry) => entry.branch.id === branchId && entry.persisted,
-      );
-      let run = null;
-      if (durable && (domain.durableBranchIds.has(branchId) || persistedSessionBranch)) {
-        try {
-          const inputPersistence = domain.persistMessage({
-            branchId,
-            clientId: userMessage.id,
-            role: "user",
-            content: userMessage.content,
-          });
-          messagePersistenceRef.current.set(userMessage.id, inputPersistence);
-          const inputMessage = await inputPersistence;
-          messagePersistenceRef.current.delete(userMessage.id);
-          if (inputMessage) {
-            persistedMessageIdsRef.current.set(userMessage.id, String(inputMessage.id));
-            updateMessage(branchId, userMessage.id, (message) => ({
-              ...message,
-              id: String(inputMessage.id),
-            }));
-            const titleClaimToken = crypto.randomUUID();
-            void startAutomaticChatTitle({
-              claim: () => domain.claimAutoTitle(chatId, titleClaimToken, runProvider, runModel),
-              complete: (title) => domain.completeAutoTitle(chatId, titleClaimToken, title),
-              release: () => domain.releaseAutoTitle(chatId, titleClaimToken),
-            });
-            if (!controller.signal.aborted) {
-              run = await domain.createRun({
-                branchId,
-                provider: runProvider,
-                model: runModel,
-                inputMessageId: inputMessage.id,
-                reasoningEffort,
-                fastMode: runFastMode,
-              });
-            }
-          }
-        } catch {
-          setChatRunning(chatId, assistantId, false);
-          releaseController();
-          messagePersistenceRef.current.delete(userMessage.id);
-          toast.error(persistenceErrorMessage);
-          setSessionMessages((current) => ({
-            ...current,
-            [branchId]: (current[branchId] ?? []).filter(
-              (message) => message.id !== userMessage.id && message.id !== assistantId,
-            ),
-          }));
-          return;
-        }
-        if (controller.signal.aborted && !run) {
-          setChatRunning(chatId, assistantId, false);
-          removeMessages(branchId, [assistantId]);
-          releaseController();
-          return;
-        }
-        if (!run) {
-          setChatRunning(chatId, assistantId, false);
-          releaseController();
-          toast.error(persistenceErrorMessage);
-          setSessionMessages((current) => ({
-            ...current,
-            [branchId]: (current[branchId] ?? []).filter(
-              (message) => message.id !== userMessage.id && message.id !== assistantId,
-            ),
-          }));
-          return;
-        }
-      }
-
-      let outcome: "succeeded" | "failed" | "canceled" = "succeeded";
-      let assistantContent = "";
-      let persistedAssistantId: string | undefined;
-      let receivedFinish = false;
-      try {
-        await streamRuntimeChat({
-          provider: runProvider,
-          model: runModel,
-          messages: runtimeMessages,
-          prompt: text,
-          reasoningEffort,
-          fastMode: runFastMode,
-          signal: controller.signal,
-          onEvent: (event) => {
-            if (event.type === "error") throw new Error(event.message);
-            if (event.type === "finish") {
-              receivedFinish = true;
-              if (event.finishReason === "cancelled" || event.finishReason === "canceled") {
-                outcome = "canceled";
-              } else if (event.finishReason === "error") {
-                outcome = "failed";
-              }
-              return;
-            }
-            if (event.type !== "text-delta") return;
-            assistantContent += event.delta;
-            updateMessage(branchId, assistantId, (message) => ({
-              ...message,
-              content: `${message.content}${event.delta}`,
-            }));
-          },
-        });
-        if (!receivedFinish) throw new Error("Runtime stream ended without a finish event.");
-      } catch {
-        if (controller.signal.aborted) {
-          outcome = "canceled";
-        } else {
-          outcome = "failed";
-          assistantContent = "";
-          toast.error(runtimeOfflineMessage);
-          removeMessages(branchId, [assistantId]);
-        }
-      } finally {
-        let terminalOutcome = outcome;
-        let durableRunCompleted = !run;
-        if (run) {
-          let outputMessageId: MessageItem["id"] | undefined;
-          if (assistantContent.trim()) {
-            let outputPersistenceFailed = false;
-            try {
-              const outputPersistence = domain.persistMessage({
-                branchId,
-                clientId: assistantId,
-                role: "assistant",
-                content: assistantContent,
-                runId: run.id,
-              });
-              messagePersistenceRef.current.set(assistantId, outputPersistence);
-              const outputMessage = await outputPersistence;
-              messagePersistenceRef.current.delete(assistantId);
-              if (outputMessage) {
-                outputMessageId = outputMessage.id;
-                persistedAssistantId = String(outputMessage.id);
-                persistedMessageIdsRef.current.set(assistantId, String(outputMessage.id));
-                updateMessage(branchId, assistantId, (message) => ({
-                  ...message,
-                  id: String(outputMessage.id),
-                }));
-              } else {
-                outputPersistenceFailed = true;
-              }
-            } catch {
-              outputPersistenceFailed = true;
-              messagePersistenceRef.current.delete(assistantId);
-            }
-            if (outputPersistenceFailed) {
-              terminalOutcome = "failed";
-              toast.error(persistenceErrorMessage);
-              removeMessages(branchId, [assistantId]);
-            }
-          }
-          try {
-            await domain.completeRun(run, terminalOutcome, outputMessageId);
-            durableRunCompleted = true;
-          } catch {
-            try {
-              // Completion is idempotent, so retry once in case the response was lost after commit.
-              await domain.completeRun(run, terminalOutcome, outputMessageId);
-              durableRunCompleted = true;
-            } catch {
-              try {
-                // If the output cannot be attached, terminalize the run without advancing unread.
-                await domain.completeRun(run, "failed");
-                terminalOutcome = "failed";
-                durableRunCompleted = true;
-              } catch {
-                // Keep the optimistic message and chat busy rather than claiming completion.
-              }
-              toast.error(persistenceErrorMessage);
-            }
-          }
-        }
-        if (!assistantContent.trim()) {
-          removeMessages(branchId, [assistantId, persistedAssistantId]);
-        } else if (durableRunCompleted) {
-          updateMessage(branchId, persistedAssistantId ?? assistantId, (message) => ({
-            ...message,
-            isStreaming: false,
-            runStatus: terminalOutcome,
-          }));
-        }
-        if (durableRunCompleted) setChatRunning(chatId, assistantId, false);
-        releaseController();
-      }
-    },
-    [
-      activeBranchId,
-      activeChatId,
-      activeSessionBranches,
-      appendMessages,
-      branches,
-      domain,
-      durable,
-      fastMode,
-      loading,
-      messages,
-      persistenceErrorMessage,
-      provider,
-      providerModels,
-      reasoningEffort,
-      removeMessages,
-      runtimeOfflineMessage,
-      setChatRunning,
-      setSessionMessages,
-      updateMessage,
-    ],
-  );
+  const sendMessage = useConversationTurnRunner({
+    activeBranchId,
+    activeChatId,
+    activeSessionBranches,
+    appendMessages,
+    branchActivity,
+    branchActivityNow,
+    branches,
+    domain,
+    durable,
+    fastMode,
+    loading,
+    messagePersistenceRef,
+    messages,
+    persistedMessageIdsRef,
+    persistenceErrorMessage,
+    provider,
+    providerModel: providerModels[provider],
+    reasoningEffort,
+    removeMessages,
+    runtimeOfflineMessage,
+    setChatRunning,
+    setSessionMessages,
+    updateMessage,
+  });
 
   const retryMessage = useCallback(
     async (source: ChatMessage, replacementContent = source.content) => {
-      if (loading || hasStreamingMessage(branches)) return false;
+      if (loading || hasRunningBranchInSubtree(branches, source.branchId, branchActivityNow)) {
+        return false;
+      }
       const text = replacementContent.trim();
       if (!text || source.role !== "user") return false;
       const sourceBranch = branches.find((branch) => branch.id === source.branchId);
@@ -534,12 +314,12 @@ export function useConversationController(
             current.filter((entry) => !removedBranches.has(entry.branch.id)),
           );
           setRequestedBranchId(String(result.branchId));
-          await sendMessage(text, {
+          const sent = await sendMessage(text, {
             branchId: String(result.branchId),
             contextMessages,
             anchor: sourceBranch.anchor,
           });
-          return true;
+          return sent;
         } catch {
           toast.error(persistenceErrorMessage);
           return false;
@@ -572,15 +352,15 @@ export function useConversationController(
           ),
       );
       setRequestedBranchId(source.branchId);
-      await sendMessage(text, {
+      return sendMessage(text, {
         branchId: source.branchId,
         contextMessages,
         anchor: sourceBranch.anchor,
       });
-      return true;
     },
     [
       branches,
+      branchActivityNow,
       domain,
       durable,
       loading,
@@ -593,14 +373,111 @@ export function useConversationController(
   );
   const editMessage = retryMessage;
 
+  const renameBranch = useCallback(
+    async (branchId: string, title: string) => {
+      const branch = branches.find((candidate) => candidate.id === branchId);
+      if (!branch?.parentBranchId) return false;
+      try {
+        if (durable) return await domain.renameBranch(branchId, title);
+        if (!demoMode) return false;
+        setFallbackBranches((current) => updateBranchTitle(current, branchId, title));
+        return true;
+      } catch {
+        toast.error(persistenceErrorMessage);
+        return false;
+      }
+    },
+    [branches, domain, durable, persistenceErrorMessage, setFallbackBranches],
+  );
+
+  const setBranchUnread = useCallback(
+    async (branchId: string, unread: boolean) => {
+      const branch = branches.find((candidate) => candidate.id === branchId);
+      if (!branch) return false;
+      try {
+        if (durable) return await domain.setBranchUnread(branchId, unread);
+        if (!demoMode) return false;
+        setFallbackBranches((current) =>
+          current.map((candidate) =>
+            candidate.id === branchId ? { ...candidate, isUnread: unread } : candidate,
+          ),
+        );
+        return true;
+      } catch {
+        toast.error(persistenceErrorMessage);
+        return false;
+      }
+    },
+    [branches, domain, durable, persistenceErrorMessage, setFallbackBranches],
+  );
+
+  const deleteBranch = useCallback(
+    async (branchId: string) => {
+      const branch = branches.find((candidate) => candidate.id === branchId);
+      if (!branch?.parentBranchId) return false;
+      const removedBranchIds = branchSubtreeIds(branches, branchId);
+      try {
+        if (durable) {
+          const result = await domain.deleteBranchSubtree(branchId);
+          if (!result) return false;
+          setSessionBranches((current) =>
+            current.filter((entry) => !removedBranchIds.has(entry.branch.id)),
+          );
+          setSessionMessages((current) =>
+            Object.fromEntries(
+              Object.entries(current).filter(([candidateId]) => !removedBranchIds.has(candidateId)),
+            ),
+          );
+          if (removedBranchIds.has(activeBranchId)) {
+            setRequestedBranchId(String(result.parentBranchId));
+          }
+          return {
+            parentBranchId: String(result.parentBranchId),
+            parentBranchPublicId: result.parentBranchPublicId,
+          };
+        }
+        if (!demoMode) return false;
+        setFallbackBranches((current) =>
+          current.filter((candidate) => !removedBranchIds.has(candidate.id)),
+        );
+        if (removedBranchIds.has(activeBranchId)) setRequestedBranchId(branch.parentBranchId);
+        return {
+          parentBranchId: branch.parentBranchId,
+          parentBranchPublicId:
+            branches.find((candidate) => candidate.id === branch.parentBranchId)?.publicId ??
+            branch.parentBranchId,
+        };
+      } catch {
+        toast.error(persistenceErrorMessage);
+        return false;
+      }
+    },
+    [
+      activeBranchId,
+      branches,
+      domain,
+      durable,
+      persistenceErrorMessage,
+      setFallbackBranches,
+      setSessionBranches,
+      setSessionMessages,
+    ],
+  );
+
   // lint-allow: no-direct-use-effect — a created branch must render before its first turn targets it.
   useEffect(() => {
-    if (loading || !pendingBranchTurn || pendingBranchTurn.branchId !== activeBranchId) return;
+    const pendingBranchTurn = pendingBranchTurns[activeBranchId];
+    if (loading || !pendingBranchTurn) return;
     if (startedBranchTurnsRef.current.has(pendingBranchTurn.branchId)) return;
     startedBranchTurnsRef.current.add(pendingBranchTurn.branchId);
-    setPendingBranchTurn(undefined);
+    setPendingBranchTurns((current) => {
+      if (!(pendingBranchTurn.branchId in current)) return current;
+      const next = { ...current };
+      delete next[pendingBranchTurn.branchId];
+      return next;
+    });
     void sendMessage(pendingBranchTurn.prompt);
-  }, [activeBranchId, loading, pendingBranchTurn, sendMessage]);
+  }, [activeBranchId, loading, pendingBranchTurns, sendMessage]);
 
   const {
     archiveChat,
@@ -624,6 +501,8 @@ export function useConversationController(
 
   return {
     activeBranchId,
+    branchActivityNow,
+    canStopActiveBranch: branchActivity.isLocallyRunning(activeBranchId),
     activeBranchPublicId:
       branches.find((branch) => branch.id === activeBranchId)?.publicId ??
       (demoMode ? activeBranchId : undefined),
@@ -652,10 +531,13 @@ export function useConversationController(
     createProject,
     createWorkspace,
     editMessage,
+    deleteBranch,
     fastMode,
     loading,
     markChatUnread,
     markChatRead,
+    renameBranch,
+    setBranchUnread,
     messages,
     projects: demoMode ? demoProjects : domain.projects,
     provider,
@@ -685,7 +567,7 @@ export function useConversationController(
       setProviderModel(provider, model);
     },
     selectWorkspace,
-    stop: () => abortRef.current?.abort(),
+    stop: () => branchActivity.stop(activeBranchId),
     workspaceId: demoMode
       ? demoWorkspace.id
       : domain.workspace

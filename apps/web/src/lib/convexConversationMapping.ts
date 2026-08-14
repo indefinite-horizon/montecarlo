@@ -72,6 +72,7 @@ export function messageFromEnvelope(
   return {
     id: String(message.id),
     publicId: message.publicId,
+    persisted: true,
     branchId: String(message.branchId),
     role: message.role === "tool" ? "system" : message.role,
     content: hydrated ?? message.contentPreview,

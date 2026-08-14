@@ -291,7 +291,8 @@ function createWindow() {
   const windowChrome =
     process.platform === "darwin"
       ? {
-          titleBarOverlay: { height: 64 },
+          trafficLightPosition: { x: 16, y: 16 },
+          titleBarOverlay: { height: 48 },
           titleBarStyle: "hidden",
         }
       : {};
