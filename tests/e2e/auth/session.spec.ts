@@ -24,9 +24,16 @@ test("magic-link sign-in opens the workspace and survives reload", async ({ page
   await expect(page.getByTestId("workspace-app")).toBeVisible();
 });
 
-test("expired session returns the user to login", async ({ page, context }) => {
+test("cleared persisted session returns the user to login", async ({ page, context }) => {
   await signIn(page, uniqueEmail("auth-expired"));
   await context.clearCookies();
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("better-auth_")) {
+        localStorage.removeItem(key);
+      }
+    }
+  });
   await page.reload();
   await expect(page).toHaveURL(/\/login$/u);
   await expect(page.getByTestId("workspace-app")).toHaveCount(0, { timeout: 15_000 });

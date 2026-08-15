@@ -86,13 +86,20 @@ declare module "@tanstack/react-router" {
 }
 
 function InnerApp() {
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending } = authClient.useSession();
 
   // lint-allow: no-direct-use-effect — auth changes must rerun route guards.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: session is consumed by RouterProvider below, but its changes must also rerun route guards.
   React.useEffect(() => {
-    if (session === undefined) return;
+    if (isPending) return;
     void router.invalidate();
-  }, [session]);
+  }, [isPending, session]);
+
+  // Do not mount auth-gated routes until Better Auth has completed its initial
+  // session lookup. In cross-domain flows this also gives the provider time to
+  // exchange the one-time token before a route guard can redirect to /login and
+  // remove it from the URL.
+  if (isPending) return null;
 
   return <RouterProvider router={router} context={{ session, convexClient }} />;
 }

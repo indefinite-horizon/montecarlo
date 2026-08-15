@@ -217,6 +217,7 @@ export function useWorkspaceRouteSync({
 
   // lint-allow: no-direct-use-effect — complete URLs only after portable IDs finish loading.
   useEffect(() => {
+    if (controller.loading) return;
     if (pendingRouteKeyRef.current || handledRouteKeyRef.current !== routeKey) return;
     if (view !== routeSearch.view) return;
     if (
@@ -237,6 +238,7 @@ export function useWorkspaceRouteSync({
   }, [
     controller.activeBranchPublicId,
     controller.activeChatPublicId,
+    controller.loading,
     controller.workspacePublicId,
     navigateToRoute,
     routeKey,
