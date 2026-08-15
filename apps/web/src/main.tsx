@@ -1,6 +1,9 @@
 /** Bootstraps the web app, Convex auth provider, TanStack Router, and global toasts. */
 
-import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import {
+  type AuthClient as ConvexAuthClient,
+  ConvexBetterAuthProvider,
+} from "@convex-dev/better-auth/react";
 import { getAppName } from "@montecarlo/app-constants";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { ConvexReactClient } from "convex/react";
@@ -52,6 +55,11 @@ const convexClient = new ConvexReactClient(convexUrl, {
   expectAuth: import.meta.env.VITE_AUTH_REQUIRED === "true",
 });
 
+// TODO: Remove when https://github.com/get-convex/better-auth/issues/420 is fixed.
+// Better Auth 1.6.22+ exposes a named client type that the provider's otherwise compatible
+// AuthClient definition rejects. Keep the workaround at this single integration boundary.
+const convexProviderAuthClient = authClient as unknown as ConvexAuthClient;
+
 function RouteErrorComponent({ error }: { error: unknown }) {
   const { captureAppError } = useAnalytics();
   // lint-allow: no-direct-use-effect — route error boundaries report once on mount.
@@ -96,7 +104,7 @@ function App() {
   return (
     <ThemeContext.Provider value={themeCtx}>
       <AnalyticsProvider>
-        <ConvexBetterAuthProvider client={convexClient} authClient={authClient}>
+        <ConvexBetterAuthProvider client={convexClient} authClient={convexProviderAuthClient}>
           <InnerApp />
         </ConvexBetterAuthProvider>
         <DesktopUpdateToast />

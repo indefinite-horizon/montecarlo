@@ -40,8 +40,8 @@ that is already listening at `ELECTRON_START_URL`.
 ## One-time release setup
 
 Create `indefinite-horizon/montecarlo-releases` as a **public** GitHub
-repository. The source repository is private, but installed applications must
-be able to read update metadata without embedding a GitHub credential.
+repository. Keep update metadata publicly readable so installed applications
+never need an embedded GitHub credential.
 
 Configure these Actions secrets in the source repository:
 
@@ -57,10 +57,11 @@ Configure these Actions secrets in the source repository:
 Never put these in `.env.local`, Convex, the renderer, release assets, or the
 application bundle.
 
-## Main-branch release
+## Manual release gate
 
-`.github/workflows/desktop-release.yml` runs after the `CI` workflow succeeds on
-`main`, and can also be dispatched manually. It:
+`.github/workflows/desktop-release.yml` can currently be dispatched manually
+from `main`. Automatic post-CI publishing is disabled until the explicit,
+source-controlled release-version workflow is in place. The workflow:
 
 1. requires all signing/publishing secrets and a public update repository;
 2. chooses a semantic version greater than the latest published release;

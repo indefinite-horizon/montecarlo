@@ -87,10 +87,10 @@ requires.
 
 The desktop update identity is the stable tuple of application ID, executable
 name, Apple signing team, public update repository, channel, and data-layout
-contract. A successful `main` CI run builds a universal macOS DMG and ZIP,
-signs and notarizes the app and every bundled executable, uploads an invisible
-draft, verifies signatures, notarization, architectures, feed hashes, and
-compatibility metadata, and only then publishes the release.
+contract. The manually dispatched release gate builds a universal macOS DMG
+and ZIP from `main`, signs and notarizes the app and every bundled executable,
+uploads an invisible draft, verifies signatures, notarization, architectures,
+feed hashes, and compatibility metadata, and only then publishes the release.
 
 Electron downloads an applicable update in the background. Only the
 `update-downloaded` event reaches the renderer; once per app session it shows a

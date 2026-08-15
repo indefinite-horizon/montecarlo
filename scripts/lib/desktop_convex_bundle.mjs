@@ -37,6 +37,14 @@ const ESBUILD_NATIVE_PACKAGES = {
   "windows-x64": "@esbuild/win32-x64",
 };
 
+export function pinnedDependencyVersion(packageManifest, dependencyName) {
+  const version = packageManifest?.dependencies?.[dependencyName];
+  if (typeof version !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error(`${dependencyName} must be pinned to an exact version`);
+  }
+  return version;
+}
+
 function assertChildPath(parent, child, label) {
   const pathFromParent = relative(resolve(parent), resolve(child));
   if (pathFromParent === "" || pathFromParent.startsWith(`..${sep}`) || pathFromParent === "..") {
@@ -217,10 +225,10 @@ async function extractBackend(archive, targetDirectory, executableName) {
 
 async function stageProject(projectDirectory, targets) {
   await mkdir(projectDirectory, { recursive: true });
-  await copyFile(
-    join(CONVEX_BUNDLE_TEMPLATE, "package.json"),
-    join(projectDirectory, "package.json"),
-  );
+  const packageManifestPath = join(CONVEX_BUNDLE_TEMPLATE, "package.json");
+  const packageManifest = JSON.parse(await readFile(packageManifestPath, "utf8"));
+  const convexCliVersion = pinnedDependencyVersion(packageManifest, "convex");
+  await copyFile(packageManifestPath, join(projectDirectory, "package.json"));
   await copyFile(
     join(CONVEX_BUNDLE_TEMPLATE, "package-lock.json"),
     join(projectDirectory, "package-lock.json"),
@@ -321,7 +329,7 @@ async function stageProject(projectDirectory, targets) {
 
   const cliPath = join(projectDirectory, "node_modules/convex/bin/main.js");
   await stat(cliPath);
-  return cliPath;
+  return { cliPath, convexCliVersion };
 }
 
 export async function prepareDesktopConvexBundle({
@@ -370,14 +378,17 @@ export async function prepareDesktopConvexBundle({
     };
   }
 
-  const cliPath = await stageProject(join(outputDirectory, "project"), targets);
+  const { cliPath, convexCliVersion } = await stageProject(
+    join(outputDirectory, "project"),
+    targets,
+  );
   const bundleManifest = {
     schemaVersion: 1,
     backendRelease: manifest.release,
     dataFormatVersion: dataPolicy.dataLayoutVersion,
     minimumReadableDataFormatVersion: dataPolicy.minimumReadableDataLayoutVersion,
     backendRepository: manifest.repository,
-    convexCliVersion: "1.39.1",
+    convexCliVersion,
     cliEntrypoint: relative(outputDirectory, cliPath).split(sep).join("/"),
     projectDirectory: "project",
     binaries,

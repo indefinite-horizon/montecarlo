@@ -4,6 +4,9 @@ on:
     types: [opened, synchronize, ready_for_review, reopened]
 jobs:
   security:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     permissions:
       contents: read
@@ -48,7 +51,7 @@ jobs:
 
       - name: Run Security Review
         if: steps.trusted-skill.outputs.workflow_changed != 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c # v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: cursor[bot],cursor,claude[bot],claude
@@ -56,4 +59,4 @@ jobs:
           prompt: '/security-review Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }}'
           claude_args: >-
             --allowedTools "Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr view:*)"
-            --disallowedTools "Bash(git add:*),Bash(git commit:*),Bash(git rm:*),Bash(git push:*),Bash(/home/runner/_work/_actions/anthropics/claude-code-action/v1/scripts/git-push.sh:*)"
+            --disallowedTools "Bash(git add:*),Bash(git commit:*),Bash(git rm:*),Bash(git push:*),Bash(/home/runner/_work/_actions/anthropics/claude-code-action/9d7150bc8a3dae8149739a88019d192b579ad90c/scripts/git-push.sh:*)"

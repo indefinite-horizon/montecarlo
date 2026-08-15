@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
 const { describe, it } = require("node:test");
+const { pathToFileURL } = require("node:url");
 
 const desktopRoot = path.resolve(__dirname, "..");
 const mainSource = readFileSync(path.join(__dirname, "main.cjs"), "utf8");
@@ -24,6 +25,10 @@ const smokeScript = readFileSync(
 const runtimeConfigSource = readFileSync(
   path.resolve(desktopRoot, "../runtime/src/config.ts"),
   "utf8",
+);
+const desktopConvexBundlePath = path.resolve(
+  desktopRoot,
+  "../../scripts/lib/desktop_convex_bundle.mjs",
 );
 const devLauncher = readFileSync(path.resolve(desktopRoot, "../../scripts/dev_desktop.sh"), "utf8");
 const appCss = readFileSync(path.resolve(desktopRoot, "../web/src/styles/app.css"), "utf8");
@@ -73,6 +78,18 @@ describe("desktop integration contracts", () => {
     assert.match(preloadSource, /readLoopbackArgument\("montecarlo-convex-url"\)/);
   });
 
+  it("records the exact staged Convex CLI version in bundle metadata", async () => {
+    const { pinnedDependencyVersion } = await import(pathToFileURL(desktopConvexBundlePath).href);
+    const bundlePackage = JSON.parse(
+      readFileSync(path.join(desktopRoot, "convex-bundle/package.json"), "utf8"),
+    );
+    assert.equal(pinnedDependencyVersion(bundlePackage, "convex"), "1.43.0");
+    assert.throws(
+      () => pinnedDependencyVersion({ dependencies: { convex: "^1.43.0" } }, "convex"),
+      /must be pinned to an exact version/,
+    );
+  });
+
   it("exposes only downloaded-update controls and stops services before install", () => {
     assert.match(builderConfig, /electronUpdaterCompatibility: ">=2\.16"/);
     assert.match(builderConfig, /generateUpdatesFilesForAllChannels: true/);
@@ -100,11 +117,14 @@ describe("desktop integration contracts", () => {
   it("runs a persisted packaged-model turn before merge and release", () => {
     assert.match(ciWorkflow, /desktop-smoke-macos:/);
     assert.match(ciWorkflow, /if: github\.event_name == 'push'/);
-    assert.match(ciWorkflow, /actions\/setup-node@v4/);
+    assert.match(ciWorkflow, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4/);
     assert.match(ciWorkflow, /build:smoke:mac/);
     assert.match(ciWorkflow, /bash scripts\/smoke_packaged_desktop\.sh/);
     assert.match(releaseWorkflow, /bash scripts\/smoke_packaged_desktop\.sh/);
-    assert.match(releaseWorkflow, /actions\/setup-node@v4/);
+    assert.match(
+      releaseWorkflow,
+      /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4/,
+    );
     assert.match(smokeScript, /CODEX_PATH="\$fake_codex"/);
     assert.match(smokeScript, /PACKAGED_DESKTOP_EXECUTABLE="\$executable"/);
     assert.match(smokeScript, /playwright-core\/lib\/server\/electron\/loader\.js/);
