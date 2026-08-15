@@ -204,6 +204,7 @@ test("macOS titlebar stays inside the native safe area and keeps controls intera
   const sidebarTitlebar = page.getByTestId("sidebar-titlebar");
   const sidebarDragHandle = page.getByTestId("sidebar-titlebar-drag-handle");
   const collapseSidebar = page.getByRole("button", { name: "Collapse sidebar" });
+  const collapseSidebarBox = await collapseSidebar.boundingBox();
   expect(await sidebarTitlebar.evaluate(appRegion)).toBe("drag");
   expect(await sidebarDragHandle.evaluate(appRegion)).toBe("drag");
   expect(await collapseSidebar.evaluate(appRegion)).toBe("no-drag");
@@ -215,18 +216,39 @@ test("macOS titlebar stays inside the native safe area and keeps controls intera
   const branchMapTitlebar = page.getByTestId("branch-map-titlebar");
   expect(await branchMapTitlebar.evaluate(appRegion)).toBe("drag");
   const closeBranchMap = page.getByRole("button", { name: "Close branch map" });
+  const closeBranchMapBox = await closeBranchMap.boundingBox();
   expect(await closeBranchMap.evaluate(appRegion)).toBe("no-drag");
   const branchMapBox = await branchMapTitlebar.boundingBox();
   expect(branchMapBox?.height).toBe(safeArea.height);
   await expectTitlebarControlsInside(branchMapTitlebar, safeArea);
 
+  await closeBranchMap.click();
+  const openBranchMap = page.getByRole("button", { name: "Branch map" });
+  const openBranchMapBox = await openBranchMap.boundingBox();
+  const viewport = page.viewportSize();
+  if (!closeBranchMapBox || !openBranchMapBox || !viewport) {
+    throw new Error("Could not measure branch sidebar toggle positions.");
+  }
+  expect(
+    Math.abs(
+      viewport.width -
+        (closeBranchMapBox.x + closeBranchMapBox.width) -
+        (viewport.width - (openBranchMapBox.x + openBranchMapBox.width)),
+    ),
+  ).toBeLessThanOrEqual(1);
+
   await collapseSidebar.click();
   const openSidebar = page.getByRole("button", { name: "Open sidebar" });
+  const openSidebarBox = await openSidebar.boundingBox();
   expect(await workspaceTitlebar.evaluate(appRegion)).toBe("drag");
   expect(await openSidebar.evaluate(appRegion)).toBe("no-drag");
   const workspaceBox = await workspaceTitlebar.boundingBox();
   expect(workspaceBox?.height).toBe(safeArea.height);
   await expectTitlebarControlsInside(workspaceTitlebar, safeArea);
+  if (!collapseSidebarBox || !openSidebarBox) {
+    throw new Error("Could not measure left sidebar toggle positions.");
+  }
+  expect(Math.abs(collapseSidebarBox.x - openSidebarBox.x)).toBeLessThanOrEqual(1);
 
   await page.getByRole("button", { name: "Open settings" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();

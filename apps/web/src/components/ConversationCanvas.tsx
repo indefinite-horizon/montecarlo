@@ -13,9 +13,10 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  type Viewport,
 } from "@xyflow/react";
 import { ArrowUpRight, GitBranch, LoaderCircle, Quote, Sparkles } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useClearCollapsedTextSelection } from "@/hooks/useClearCollapsedTextSelection";
 import { useContainedMessageVisibility } from "@/hooks/useContainedMessageVisibility";
@@ -25,15 +26,18 @@ import {
   type BranchAnchor,
   type ChatBranch,
   type ChatMessage,
+  isBranchRunning,
   isThreadOpeningContentReady,
   messageScrollId,
   type SelectionAnchor,
 } from "@/lib/conversation";
 import { retrySourceForMessage } from "@/lib/messageRetry";
+import type { ThreadScrollBookmark } from "@/lib/sessionPresentationMemory";
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "./ActionTooltip";
 import { SelectionBranchAction } from "./BranchComposer";
 import { CanvasMessage } from "./CanvasMessage";
+import { FollowUpCanvasNode, type FollowUpComposerNode } from "./FollowUpCanvasNode";
 import { ThreadScroller } from "./ThreadScroller";
 import { Button } from "./ui/button";
 import { MessageScrollerItem } from "./ui/message-scroller";
@@ -51,7 +55,9 @@ type FollowUpDraft = {
 type BranchNodeData = {
   branch: ChatBranch;
   active: boolean;
+  running: boolean;
   contentReady: boolean;
+  initialScrollBookmark?: ThreadScrollBookmark;
   pathActive: boolean;
   dimmed: boolean;
   onAskFollowUp: (branchId: string) => void;
@@ -59,37 +65,38 @@ type BranchNodeData = {
   onEditMessage: (message: ChatMessage, content: string) => Promise<boolean>;
   onRetryMessage: (message: ChatMessage) => Promise<boolean>;
   onReadMessage: (messageId: string) => Promise<boolean>;
+  onScrollBookmarkChange?: (bookmark: ThreadScrollBookmark) => void;
   onSelectText: (selection?: CanvasSelection) => void;
   onClearTextSelection: () => void;
   readMessageId?: string;
   readTrackingEnabled: boolean;
 };
 
-type ComposerNodeData = {
-  selection?: SelectionAnchor;
-  onCancel: () => void;
-  onSubmit: (prompt: string) => Promise<void>;
-};
-
 type BranchNode = Node<BranchNodeData, "branch">;
-type ComposerNode = Node<ComposerNodeData, "composer">;
-type ConversationNode = BranchNode | ComposerNode;
+type ConversationNode = BranchNode | FollowUpComposerNode;
 type ConversationEdgeData = { pathActive: boolean; draft?: boolean };
 type ConversationEdge = Edge<ConversationEdgeData>;
 
 export type ConversationCanvasProps = {
   branches: ChatBranch[];
   activeBranchId: string;
+  activityNow: number;
+  initialBranchScrollBookmarks?: ReadonlyMap<string, ThreadScrollBookmark>;
+  initialViewport?: ConversationCanvasViewport;
   loading: boolean;
   readMessageId?: string;
   readTrackingEnabled: boolean;
   onReadMessage: (messageId: string) => Promise<boolean>;
+  onBranchScrollBookmarkChange?: (branchId: string, bookmark: ThreadScrollBookmark) => void;
   onSelectBranch: (branchId: string) => void;
   onOpenThread: () => void;
+  onViewportChange?: (viewport: ConversationCanvasViewport) => void;
   onEditMessage: (message: ChatMessage, content: string) => Promise<boolean>;
   onRetryMessage: (message: ChatMessage) => Promise<boolean>;
   onCreateBranch: (anchor: BranchAnchor, parentBranchId?: string) => Promise<boolean>;
 };
+
+export type ConversationCanvasViewport = Viewport;
 
 export const ConversationCanvas = memo(function ConversationCanvas(props: ConversationCanvasProps) {
   return (
@@ -102,12 +109,17 @@ export const ConversationCanvas = memo(function ConversationCanvas(props: Conver
 const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
   branches,
   activeBranchId,
+  activityNow,
+  initialBranchScrollBookmarks,
+  initialViewport,
   loading,
   readMessageId,
   readTrackingEnabled,
   onReadMessage,
+  onBranchScrollBookmarkChange,
   onSelectBranch,
   onOpenThread,
+  onViewportChange,
   onEditMessage,
   onRetryMessage,
   onCreateBranch,
@@ -211,6 +223,7 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
   const nodes = useMemo<ConversationNode[]>(() => {
     const branchNodes: BranchNode[] = branches.map((branch) => {
       const pathActive = pathBranchIds.has(branch.id);
+      const branchScrollKey = branch.publicId ?? branch.id;
       return {
         id: branch.id,
         type: "branch",
@@ -253,7 +266,9 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
         data: {
           branch,
           active: branch.id === activeBranchId,
+          running: isBranchRunning(branch, activityNow),
           contentReady: branch.openingContentReady ?? isThreadOpeningContentReady(branch.messages),
+          initialScrollBookmark: initialBranchScrollBookmarks?.get(branchScrollKey),
           pathActive,
           dimmed: Boolean(hoveredBranchId) && !pathActive,
           onAskFollowUp: (branchId) => openFollowUp(branchId),
@@ -261,6 +276,9 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
           onEditMessage,
           onRetryMessage,
           onReadMessage,
+          onScrollBookmarkChange: onBranchScrollBookmarkChange
+            ? (bookmark) => onBranchScrollBookmarkChange(branchScrollKey, bookmark)
+            : undefined,
           onSelectText: setSelection,
           onClearTextSelection: clearTextSelection,
           readMessageId: branch.id === activeBranchId ? readMessageId : undefined,
@@ -271,7 +289,7 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
 
     if (!draft) return branchNodes;
     const composerId = draftNodeId ?? `follow-up-${draft.parentBranchId}`;
-    const composerNode: ComposerNode = {
+    const composerNode: FollowUpComposerNode = {
       id: composerId,
       type: "composer",
       position: positions.get(composerId) ?? { x: 0, y: 0 },
@@ -305,14 +323,17 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
     return [...branchNodes, composerNode];
   }, [
     activeBranchId,
+    activityNow,
     branches,
     clearTextSelection,
     closeFollowUp,
     draft,
     draftNodeId,
     hoveredBranchId,
+    initialBranchScrollBookmarks,
     openFollowUp,
     openThread,
+    onBranchScrollBookmarkChange,
     onReadMessage,
     onEditMessage,
     onRetryMessage,
@@ -329,14 +350,14 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
     const branchEdges = branches.flatMap((branch) => {
       if (!branch.parentBranchId) return [];
       const pathActive = pathBranchIds.has(branch.parentBranchId) && pathBranchIds.has(branch.id);
-      const streaming = branch.messages.some((message) => message.isStreaming);
+      const running = isBranchRunning(branch, activityNow);
       return [
         {
           id: `${branch.parentBranchId}-${branch.id}`,
           source: branch.parentBranchId,
           target: branch.id,
           data: { pathActive },
-          animated: streaming,
+          animated: running,
           focusable: false,
           selectable: false,
           className: pathActive ? "canvas-edge--active" : "canvas-edge--muted",
@@ -380,7 +401,7 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
         } as NonNullable<ConversationEdge["domAttributes"]>,
       },
     ];
-  }, [branches, draft, hoveredBranchId, pathBranchIds]);
+  }, [activityNow, branches, draft, hoveredBranchId, pathBranchIds]);
 
   return (
     <section
@@ -401,7 +422,8 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
         deleteKeyCode={null}
         minZoom={0.16}
         maxZoom={1.35}
-        fitView
+        defaultViewport={initialViewport}
+        fitView={!initialViewport}
         fitViewOptions={{ padding: 0.16, maxZoom: 0.92 }}
         onNodeClick={(_, node) => {
           if (node.type === "branch") onSelectBranch(node.id);
@@ -416,7 +438,10 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
           suspendReadTracking();
           if (event) clearTextSelection();
         }}
-        onMoveEnd={resumeReadTracking}
+        onMoveEnd={(_, viewport) => {
+          resumeReadTracking();
+          onViewportChange?.(viewport);
+        }}
         ariaLabelConfig={{
           "controls.ariaLabel": t("canvas.controls"),
           "controls.zoomIn.ariaLabel": t("canvas.zoomIn"),
@@ -466,13 +491,12 @@ const ConversationCanvasFlow = memo(function ConversationCanvasFlow({
 const BranchCanvasNode = memo(function BranchCanvasNode({ data }: NodeProps<BranchNode>) {
   const { t } = useTranslation();
   const { branch } = data;
-  const streaming = branch.messages.some((message) => message.isStreaming);
   const turnCount = branch.messages.filter((message) => message.role === "user").length;
 
   return (
     <article
       aria-label={branch.title}
-      aria-busy={streaming}
+      aria-busy={data.running}
       data-path-active={data.pathActive ? "true" : "false"}
       className={cn(
         "group relative flex h-full w-full flex-col overflow-hidden rounded-[18px] border bg-card shadow-[0_18px_52px_hsl(var(--foreground)/0.09)] transition-[border-color,box-shadow,opacity,transform] duration-200",
@@ -532,11 +556,13 @@ const BranchCanvasNode = memo(function BranchCanvasNode({ data }: NodeProps<Bran
         buttonClassName="nowheel nodrag nopan size-7"
         contentClassName="gap-0"
         contentReady={data.contentReady}
+        initialScrollBookmark={data.initialScrollBookmark}
         onScroll={data.onClearTextSelection}
         onReadMessage={data.onReadMessage}
+        onScrollBookmarkChange={data.onScrollBookmarkChange}
         readMessageId={data.readMessageId}
         readTrackingEnabled={data.readTrackingEnabled}
-        streaming={streaming}
+        streaming={data.running}
         threadId={branch.publicId ?? branch.id}
         viewportClassName="nowheel nodrag nopan"
       >
@@ -574,6 +600,7 @@ const BranchCanvasNode = memo(function BranchCanvasNode({ data }: NodeProps<Bran
               scrollAnchor={message.role === "user"}
             >
               <CanvasMessage
+                actionsDisabled={data.running}
                 message={message}
                 onEdit={
                   message.role === "user"
@@ -596,7 +623,7 @@ const BranchCanvasNode = memo(function BranchCanvasNode({ data }: NodeProps<Bran
           className="nodrag nopan rounded-full"
           size="sm"
           variant="outline"
-          disabled={streaming}
+          disabled={data.running}
           onClick={() => data.onAskFollowUp(branch.id)}
         >
           <Sparkles />
@@ -604,92 +631,6 @@ const BranchCanvasNode = memo(function BranchCanvasNode({ data }: NodeProps<Bran
         </Button>
       </footer>
     </article>
-  );
-});
-
-const FollowUpCanvasNode = memo(function FollowUpCanvasNode({ data }: NodeProps<ComposerNode>) {
-  const { t } = useTranslation();
-  const [prompt, setPrompt] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const promptRef = useRef<HTMLTextAreaElement | null>(null);
-  const promptRequired = !data.selection;
-
-  // lint-allow: no-direct-use-effect — the newly mounted canvas dialog owns focus.
-  useEffect(() => {
-    promptRef.current?.focus();
-  }, []);
-
-  const submit = async () => {
-    const value = prompt.trim();
-    if ((promptRequired && !value) || submitting) return;
-    setSubmitting(true);
-    try {
-      await data.onSubmit(value);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <section
-      role="dialog"
-      aria-labelledby="canvas-follow-up-title"
-      className="flex h-full w-full flex-col overflow-hidden rounded-[18px] border border-primary/45 bg-card shadow-[0_20px_64px_hsl(var(--foreground)/0.14)]"
-    >
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!size-2.5 !border-2 !border-card !bg-branch-blue"
-      />
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <Sparkles className="size-4 text-primary" />
-        <h2 id="canvas-follow-up-title" className="font-display text-sm font-bold">
-          {t("branch.askFollowUp")}
-        </h2>
-      </header>
-      {data.selection ? (
-        <blockquote className="mx-3 mt-3 line-clamp-2 rounded-md bg-accent/55 px-3 py-2 font-display text-[11px] italic leading-4 text-foreground/75">
-          “{data.selection.text}”
-        </blockquote>
-      ) : null}
-      <label htmlFor="canvas-follow-up-prompt" className="sr-only">
-        {t("canvas.promptLabel")}
-      </label>
-      <textarea
-        ref={promptRef}
-        id="canvas-follow-up-prompt"
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            data.onCancel();
-            return;
-          }
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            void submit();
-          }
-        }}
-        rows={4}
-        className="nodrag nopan nowheel mx-3 mt-3 min-h-0 flex-1 resize-none rounded-lg border border-input bg-background/55 px-3 py-2.5 text-[12px] leading-5 outline-none focus:border-ring focus:ring-2 focus:ring-ring/15"
-        placeholder={t("canvas.promptPlaceholder")}
-      />
-      <footer className="flex gap-2 p-3">
-        <Button className="nodrag nopan flex-1" size="sm" variant="ghost" onClick={data.onCancel}>
-          {t("common.cancel")}
-        </Button>
-        <Button
-          className="nodrag nopan flex-1"
-          size="sm"
-          disabled={(promptRequired && !prompt.trim()) || submitting}
-          onClick={() => void submit()}
-        >
-          {submitting ? <LoaderCircle className="animate-spin" /> : <Sparkles />}
-          {t("canvas.ask")}
-        </Button>
-      </footer>
-    </section>
   );
 });
 

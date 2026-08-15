@@ -10,11 +10,13 @@ import { MarkdownMessage } from "./MarkdownMessage";
 import { MessageOutputActions } from "./MessageOutputActions";
 
 export const CanvasMessage = memo(function CanvasMessage({
+  actionsDisabled = false,
   message,
   onEdit,
   onRetry,
   onSelectText,
 }: {
+  actionsDisabled?: boolean;
   message: ChatMessage;
   onEdit?: (content: string) => Promise<boolean>;
   onRetry?: () => Promise<boolean>;
@@ -34,6 +36,7 @@ export const CanvasMessage = memo(function CanvasMessage({
           {message.content}
         </div>
         <MessageOutputActions
+          actionsDisabled={actionsDisabled}
           className="mt-1 justify-end"
           message={message}
           onEdit={onEdit}
@@ -72,7 +75,12 @@ export const CanvasMessage = memo(function CanvasMessage({
         />
       ) : null}
       {message.isStreaming && !message.content ? <CanvasStreamingState /> : null}
-      <MessageOutputActions className="mt-1" message={message} onRetry={onRetry} />
+      <MessageOutputActions
+        actionsDisabled={actionsDisabled}
+        className="mt-1"
+        message={message}
+        onRetry={onRetry}
+      />
     </section>
   );
 });

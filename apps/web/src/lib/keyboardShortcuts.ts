@@ -6,6 +6,7 @@ export type ShortcutModifier = "meta" | "control" | "alt" | "shift";
 export type KeyboardShortcut = {
   code: string;
   key: string;
+  macosKey?: string;
   macos: readonly ShortcutModifier[];
   windowsLinux: readonly ShortcutModifier[];
 };
@@ -59,6 +60,13 @@ export const appShortcuts = {
     macos: ["alt"],
     windowsLinux: ["alt"],
   },
+  stopGeneration: {
+    code: "Backspace",
+    key: "Backspace",
+    macosKey: "⌫",
+    macos: ["meta", "shift"],
+    windowsLinux: ["control", "shift"],
+  },
 } as const satisfies Record<string, KeyboardShortcut>;
 
 export type AppShortcutId = keyof typeof appShortcuts;
@@ -109,7 +117,8 @@ export function shortcutLabel(
   const labels = modifiers.map((modifier) =>
     macos ? macModifierLabels[modifier] : otherModifierLabels[modifier],
   );
-  return macos ? `${labels.join("")}${shortcut.key}` : [...labels, shortcut.key].join("+");
+  const key = macos ? (shortcut.macosKey ?? shortcut.key) : shortcut.key;
+  return macos ? `${labels.join("")}${key}` : [...labels, key].join("+");
 }
 
 export function appShortcutLabel(id: AppShortcutId, platform = detectShortcutPlatform()): string {

@@ -1,6 +1,6 @@
 /** Prompt, selection, and nested branch creation semantics. */
 
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   type ControlledRuntimeStream,
   conversationRequests,
@@ -31,62 +31,6 @@ test.beforeEach(async ({ context, page }) => {
   activeWorkspaceName = `Branch workspace ${Date.now()}`;
   await createWorkspace(page, activeWorkspaceName);
 });
-
-async function selectTextWithMouse(page: Page, message: Locator, text: string) {
-  await message.evaluate((element, selectedText) => {
-    const walker = window.document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    let node = walker.nextNode();
-    while (node) {
-      const value = node.textContent ?? "";
-      const start = value.indexOf(selectedText);
-      if (start >= 0) {
-        const range = window.document.createRange();
-        range.setStart(node, start);
-        range.setEnd(node, start + selectedText.length);
-        const scroller = element.closest<HTMLElement>('[data-testid="transcript-scroller"]');
-        if (!scroller) throw new Error("Could not resolve the transcript scroller.");
-        const rangeRect = range.getBoundingClientRect();
-        const scrollerRect = scroller.getBoundingClientRect();
-        scroller.scrollTop +=
-          rangeRect.top - scrollerRect.top - scroller.clientHeight / 2 + rangeRect.height / 2;
-        return;
-      }
-      node = walker.nextNode();
-    }
-    throw new Error(`Could not scroll to text: ${selectedText}`);
-  }, text);
-
-  const points = await message.evaluate((element, selectedText) => {
-    const walker = window.document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-    let node = walker.nextNode();
-    while (node) {
-      const value = node.textContent ?? "";
-      const start = value.indexOf(selectedText);
-      if (start >= 0) {
-        const firstCharacter = window.document.createRange();
-        firstCharacter.setStart(node, start);
-        firstCharacter.setEnd(node, start + 1);
-        const lastCharacter = window.document.createRange();
-        lastCharacter.setStart(node, start + selectedText.length - 1);
-        lastCharacter.setEnd(node, start + selectedText.length);
-        const firstRect = firstCharacter.getBoundingClientRect();
-        const lastRect = lastCharacter.getBoundingClientRect();
-        return {
-          start: { x: firstRect.left + 0.5, y: firstRect.top + firstRect.height / 2 },
-          end: { x: lastRect.right - 0.5, y: lastRect.top + lastRect.height / 2 },
-        };
-      }
-      node = walker.nextNode();
-    }
-    throw new Error(`Could not measure text: ${selectedText}`);
-  }, text);
-
-  await page.mouse.move(points.start.x, points.start.y);
-  await page.mouse.down();
-  await page.mouse.move(points.end.x, points.end.y, { steps: 12 });
-  await page.mouse.up();
-  return page.evaluate(() => window.getSelection()?.toString().trim() ?? "");
-}
 
 test("branch map shows response activity without shifting the branch title", async ({ page }) => {
   const prompt = `Waiting child ${controlledStream.marker}`;
@@ -212,11 +156,14 @@ for (const storageMode of ["local"] as const) {
     }, lateSelection);
     expect(sourceStart).toBeGreaterThan(1_000);
 
-    const selectedText = await selectTextWithMouse(page, message, lateSelection);
+    await selectAssistantText(page, lateSelection);
+    const selectedText = await page.evaluate(() => window.getSelection()?.toString().trim() ?? "");
     expect(selectedText).toContain("late hydrated anchor");
     const action = page.getByTestId("selection-follow-up-action");
     await expect(action).toBeVisible();
-    await action.click();
+    // This test selects a hydrated range programmatically so it can reach far
+    // beyond the preview boundary without coupling the assertion to scrolling.
+    await action.evaluate((button: HTMLButtonElement) => button.click());
     const dialog = page.getByRole("dialog", { name: "Ask Follow-up" });
     await expect(dialog.locator("blockquote")).toContainText(selectedText);
     await dialog.getByRole("button", { name: "Create branch" }).click();

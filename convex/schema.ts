@@ -166,6 +166,7 @@ export default defineSchema({
     lastReadMessageId: v.optional(v.id("messages")),
     lastReadMessagePublicId: v.optional(v.string()),
     pinnedAt: v.optional(v.number()),
+    unreadBranchPublicIds: v.optional(v.array(v.string())),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -187,6 +188,9 @@ export default defineSchema({
     contextPreview: v.optional(v.string()),
     depth: v.number(),
     nextMessageOrdinal: v.number(),
+    runLeaseVersion: v.optional(v.number()),
+    activeRunId: v.optional(v.id("agent_runs")),
+    activeRunLeaseExpiresAt: v.optional(v.number()),
     createdByUserId: v.id("users"),
     createdAt: v.number(),
   })
@@ -233,6 +237,8 @@ export default defineSchema({
     status: runStatusValidator,
     errorCode: v.optional(v.string()),
     errorMessage: v.optional(v.string()),
+    leaseCapabilityHash: v.optional(v.string()),
+    leaseHandoffAt: v.optional(v.number()),
     requestedByUserId: v.id("users"),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
@@ -240,7 +246,13 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_workspace_public_id", ["workspaceId", "publicId"])
-    .index("by_workspace_chat_updated_at", ["workspaceId", "chatId", "updatedAt"]),
+    .index("by_workspace_chat_updated_at", ["workspaceId", "chatId", "updatedAt"])
+    .index("by_workspace_branch_status_updated_at", [
+      "workspaceId",
+      "branchId",
+      "status",
+      "updatedAt",
+    ]),
 
   blob_manifests: defineTable({
     publicId: v.string(),

@@ -65,6 +65,8 @@ type ChatItem = {
 type BranchItem = {
   id: Id<"chat_branches">;
   publicId: string;
+  activeRunId?: Id<"agent_runs">;
+  activeRunLeaseExpiresAt?: number;
   workspaceId?: Id<"workspaces">;
   chatId?: Id<"chats">;
   parentBranchId?: Id<"chat_branches">;
@@ -74,6 +76,7 @@ type BranchItem = {
   anchorSelection?: { start: number; end: number; quote: string; displayText?: string };
   anchorPrompt?: string;
   title?: string;
+  isUnread: boolean;
   contextMessageIds: Id<"messages">[];
   contextPreview?: string;
   depth: number;
@@ -146,6 +149,13 @@ export type RunItem = {
   completedAt?: number;
   createdAt: number;
   updatedAt: number;
+};
+
+export type StartTurnResult = {
+  message: MessageItem;
+  run: RunItem;
+  leaseExpiresAt: number;
+  leaseCapability: string;
 };
 
 type DomainApi = {
@@ -289,6 +299,18 @@ type DomainApi = {
       { workspaceId: Id<"workspaces">; branchId: Id<"chat_branches">; title: string },
       boolean
     >;
+    rename: PublicMutation<
+      { workspaceId: Id<"workspaces">; branchId: Id<"chat_branches">; title: string },
+      boolean
+    >;
+    markUnread: PublicMutation<
+      { workspaceId: Id<"workspaces">; branchId: Id<"chat_branches"> },
+      boolean
+    >;
+    markRead: PublicMutation<
+      { workspaceId: Id<"workspaces">; branchId: Id<"chat_branches"> },
+      boolean
+    >;
   };
   messages: {
     list: PublicQuery<
@@ -311,6 +333,7 @@ type DomainApi = {
         contentPreview: string;
         replyToMessageId?: Id<"messages">;
         runId?: Id<"agent_runs">;
+        leaseCapability?: string;
       },
       MessageItem
     >;
@@ -327,6 +350,18 @@ type DomainApi = {
         branchPublicId: string;
         removedBranchIds: Id<"chat_branches">[];
         removedMessagePublicIds: string[];
+      }
+    >;
+    deleteBranchSubtree: PublicMutation<
+      {
+        workspaceId: Id<"workspaces">;
+        chatId: Id<"chats">;
+        branchId: Id<"chat_branches">;
+      },
+      {
+        parentBranchId: Id<"chat_branches">;
+        parentBranchPublicId: string;
+        removedBranchIds: Id<"chat_branches">[];
       }
     >;
   };
@@ -353,6 +388,28 @@ type DomainApi = {
     >;
   };
   runs: {
+    startTurn: PublicMutation<
+      {
+        workspaceId: Id<"workspaces">;
+        chatId: Id<"chats">;
+        branchId: Id<"chat_branches">;
+        messagePublicId?: string;
+        runPublicId?: string;
+        contentRef: string;
+        contentPreview: string;
+        runtime: "model" | "harness";
+        provider: string;
+        model: string;
+        providerSessionId?: string;
+        reasoningEffort?: ReasoningEffort;
+        fastMode?: boolean;
+      },
+      StartTurnResult
+    >;
+    renewLease: PublicMutation<
+      { workspaceId: Id<"workspaces">; runId: Id<"agent_runs">; leaseCapability: string },
+      { leaseExpiresAt: number }
+    >;
     create: PublicMutation<
       {
         workspaceId: Id<"workspaces">;
@@ -367,12 +424,18 @@ type DomainApi = {
         reasoningEffort?: ReasoningEffort;
         fastMode?: boolean;
       },
-      RunItem
+      { run: RunItem; leaseExpiresAt: number; leaseCapability: string }
     >;
+    handoffLease: PublicMutation<
+      { workspaceId: Id<"workspaces">; runId: Id<"agent_runs">; leaseCapability: string },
+      boolean
+    >;
+    cancelLease: PublicMutation<{ workspacePublicId: string; runPublicId: string }, RunItem>;
     complete: PublicMutation<
       {
         workspaceId: Id<"workspaces">;
         runId: Id<"agent_runs">;
+        leaseCapability?: string;
         status: "succeeded" | "failed" | "canceled";
         outputMessageId?: Id<"messages">;
         errorCode?: string;

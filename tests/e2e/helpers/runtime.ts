@@ -30,7 +30,7 @@ export type ControlledRuntimeStream = {
 
 const runtimeOrigin = new URL(process.env.VITE_RUNTIME_URL ?? "http://127.0.0.1:4242").origin;
 const runtimePattern = `${runtimeOrigin}/**`;
-const controlledStreamStateKey = "__monteCarloControlledRuntimeStream";
+const controlledStreamRegistryKey = "__monteCarloControlledRuntimeStreams";
 const envelopeContentType = "application/json";
 const e2eBlobAttestationPrivateKey =
   "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg7h5Hg/B7z8jrBZYTmh0eS56pB+NXXpmNi1CMAU8+cSihRANCAAQ9vrH0LB1nEP/VPXJHSQ3qiFxK4u2MQgVG42RWgiEUpLLWJADAcSqdPVswzW1QeMTLYdekVAmkeEHrnr4Maa/l";
@@ -96,97 +96,138 @@ export async function installControlledRuntimeStream(
   marker = "[e2e:controlled-stream]",
 ): Promise<ControlledRuntimeStream> {
   await context.addInitScript(
-    ({ requestMarker, stateKey }) => {
-      const originalFetch = window.fetch.bind(window);
-      const state: {
+    ({ registryKey, requestMarker }) => {
+      type ControlledState = {
         closed: boolean;
+        marker: string;
         requestCount: number;
         requestStarted: boolean;
         writer?: WritableStreamDefaultWriter<Uint8Array>;
-      } = {
+      };
+      type ControlledRegistry = {
+        originalFetch: typeof window.fetch;
+        streams: Record<string, ControlledState>;
+      };
+
+      let registry = Reflect.get(window, registryKey) as ControlledRegistry | undefined;
+      if (!registry) {
+        const createdRegistry: ControlledRegistry = {
+          originalFetch: window.fetch.bind(window),
+          streams: {},
+        };
+        registry = createdRegistry;
+        Reflect.set(window, registryKey, createdRegistry);
+
+        window.fetch = async (input, init) => {
+          const url =
+            typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+          if (new URL(url, window.location.href).pathname !== "/v1/chat") {
+            return createdRegistry.originalFetch(input, init);
+          }
+
+          let body = "";
+          if (typeof init?.body === "string") {
+            body = init.body;
+          } else if (input instanceof Request) {
+            body = await input.clone().text();
+          } else if (init?.body) {
+            body = await new Response(init.body).text();
+          }
+          let request: {
+            messages?: Array<{ content?: string; role?: string }>;
+            provider?: string;
+          };
+          try {
+            request = JSON.parse(body) as typeof request;
+          } catch {
+            return createdRegistry.originalFetch(input, init);
+          }
+          const prompt = [...(request.messages ?? [])]
+            .reverse()
+            .find((message) => message.role === "user")?.content;
+          const state = Object.values(createdRegistry.streams).find((candidate) =>
+            prompt?.includes(candidate.marker),
+          );
+          if (!state || prompt?.startsWith("Create a concise chat name")) {
+            return createdRegistry.originalFetch(input, init);
+          }
+
+          const encodeEvent = (event: unknown) =>
+            new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
+          const stream = new TransformStream<Uint8Array, Uint8Array>();
+          const writer = stream.writable.getWriter();
+          state.writer = writer;
+          state.closed = false;
+          state.requestCount += 1;
+          state.requestStarted = true;
+          void writer
+            .write(
+              encodeEvent({
+                type: "start",
+                runId: `run-controlled-${state.requestCount}`,
+                provider: request.provider ?? "codex",
+              }),
+            )
+            .catch(() => undefined);
+          const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+          const abortStream = () => {
+            state.closed = true;
+            void state.writer?.abort(new DOMException("The operation was aborted.", "AbortError"));
+            state.writer = undefined;
+          };
+          if (signal?.aborted) abortStream();
+          else signal?.addEventListener("abort", abortStream, { once: true });
+          return new Response(stream.readable, {
+            status: 200,
+            headers: {
+              "access-control-allow-origin": "*",
+              "content-type": "text/event-stream",
+            },
+          });
+        };
+      }
+
+      if (registry.streams[requestMarker]) {
+        throw new Error(`A controlled runtime stream already uses marker ${requestMarker}.`);
+      }
+      registry.streams[requestMarker] = {
         closed: false,
+        marker: requestMarker,
         requestCount: 0,
         requestStarted: false,
       };
-      Reflect.set(window, stateKey, state);
-
-      window.fetch = async (input, init) => {
-        const url =
-          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-        const body =
-          typeof init?.body === "string"
-            ? init.body
-            : input instanceof Request
-              ? await input.clone().text()
-              : "";
-        if (new URL(url, window.location.href).pathname !== "/v1/chat") {
-          return originalFetch(input, init);
-        }
-
-        const request = JSON.parse(body) as {
-          messages?: Array<{ content?: string; role?: string }>;
-          provider?: string;
-        };
-        const prompt = [...(request.messages ?? [])]
-          .reverse()
-          .find((message) => message.role === "user")?.content;
-        if (!prompt?.includes(requestMarker) || prompt.startsWith("Create a concise chat name")) {
-          return originalFetch(input, init);
-        }
-        const encodeEvent = (event: unknown) =>
-          new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
-        const stream = new TransformStream<Uint8Array, Uint8Array>();
-        const writer = stream.writable.getWriter();
-        state.writer = writer;
-        state.closed = false;
-        state.requestCount += 1;
-        state.requestStarted = true;
-        void writer
-          .write(
-            encodeEvent({
-              type: "start",
-              runId: "run-controlled",
-              provider: request.provider ?? "codex",
-            }),
-          )
-          .catch(() => undefined);
-        const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
-        const abortStream = () => {
-          state.closed = true;
-          void state.writer?.abort(new DOMException("The operation was aborted.", "AbortError"));
-          state.writer = undefined;
-        };
-        if (signal?.aborted) abortStream();
-        else signal?.addEventListener("abort", abortStream, { once: true });
-        return new Response(stream.readable, {
-          status: 200,
-          headers: {
-            "access-control-allow-origin": "*",
-            "content-type": "text/event-stream",
-          },
-        });
-      };
     },
-    { requestMarker: marker, stateKey: controlledStreamStateKey },
+    { registryKey: controlledStreamRegistryKey, requestMarker: marker },
   );
 
   const waitForRequest = async (page: Page) => {
-    await page.waitForFunction((stateKey) => {
-      const state = Reflect.get(window, stateKey) as { requestStarted?: boolean } | undefined;
-      return state?.requestStarted === true;
-    }, controlledStreamStateKey);
+    await page.waitForFunction(
+      ({ registryKey, requestMarker }) => {
+        const registry = Reflect.get(window, registryKey) as
+          | { streams?: Record<string, { requestStarted?: boolean }> }
+          | undefined;
+        return registry?.streams?.[requestMarker]?.requestStarted === true;
+      },
+      { registryKey: controlledStreamRegistryKey, requestMarker: marker },
+    );
   };
 
   const releaseText = async (page: Page, delta: string) => {
     await page.evaluate(
-      async ({ stateKey, text }) => {
-        const state = Reflect.get(window, stateKey) as
+      async ({ registryKey, requestMarker, text }) => {
+        const registry = Reflect.get(window, registryKey) as
           | {
-              closed: boolean;
-              requestCount: number;
-              writer?: WritableStreamDefaultWriter<Uint8Array>;
+              streams?: Record<
+                string,
+                {
+                  closed: boolean;
+                  requestCount: number;
+                  writer?: WritableStreamDefaultWriter<Uint8Array>;
+                }
+              >;
             }
           | undefined;
+        const state = registry?.streams?.[requestMarker];
         if (!state?.writer || state.closed) {
           throw new Error("The controlled runtime stream is not open.");
         }
@@ -202,21 +243,33 @@ export async function installControlledRuntimeStream(
         );
         await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       },
-      { stateKey: controlledStreamStateKey, text: delta },
+      { registryKey: controlledStreamRegistryKey, requestMarker: marker, text: delta },
     );
   };
 
   const finish = async (page: Page, finishReason = "stop") => {
     await page.evaluate(
-      async ({ stateKey, reason }) => {
-        const state = Reflect.get(window, stateKey) as
+      async ({ reason, registryKey, requestMarker }) => {
+        const registry = Reflect.get(window, registryKey) as
           | {
-              closed: boolean;
-              writer?: WritableStreamDefaultWriter<Uint8Array>;
+              streams?: Record<
+                string,
+                {
+                  closed: boolean;
+                  requestCount: number;
+                  writer?: WritableStreamDefaultWriter<Uint8Array>;
+                }
+              >;
             }
           | undefined;
+        const state = registry?.streams?.[requestMarker];
         if (!state?.writer || state.closed) {
           throw new Error("The controlled runtime stream is not open.");
+        }
+        if (state.requestCount !== 1) {
+          throw new Error(
+            `Expected one controlled runtime request, received ${state.requestCount}.`,
+          );
         }
         await state.writer.write(
           new TextEncoder().encode(
@@ -227,7 +280,7 @@ export async function installControlledRuntimeStream(
         state.closed = true;
         state.writer = undefined;
       },
-      { stateKey: controlledStreamStateKey, reason: finishReason },
+      { reason: finishReason, registryKey: controlledStreamRegistryKey, requestMarker: marker },
     );
   };
 

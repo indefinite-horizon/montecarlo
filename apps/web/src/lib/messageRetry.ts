@@ -1,4 +1,4 @@
-/** Resolves which completed user turn a retry or edit action should replay. */
+/** Resolves which durable user turn a retry or edit action should replay. */
 
 import type { ChatMessage } from "./conversation";
 
@@ -11,6 +11,7 @@ export function retrySourceForMessage(
   if (!message) return undefined;
 
   if (message.role === "user") {
+    if (message.persisted) return message;
     for (let index = messageIndex + 1; index < messages.length; index += 1) {
       const response = messages[index];
       if (!response || response.role === "user") return undefined;

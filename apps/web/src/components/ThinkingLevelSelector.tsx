@@ -65,8 +65,8 @@ export const ThinkingLevelSelector = memo(function ThinkingLevelSelector({
     <ActionTooltip label={t("composer.adjustThinking")} shortcut={shortcut}>
       <Button
         data-testid="thinking-level-trigger"
-        className="gap-1.5 px-2.5 text-muted-foreground"
-        variant="ghost"
+        className="gap-1.5 px-2.5"
+        variant="quiet"
         aria-label={`${t("composer.adjustThinking")}: ${t(`composer.thinkingLevels.${value}`)}`}
         onClick={() => onChange(nextReasoningEffort(value, options))}
       >

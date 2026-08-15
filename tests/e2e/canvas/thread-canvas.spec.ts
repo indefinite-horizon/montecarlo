@@ -47,6 +47,56 @@ async function openCanvas(page: Page) {
   await expect(page.getByTestId("conversation-canvas")).toBeVisible();
 }
 
+test("keeps the branch map available while switching between thread and canvas", async ({
+  page,
+}) => {
+  const branchMap = page.getByRole("complementary", { name: "Branch map" });
+  await expect(branchMap).toBeVisible();
+
+  await openCanvas(page);
+  await expect(branchMap).toBeVisible();
+
+  await branchMap.getByRole("button", { name: "Close branch map" }).click();
+  await expect(branchMap).toHaveCount(0);
+  await page.getByRole("button", { name: "Branch map" }).click();
+  await expect(branchMap).toBeVisible();
+  await expect(page.getByRole("button", { name: "Canvas view", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await page.getByRole("button", { name: "Thread view", exact: true }).click();
+  await expect(branchMap).toBeVisible();
+});
+
+test("keeps an active response running while switching between thread and canvas", async ({
+  page,
+}) => {
+  const prompt = `Keep streaming across views ${controlledStream.marker}`;
+  await page.getByPlaceholder("Ask a follow-up or start a new direction…").fill(prompt);
+  await page.getByRole("button", { name: "Send message" }).click();
+  await controlledStream.waitForRequest(page);
+  await expect(page.getByRole("button", { name: "Stop generation" })).toBeVisible();
+
+  await openCanvas(page);
+  const canvas = page.getByTestId("conversation-canvas");
+  await expect(
+    canvas.getByRole("article").filter({ has: page.getByText("Active") }),
+  ).toHaveAttribute("aria-busy", "true");
+
+  await controlledStream.releaseText(page, "This response survived the view change.");
+
+  const threadToggle = page.getByRole("button", { name: "Thread view", exact: true });
+  await threadToggle.click();
+  await expect(threadToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Stop generation" })).toBeVisible();
+  await expect(assistantMessage(page, "This response survived the view change.")).toBeVisible();
+
+  await controlledStream.finish(page);
+  await expect(page.getByRole("button", { name: "Stop generation" })).toHaveCount(0);
+  await expect(assistantMessage(page, "This response survived the view change.")).toBeVisible();
+});
+
 async function waitForStableCanvasTransform(canvas: Locator) {
   const viewport = canvas.locator(".react-flow__viewport");
   let previousTransform: string | undefined;

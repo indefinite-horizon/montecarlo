@@ -50,6 +50,74 @@ test("branch map selection keeps header, transcript, provenance, and marker alig
   await expect(userMessage(page, "Root transcript")).toBeVisible();
 });
 
+test("parent turns link to their child branches from the transcript margin", async ({ page }) => {
+  await sendMessage(page, "Branch source turn", "Stub response: Branch source turn");
+  await createPromptBranch(page, "Margin child");
+  await page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]').click();
+
+  const callout = page
+    .getByRole("button", {
+      name: /Open branch Margin child, created/u,
+    })
+    .first();
+  await expect(callout).toBeVisible();
+  await expect(callout).toContainText("Margin child");
+  await expect(callout.locator("time")).toHaveAttribute("datetime", /\d{4}-\d{2}-\d{2}T/u);
+
+  await callout.click();
+  await expect(page.getByTestId("branch-origin-divider")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Margin child", exact: true })).toHaveClass(
+    /border-primary/u,
+  );
+
+  await page.getByTestId("branch-parent-link").click();
+  await expect(page.getByTestId("branch-origin-divider")).toHaveCount(0);
+  await expect(page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]')).toHaveClass(
+    /border-primary/u,
+  );
+});
+
+test("branch context menu manages read state, rename, copy link, and subtree deletion", async ({
+  context,
+  page,
+}) => {
+  await createPromptBranch(page, "Managed branch");
+  const row = childBranchRow(page, "Managed branch");
+
+  await row.click({ button: "right" });
+  let menu = page.getByTestId("branch-context-menu");
+  await menu.getByRole("menuitem", { name: "Mark as unread" }).click();
+  await expect(row).toHaveAttribute("data-unread", "true");
+
+  await row.click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Mark as read" }).click();
+  await expect(row).toHaveAttribute("data-unread", "false");
+
+  await row.click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Rename" }).click();
+  const rename = page.getByRole("dialog", { name: "Rename branch" });
+  await rename.getByLabel("Branch name").fill("Renamed branch");
+  await rename.getByRole("button", { name: "Save" }).click();
+  const renamedRow = childBranchRow(page, "Renamed branch");
+  await expect(renamedRow).toBeVisible();
+
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await renamedRow.click({ button: "right" });
+  menu = page.getByTestId("branch-context-menu");
+  await menu.getByRole("menuitem", { name: "Copy link" }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(new URL(copied).searchParams.get("branch")).toBeTruthy();
+
+  await renamedRow.click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Delete branch" }).click();
+  const confirmation = page.getByRole("dialog", { name: "Delete branch?" });
+  await confirmation.getByRole("button", { name: "Delete branch" }).click();
+  await expect(renamedRow).toHaveCount(0);
+  await expect(page.locator('[data-testid="branch-map-row"][data-branch-depth="0"]')).toHaveClass(
+    /border-primary/u,
+  );
+});
+
 test("sibling branches never display each other's turns", async ({ page }) => {
   await createPromptBranch(page, "Sibling A seed");
   await sendMessage(page, "Sibling A only", "Stub response: Sibling A only");

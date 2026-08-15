@@ -129,6 +129,31 @@ test("active branch has semantic state in addition to visual styling", async ({ 
   ).toHaveAccessibleName("Close branch map");
 });
 
+test("branch map reveals branch creation on row hover and focus", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const branchMap = page.getByRole("complementary", { name: "Branch map" });
+  const branchMapTitle = branchMap.getByRole("heading", { name: "Branch map" });
+  const branchRow = branchMap.getByTestId("branch-map-row").first();
+  const branchName = branchRow.getByTestId("branch-map-title");
+  const createBranch = branchMap.getByTestId("branch-map-create").first();
+  const workspaceTitle = page.getByTestId("chat-breadcrumb-title");
+
+  await expect(branchMapTitle).toHaveCSS("font-size", "14px");
+  await expect(branchName).toHaveCSS("font-size", "14px");
+  await expect(workspaceTitle).toHaveCSS("font-size", "14px");
+  await expect(createBranch).toHaveCSS("opacity", "0");
+
+  await branchRow.hover();
+  await expect(createBranch).toHaveCSS("opacity", "1");
+  await expect(createBranch).toHaveAccessibleName("New branch");
+
+  await createBranch.focus();
+  await expect(createBranch).toHaveCSS("opacity", "1");
+
+  await createBranch.click();
+  await expect(page.getByRole("dialog", { name: "Branch this conversation" })).toBeVisible();
+});
+
 test("co-located header and composer controls share a hit-target height", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const headerControls = [

@@ -14,7 +14,6 @@ import {
   createPromptBranch,
   createWorkspace,
   openFreshUser,
-  sendMessage,
   userMessage,
 } from "../helpers/workspace";
 
@@ -156,9 +155,9 @@ test("does not treat canceled partial output as a new unread completion", async 
   await expect(assistantMessage(page, "Persisted but incomplete partial output.")).toBeVisible();
   await expect(canceledChat).toHaveAttribute("data-unread", "false");
 
-  await chatRow(page, otherChatId).click();
-  await sendMessage(page, "Abort the other chat", "Stub response: Abort the other chat");
+  await page.getByRole("button", { name: "Stop generation" }).click();
   await expect(canceledChat).toHaveAttribute("data-ongoing-response", "false");
+  await chatRow(page, otherChatId).click();
   await expect(canceledChat).toHaveAttribute("data-unread", "false");
 
   await canceledChat.click();
@@ -230,9 +229,9 @@ test("removes an empty assistant message when a response is canceled", async ({ 
   await controlledStream.waitForRequest(page);
   await expect(page.locator('[role="document"]')).toHaveCount(1);
 
-  await chatRow(page, otherChatId).click();
-  await sendMessage(page, "Abort the empty response", "Stub response: Abort the empty response");
+  await page.getByRole("button", { name: "Stop generation" }).click();
   await expect(canceledChat).toHaveAttribute("data-ongoing-response", "false");
+  await chatRow(page, otherChatId).click();
 
   await canceledChat.click();
   await expect(userMessage(page, prompt)).toBeVisible();

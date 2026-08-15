@@ -126,3 +126,26 @@ export function canGoBackInWorkspaceHistory(history: WorkspaceRouteHistory): boo
 export function canGoForwardInWorkspaceHistory(history: WorkspaceRouteHistory): boolean {
   return history.index >= 0 && history.index < history.entries.length - 1;
 }
+
+function workspaceChatRouteKey(workspace: string, chat: string): string {
+  return `${workspace}\n${chat}`;
+}
+
+export function rememberWorkspaceRoute(
+  memory: ReadonlyMap<string, CompleteWorkspaceRouteSearch>,
+  route: WorkspaceRouteSearch,
+): ReadonlyMap<string, CompleteWorkspaceRouteSearch> {
+  if (!isCompleteWorkspaceRoute(route)) return memory;
+  const next = new Map(memory);
+  next.set(workspaceChatRouteKey(route.workspace, route.chat), copyCompleteRoute(route));
+  return next;
+}
+
+export function rememberedWorkspaceRouteForChat(
+  memory: ReadonlyMap<string, CompleteWorkspaceRouteSearch>,
+  workspace: string,
+  chat: string,
+): CompleteWorkspaceRouteSearch | undefined {
+  const route = memory.get(workspaceChatRouteKey(workspace, chat));
+  return route ? copyCompleteRoute(route) : undefined;
+}

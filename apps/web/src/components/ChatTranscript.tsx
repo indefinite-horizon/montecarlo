@@ -2,26 +2,38 @@
 
 import { Fragment, memo } from "react";
 import { useTranslation } from "react-i18next";
-import { type ChatMessage, messageScrollId, type SelectionAnchor } from "@/lib/conversation";
+import {
+  type ChatBranch,
+  type ChatMessage,
+  messageScrollId,
+  type SelectionAnchor,
+} from "@/lib/conversation";
 import { retrySourceForMessage } from "@/lib/messageRetry";
 import { selectionAnchorFromMessage } from "@/lib/messageSelection";
 import { cn } from "@/lib/utils";
 import { BranchOriginDivider } from "./BranchOriginDivider";
+import { BranchTurnCallouts } from "./BranchTurnCallouts";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { MessageOutputActions } from "./MessageOutputActions";
 import { MessageScrollerItem } from "./ui/message-scroller";
 
 export const ChatTranscript = memo(function ChatTranscript({
+  actionsDisabled,
   branchOrigin,
+  childBranchesByMessageId,
   messages,
   onEditMessage,
   onRetryMessage,
+  onSelectBranch,
   onSelectText,
 }: {
-  branchOrigin?: { branchId: string; createdAt: number };
+  actionsDisabled: boolean;
+  branchOrigin?: { branchId: string; parentBranchId: string; createdAt: number };
+  childBranchesByMessageId: ReadonlyMap<string, ChatBranch[]>;
   messages: ChatMessage[];
   onEditMessage: (message: ChatMessage, content: string) => Promise<boolean>;
   onRetryMessage: (message: ChatMessage) => Promise<boolean>;
+  onSelectBranch: (branchId: string) => void;
   onSelectText: (anchor?: SelectionAnchor) => void;
 }) {
   const branchOriginIndex = branchOrigin
@@ -38,40 +50,55 @@ export const ChatTranscript = memo(function ChatTranscript({
       {messages.map((message, index) => (
         <Fragment key={messageScrollId(message)}>
           {branchOrigin && index === dividerIndex ? (
-            <BranchOriginDivider createdAt={branchOrigin.createdAt} />
+            <BranchOriginDivider
+              createdAt={branchOrigin.createdAt}
+              onSelectParent={() => onSelectBranch(branchOrigin.parentBranchId)}
+            />
           ) : null}
           <MessageScrollerItem
             className={cn(
-              "mx-auto w-full max-w-3xl px-5 sm:px-8",
+              "relative mx-auto w-full max-w-4xl px-5 sm:px-8",
               message.isStreaming && "[overflow-anchor:none]",
             )}
             messageId={messageScrollId(message)}
             scrollAnchor={message.role === "user"}
           >
             <Message
+              actionsDisabled={actionsDisabled}
               message={message}
               onEditMessage={onEditMessage}
               onRetryMessage={onRetryMessage}
               onSelectText={onSelectText}
               retrySource={retrySourceForMessage(messages, index)}
             />
+            {childBranchesByMessageId.get(message.id)?.length ? (
+              <BranchTurnCallouts
+                branches={childBranchesByMessageId.get(message.id) ?? []}
+                onSelect={onSelectBranch}
+              />
+            ) : null}
           </MessageScrollerItem>
         </Fragment>
       ))}
       {branchOrigin && dividerIndex === messages.length ? (
-        <BranchOriginDivider createdAt={branchOrigin.createdAt} />
+        <BranchOriginDivider
+          createdAt={branchOrigin.createdAt}
+          onSelectParent={() => onSelectBranch(branchOrigin.parentBranchId)}
+        />
       ) : null}
     </>
   );
 });
 
 const Message = memo(function Message({
+  actionsDisabled,
   message,
   onEditMessage,
   onRetryMessage,
   onSelectText,
   retrySource,
 }: {
+  actionsDisabled: boolean;
   message: ChatMessage;
   onEditMessage: (message: ChatMessage, content: string) => Promise<boolean>;
   onRetryMessage: (message: ChatMessage) => Promise<boolean>;
@@ -90,6 +117,7 @@ const Message = memo(function Message({
           {message.content}
         </div>
         <MessageOutputActions
+          actionsDisabled={actionsDisabled}
           className="justify-end"
           message={message}
           onEdit={(content) => onEditMessage(message, content)}
@@ -125,6 +153,7 @@ const Message = memo(function Message({
         }
       />
       <MessageOutputActions
+        actionsDisabled={actionsDisabled}
         message={message}
         onRetry={retrySource ? () => onRetryMessage(retrySource) : undefined}
       />

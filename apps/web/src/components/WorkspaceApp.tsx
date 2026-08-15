@@ -9,17 +9,22 @@ import { useConversationController } from "@/hooks/useConversationController";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { useProviderDiscovery } from "@/hooks/useProviderDiscovery";
+import { useSessionPresentationMemory } from "@/hooks/useSessionPresentationMemory";
+import { useWorkspaceEntityActions } from "@/hooks/useWorkspaceEntityActions";
 import { useWorkspaceRouteSync, type WorkspaceView } from "@/hooks/useWorkspaceRouteSync";
 import { useWorkspaceShortcuts } from "@/hooks/useWorkspaceShortcuts";
 import { randomFoodChatName } from "@/lib/chatNaming";
 import {
+  isBranchRunning,
   isThreadOpeningContentReady,
   nextReasoningEffort,
   type SelectionAnchor,
 } from "@/lib/conversation";
 import { appShortcutLabel } from "@/lib/keyboardShortcuts";
 import { BranchComposer, SelectionBranchAction } from "./BranchComposer";
+import { BranchDeleteDialog } from "./BranchDeleteDialog";
 import { BranchMap } from "./BranchMap";
+import { BranchRenameDialog } from "./BranchRenameDialog";
 import { ChatComposer } from "./ChatComposer";
 import { ChatRenameDialog } from "./ChatRenameDialog";
 import { LazyConversationCanvas } from "./LazyConversationCanvas";
@@ -47,13 +52,14 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     routeSearch.chat,
     routeSearch.branch,
   );
-  const { navigateToRoute, goBack, goForward, canGoBack, canGoForward } = useWorkspaceRouteSync({
-    controller,
-    routeSearch,
-    view,
-    setView,
-    workspaceSelectionRequestRef,
-  });
+  const { navigateToRoute, latestRouteForChat, goBack, goForward, canGoBack, canGoForward } =
+    useWorkspaceRouteSync({
+      controller,
+      routeSearch,
+      view,
+      setView,
+      workspaceSelectionRequestRef,
+    });
   const {
     catalogs: modelCatalogs,
     loadingProviders: modelCatalogLoading,
@@ -76,7 +82,6 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workspaceSetupOpen, setWorkspaceSetupOpen] = useState(false);
   const [projectCreateOpen, setProjectCreateOpen] = useState(false);
-  const [renameChatId, setRenameChatId] = useState<string>();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
   const [modelEditorOpen, setModelEditorOpen] = useState(false);
@@ -86,18 +91,16 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     () => controller.workspaces.map((workspace) => String(workspace.id)),
     [controller.workspaces],
   );
-  const createChatInFlightRef = useRef(false);
   const sidebarOverlaysWorkspace = useMediaQuery("(max-width: 767px)");
   const branchMapOverlaysWorkspace = useMediaQuery("(max-width: 1279px)");
   const activeBranch = controller.branches.find(
     (branch) => branch.id === controller.activeBranchId,
   );
-  const isStreaming = controller.branches.some((branch) =>
-    branch.messages.some((message) => message.isStreaming),
-  );
+  const activeBranchRunning = isBranchRunning(activeBranch, controller.branchActivityNow);
   const transcriptStreaming = controller.messages.some((message) => message.isStreaming);
   const transcriptContentReady =
-    !controller.loading && isThreadOpeningContentReady(controller.messages);
+    !controller.loading &&
+    (activeBranch?.openingContentReady ?? isThreadOpeningContentReady(controller.messages));
   const activeChat = controller.chats.find((chat) => chat.id === controller.activeChatId);
   const latestCompletedMessagePublicId = activeChat?.latestCompletedMessagePublicId;
   const latestCompletedMessage = latestCompletedMessagePublicId
@@ -163,152 +166,45 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   }, []);
 
   const toggleRightSidebar = useCallback(() => {
-    if (view !== "thread") {
-      setBranchMapOpen(true);
-      setWorkspaceView("thread");
-      return;
-    }
     setBranchMapOpen((current) => !current);
-  }, [setWorkspaceView, view]);
+  }, []);
 
-  const createNewChat = useCallback(
-    async (projectId?: string) => {
-      if (createChatInFlightRef.current) return false;
-      createChatInFlightRef.current = true;
-      try {
-        const created = await controller.createChat(randomFoodChatName(), projectId);
-        if (!created) return false;
-        if (typeof created === "object") {
-          navigateToRoute({
-            workspace: controller.workspacePublicId,
-            chat: created.publicId,
-            branch: created.rootBranchPublicId,
-            view,
-          });
-        }
-        return true;
-      } finally {
-        createChatInFlightRef.current = false;
-      }
-    },
-    [controller.createChat, controller.workspacePublicId, navigateToRoute, view],
-  );
-
-  const selectChat = useCallback(
-    (chatId: string) => {
-      const chat = controller.chats.find((candidate) => candidate.id === chatId);
-      if (!chat) return;
-      const chatPublicId = chat.publicId;
-      if (!chatPublicId || !chat.rootBranchPublicId) return;
-      controller.selectChat(chatId);
-      navigateToRoute({
-        workspace: controller.workspacePublicId,
-        chat: chatPublicId,
-        branch: chat.rootBranchPublicId,
-        view,
-      });
-      if (window.innerWidth < 768) setSidebarOpen(false);
-    },
-    [controller.chats, controller.selectChat, controller.workspacePublicId, navigateToRoute, view],
-  );
-
-  const archiveChat = useCallback(
-    async (chatId: string) => {
-      const chat = controller.chats.find((candidate) => candidate.id === chatId);
-      if (!chat) return;
-      const wasActive = chatId === controller.activeChatId;
-      const result = await controller.archiveChat(chatId, randomFoodChatName());
-      if (!result) return;
-      if (wasActive) {
-        navigateToRoute(
-          {
-            workspace: controller.workspacePublicId,
-            chat: result.nextChatPublicId,
-            branch: result.nextRootBranchPublicId,
-            view,
-          },
-          true,
-        );
-      }
-      toast.success(t("sidebar.archiveSuccess", { title: chat.title }), {
-        action: {
-          label: t("common.undo"),
-          onClick: () => void controller.restoreChat(result.archivedChatPublicId),
-        },
-      });
-    },
-    [
-      controller.activeChatId,
-      controller.archiveChat,
-      controller.chats,
-      controller.restoreChat,
-      controller.workspacePublicId,
-      navigateToRoute,
-      t,
-      view,
-    ],
-  );
-
-  const archiveFocusedChat = useCallback(async () => {
-    if (!controller.activeChatId) return;
-    await archiveChat(controller.activeChatId);
-  }, [archiveChat, controller.activeChatId]);
-
-  const markChatUnread = useCallback(
-    async (chatId: string) => {
-      const marked = await controller.markChatUnread(chatId);
-      if (marked) toast.success(t("sidebar.markUnreadSuccess"));
-    },
-    [controller.markChatUnread, t],
-  );
-
-  const setChatPinned = useCallback(
-    async (chatId: string, pinned: boolean) => {
-      const changed = await controller.setChatPinned(chatId, pinned);
-      if (changed) toast.success(t(pinned ? "sidebar.pinSuccess" : "sidebar.unpinSuccess"));
-    },
-    [controller.setChatPinned, t],
-  );
-
-  const renameChat = controller.chats.find((chat) => chat.id === renameChatId);
-  const submitChatRename = useCallback(
-    async (title: string) => {
-      if (!renameChatId) return false;
-      const renamed = await controller.renameChat(renameChatId, title);
-      if (renamed) toast.success(t("sidebar.renameSuccess"));
-      return renamed;
-    },
-    [controller.renameChat, renameChatId, t],
-  );
-
-  const copyChatLink = useCallback(
-    async (chatId: string) => {
-      const chat = controller.chats.find((candidate) => candidate.id === chatId);
-      if (!controller.workspacePublicId || !chat?.publicId || !chat.rootBranchPublicId) {
-        toast.error(t("sidebar.copyLinkError"));
-        return;
-      }
-      const url = new URL(window.location.href);
-      url.search = new URLSearchParams({
-        workspace: controller.workspacePublicId,
-        chat: chat.publicId,
-        branch: chat.rootBranchPublicId,
-        view,
-      }).toString();
-      url.hash = "";
-      try {
-        await navigator.clipboard.writeText(url.toString());
-        toast.success(t("sidebar.copyLinkSuccess"));
-      } catch {
-        toast.error(t("sidebar.copyLinkError"));
-      }
-    },
-    [controller.chats, controller.workspacePublicId, t, view],
-  );
+  const {
+    archiveChat,
+    archiveFocusedChat,
+    confirmBranchDelete,
+    copyBranchLink,
+    copyChatLink,
+    createNewChat,
+    deleteBranch,
+    deleteBranchDescendantCount,
+    markChatUnread,
+    renameBranch,
+    renameChat,
+    selectChat,
+    setChatPinned,
+    setDeleteBranchId,
+    setRenameBranchId,
+    setRenameChatId,
+    submitBranchRename,
+    submitChatRename,
+  } = useWorkspaceEntityActions({
+    controller,
+    latestRouteForChat,
+    navigateToRoute,
+    setSidebarOpen,
+    view,
+  });
 
   const markLatestMessageRead = useCallback(
-    (messagePublicId: string) => controller.markChatRead(controller.activeChatId, messagePublicId),
-    [controller.activeChatId, controller.markChatRead],
+    async (messagePublicId: string) => {
+      const marked = await controller.markChatRead(controller.activeChatId, messagePublicId);
+      if (marked && activeBranch?.isUnread) {
+        await controller.setBranchUnread(activeBranch.id, false);
+      }
+      return marked;
+    },
+    [activeBranch, controller.activeChatId, controller.markChatRead, controller.setBranchUnread],
   );
 
   const selectWorkspace = useCallback(
@@ -321,14 +217,17 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
       if (!workspace) return;
       const selected = await controller.selectWorkspace(workspaceId);
       if (!selected || workspaceSelectionRequestRef.current !== requestId) return;
-      navigateToRoute({
-        workspace: selected.workspacePublicId,
-        chat: selected.chatPublicId,
-        branch: selected.branchPublicId,
-        view,
-      });
+      const rememberedRoute = latestRouteForChat(selected.workspacePublicId, selected.chatPublicId);
+      navigateToRoute(
+        rememberedRoute ?? {
+          workspace: selected.workspacePublicId,
+          chat: selected.chatPublicId,
+          branch: selected.branchPublicId,
+          view,
+        },
+      );
     },
-    [controller.selectWorkspace, controller.workspaces, navigateToRoute, view],
+    [controller.selectWorkspace, controller.workspaces, latestRouteForChat, navigateToRoute, view],
   );
 
   const selectBranch = useCallback(
@@ -388,13 +287,31 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
     workspaceSetupOpen ||
     projectCreateOpen ||
     Boolean(renameChat) ||
+    Boolean(renameBranch) ||
+    Boolean(deleteBranch) ||
     modelEditorOpen ||
     branchComposerOpen;
   const workspaceOccluded =
-    (sidebarOpen && sidebarOverlaysWorkspace) ||
-    (view === "thread" && branchMapOpen && branchMapOverlaysWorkspace);
+    (sidebarOpen && sidebarOverlaysWorkspace) || (branchMapOpen && branchMapOverlaysWorkspace);
   const readTrackingEnabled =
     !blockingDialogOpen && !commandPaletteOpen && !providerMenuOpen && !workspaceOccluded;
+  const presentationWorkspaceId = controller.workspacePublicId;
+  const presentationChatId = controller.activeChatPublicId;
+  const presentationBranchId = controller.activeBranchPublicId;
+  const {
+    initialCanvasBranchScrollBookmarks,
+    initialCanvasViewport,
+    initialThreadScrollBookmark,
+    rememberActiveCanvasViewport,
+    rememberActiveThreadScroll,
+    rememberCanvasBranchScroll,
+  } = useSessionPresentationMemory({
+    branches: controller.branches,
+    branchId: presentationBranchId,
+    chatId: presentationChatId,
+    view,
+    workspaceId: presentationWorkspaceId,
+  });
 
   useWorkspaceShortcuts({
     blockingDialogOpen,
@@ -472,15 +389,20 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
             }
           >
             <LazyConversationCanvas
-              key={controller.activeChatId}
+              key={presentationChatId ?? controller.activeChatId}
               branches={controller.branches}
               activeBranchId={controller.activeBranchId}
+              activityNow={controller.branchActivityNow}
+              initialBranchScrollBookmarks={initialCanvasBranchScrollBookmarks}
+              initialViewport={initialCanvasViewport}
               loading={controller.loading}
               readMessageId={readMessagePublicId}
               readTrackingEnabled={readTrackingEnabled}
               onReadMessage={markLatestMessageRead}
+              onBranchScrollBookmarkChange={rememberCanvasBranchScroll}
               onSelectBranch={selectBranch}
               onOpenThread={() => setWorkspaceView("thread")}
+              onViewportChange={rememberActiveCanvasViewport}
               onEditMessage={controller.editMessage}
               onRetryMessage={controller.retryMessage}
               onCreateBranch={createBranch}
@@ -490,23 +412,29 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
           <>
             <WorkspaceThread
               activeBranch={activeBranch}
+              actionsDisabled={activeBranchRunning}
+              branches={controller.branches}
               contentReady={transcriptContentReady}
+              initialScrollBookmark={initialThreadScrollBookmark}
               messages={controller.messages}
               onEditMessage={controller.editMessage}
               onClearSelection={() => setSelection(undefined)}
               onSelectText={setSelection}
               onReadMessage={markLatestMessageRead}
+              onScrollBookmarkChange={rememberActiveThreadScroll}
               onRetryMessage={controller.retryMessage}
+              onSelectBranch={selectBranch}
               readMessageId={readMessagePublicId}
               readTrackingEnabled={readTrackingEnabled}
               streaming={transcriptStreaming}
-              threadId={`${controller.activeChatId}:${controller.activeBranchId}`}
+              threadId={`${presentationChatId ?? controller.activeChatId}:${presentationBranchId ?? controller.activeBranchId}`}
             />
 
             <ChatComposer
-              disabled={controller.loading || isStreaming}
+              disabled={controller.loading || activeBranchRunning}
               branchDisabled={!activeBranch}
-              isStreaming={isStreaming}
+              isStreaming={activeBranchRunning}
+              canStop={controller.canStopActiveBranch}
               onSend={controller.sendMessage}
               onStop={controller.stop}
               onBranch={openPromptBranch}
@@ -595,10 +523,24 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
       <BranchMap
         branches={controller.branches}
         activeBranchId={controller.activeBranchId}
+        activityNow={controller.branchActivityNow}
         unreadBranchId={activeChat?.isUnread ? latestCompletedMessage?.branchId : undefined}
         onSelect={selectBranch}
         onCreate={openPromptBranch}
-        open={view === "thread" && branchMapOpen}
+        onCopyLink={(branchId) => void copyBranchLink(branchId)}
+        onDelete={setDeleteBranchId}
+        onRename={(branchId) => {
+          const branch = controller.branches.find((candidate) => candidate.id === branchId);
+          if (branch?.parentBranchId) setRenameBranchId(branchId);
+          else setRenameChatId(controller.activeChatId);
+        }}
+        onSetUnread={(branchId, unread) => {
+          void controller.setBranchUnread(branchId, unread).then((changed) => {
+            if (changed)
+              toast.success(t(unread ? "branch.markUnreadSuccess" : "branch.markReadSuccess"));
+          });
+        }}
+        open={branchMapOpen}
         onClose={() => setBranchMapOpen(false)}
         toggleShortcut={toggleRightSidebarShortcut}
       />
@@ -618,6 +560,26 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
           onRename={submitChatRename}
         />
       ) : null}
+      {renameBranch ? (
+        <BranchRenameDialog
+          key={renameBranch.id}
+          initialTitle={renameBranch.title}
+          onOpenChange={(open) => {
+            if (!open) setRenameBranchId(undefined);
+          }}
+          onRename={submitBranchRename}
+        />
+      ) : null}
+      {deleteBranch ? (
+        <BranchDeleteDialog
+          title={deleteBranch.title}
+          descendantCount={deleteBranchDescendantCount}
+          onOpenChange={(open) => {
+            if (!open) setDeleteBranchId(undefined);
+          }}
+          onDelete={confirmBranchDelete}
+        />
+      ) : null}
       <ModelEditDialog
         open={modelEditorOpen}
         provider={controller.provider}
@@ -629,8 +591,8 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
       />
       <WorkspaceCommandPalette
         activeBranch={activeBranch}
+        activeBranchRunning={activeBranchRunning}
         controller={controller}
-        isStreaming={isStreaming}
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         onArchiveFocusedChat={() => void archiveFocusedChat()}

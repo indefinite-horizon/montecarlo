@@ -33,6 +33,8 @@ export type ChatMessage = {
   id: string;
   /** Stable portable identity used for UI state across optimistic persistence. */
   publicId?: string;
+  /** Whether the message has crossed the durable persistence boundary. */
+  persisted?: boolean;
   branchId: string;
   role: "user" | "assistant" | "system";
   content: string;
@@ -79,10 +81,14 @@ export type ChatBranch = {
   id: string;
   /** Stable portable identity used at browser and persistence boundaries. */
   publicId?: string;
+  /** Durable branch-local run identity, guarded by an expiring lease. */
+  activeRunId?: string;
+  activeRunLeaseExpiresAt?: number;
   parentBranchId?: string;
   /** Immutable ancestor message snapshot captured when this branch is created. */
   contextMessageIds?: string[];
   title: string;
+  isUnread?: boolean;
   depth: number;
   createdAt: number;
   anchor?: BranchAnchor;
@@ -93,6 +99,69 @@ export type ChatBranch = {
 
 export function hasStreamingMessage(branches: readonly ChatBranch[]): boolean {
   return branches.some((branch) => branch.messages.some((message) => message.isStreaming));
+}
+
+/** Includes optimistic streams, durable leases, and legacy pre-lease running messages. */
+export function isBranchRunning(branch: ChatBranch | undefined, now = Date.now()): boolean {
+  if (!branch) return false;
+  if (branch.messages.some((message) => message.isStreaming)) return true;
+
+  const hasLeaseMetadata =
+    branch.activeRunId !== undefined || branch.activeRunLeaseExpiresAt !== undefined;
+  if (hasLeaseMetadata) {
+    return (
+      branch.activeRunId !== undefined &&
+      branch.activeRunLeaseExpiresAt !== undefined &&
+      branch.activeRunLeaseExpiresAt > now
+    );
+  }
+
+  return branch.messages.some((message) => message.runStatus === "running");
+}
+
+export function runningBranchIds(
+  branches: readonly ChatBranch[],
+  now = Date.now(),
+): ReadonlySet<string> {
+  return new Set(
+    branches.filter((branch) => isBranchRunning(branch, now)).map((branch) => branch.id),
+  );
+}
+
+/** Returns the target branch and every branch that transitively descends from it. */
+export function branchSubtreeIds(
+  branches: readonly ChatBranch[],
+  targetBranchId: string,
+): ReadonlySet<string> {
+  if (!branches.some((branch) => branch.id === targetBranchId)) return new Set();
+
+  const childrenByParentId = new Map<string, string[]>();
+  for (const branch of branches) {
+    if (!branch.parentBranchId) continue;
+    const children = childrenByParentId.get(branch.parentBranchId) ?? [];
+    children.push(branch.id);
+    childrenByParentId.set(branch.parentBranchId, children);
+  }
+
+  const subtree = new Set<string>();
+  const pending = [targetBranchId];
+  while (pending.length > 0) {
+    const branchId = pending.pop();
+    if (!branchId || subtree.has(branchId)) continue;
+    subtree.add(branchId);
+    pending.push(...(childrenByParentId.get(branchId) ?? []));
+  }
+  return subtree;
+}
+
+/** Whether a target branch or one of its descendants currently owns an active response. */
+export function hasRunningBranchInSubtree(
+  branches: readonly ChatBranch[],
+  targetBranchId: string,
+  now = Date.now(),
+): boolean {
+  const subtree = branchSubtreeIds(branches, targetBranchId);
+  return branches.some((branch) => subtree.has(branch.id) && isBranchRunning(branch, now));
 }
 
 export type ChatSummary = {
@@ -173,4 +242,26 @@ export function visibleMessages(branches: ChatBranch[], activeBranchId: string):
     if (snapshot) return branch.messages.filter((message) => snapshot.has(message.id));
     return branch.messages.filter((message) => message.createdAt <= activeBranch.createdAt);
   });
+}
+
+/** Groups direct child branches by the inherited turn where they diverged. */
+export function childBranchesBySourceMessage(
+  branches: readonly ChatBranch[],
+  parentBranchId: string,
+): ReadonlyMap<string, ChatBranch[]> {
+  const grouped = new Map<string, ChatBranch[]>();
+
+  for (const branch of branches) {
+    if (branch.parentBranchId !== parentBranchId) continue;
+    const sourceMessageId = branch.anchor?.sourceMessageId ?? branch.contextMessageIds?.at(-1);
+    if (!sourceMessageId) continue;
+    const children = grouped.get(sourceMessageId) ?? [];
+    children.push(branch);
+    grouped.set(sourceMessageId, children);
+  }
+
+  for (const children of grouped.values()) {
+    children.sort((left, right) => left.createdAt - right.createdAt);
+  }
+  return grouped;
 }

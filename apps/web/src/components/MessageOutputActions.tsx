@@ -4,6 +4,7 @@ import { Check, Clock3, Copy, Pencil, RotateCcw } from "lucide-react";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { copyText } from "@/lib/clipboard";
 import type { ChatMessage } from "@/lib/conversation";
 import { cn } from "@/lib/utils";
 import { ActionTooltip } from "./ActionTooltip";
@@ -42,11 +43,13 @@ export function formatFullDate(createdAt: number, locale: string) {
 }
 
 export const MessageOutputActions = memo(function MessageOutputActions({
+  actionsDisabled = false,
   className,
   message,
   onEdit,
   onRetry,
 }: {
+  actionsDisabled?: boolean;
   className?: string;
   message: ChatMessage;
   onEdit?: (content: string) => Promise<boolean>;
@@ -63,7 +66,7 @@ export const MessageOutputActions = memo(function MessageOutputActions({
 
   const copyOutput = async () => {
     try {
-      await navigator.clipboard.writeText(message.content);
+      await copyText(message.content);
       setCopied(true);
       toast.success(t("chat.outputCopied"));
       window.setTimeout(() => setCopied(false), 2_000);
@@ -118,6 +121,7 @@ export const MessageOutputActions = memo(function MessageOutputActions({
           <Button
             aria-label={t("chat.retryMessage")}
             className="size-7 p-0 text-muted-foreground hover:text-foreground"
+            disabled={actionsDisabled}
             onClick={() => void onRetry()}
             size="icon"
             variant="ghost"
@@ -131,6 +135,7 @@ export const MessageOutputActions = memo(function MessageOutputActions({
           <Button
             aria-label={t("chat.editMessage")}
             className="size-7 p-0 text-muted-foreground hover:text-foreground"
+            disabled={actionsDisabled}
             onClick={() => {
               setDraft(message.content);
               setEditing(true);
@@ -182,7 +187,12 @@ export const MessageOutputActions = memo(function MessageOutputActions({
                   {t("common.cancel")}
                 </Button>
                 <Button
-                  disabled={!draft.trim() || draft.trim() === message.content.trim() || submitting}
+                  disabled={
+                    actionsDisabled ||
+                    !draft.trim() ||
+                    draft.trim() === message.content.trim() ||
+                    submitting
+                  }
                   type="submit"
                 >
                   {t("chat.saveAndRetry")}

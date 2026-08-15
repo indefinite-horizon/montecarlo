@@ -155,6 +155,7 @@ async function ensureRootBranch(
     contextMessageIds: [],
     depth: 0,
     nextMessageOrdinal: 0,
+    runLeaseVersion: 1,
     createdByUserId: userId,
     createdAt: now,
   });

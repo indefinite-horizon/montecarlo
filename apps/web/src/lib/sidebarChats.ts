@@ -58,3 +58,24 @@ export function organizeSidebarChats(
     chatsByProjectId,
   };
 }
+
+/** Chooses the row that should receive focus after a chat disappears from its section. */
+export function archiveSuccessor(
+  chats: readonly SidebarChat[],
+  projects: readonly ProjectSummary[],
+  archivedChatId: string,
+): SidebarChat | undefined {
+  const archivedChat = chats.find((chat) => chat.id === archivedChatId);
+  if (!archivedChat) return undefined;
+
+  const { pinned, projectless, chatsByProjectId } = organizeSidebarChats(chats, projects);
+  const section = archivedChat.isPinned
+    ? pinned
+    : archivedChat.projectId
+      ? (chatsByProjectId.get(archivedChat.projectId) ?? [])
+      : projectless;
+  const archivedIndex = section.findIndex((chat) => chat.id === archivedChatId);
+  if (archivedIndex < 0) return undefined;
+
+  return section[archivedIndex + 1] ?? section[archivedIndex - 1];
+}

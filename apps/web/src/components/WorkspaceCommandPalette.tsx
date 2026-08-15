@@ -23,8 +23,8 @@ import { CommandPalette, type CommandPaletteAction } from "./CommandPalette";
 
 type WorkspaceCommandPaletteProps = {
   activeBranch?: ChatBranch;
+  activeBranchRunning: boolean;
   controller: ReturnType<typeof useConversationController>;
-  isStreaming: boolean;
   onArchiveFocusedChat: () => void;
   onCreateChat: () => void;
   onCycleThinking: () => void;
@@ -54,8 +54,8 @@ type WorkspaceCommandPaletteProps = {
 
 export const WorkspaceCommandPalette = memo(function WorkspaceCommandPalette({
   activeBranch,
+  activeBranchRunning,
   controller,
-  isStreaming,
   onArchiveFocusedChat,
   onCreateChat,
   onCycleThinking,
@@ -165,7 +165,7 @@ export const WorkspaceCommandPalette = memo(function WorkspaceCommandPalette({
         id: "new-branch",
         label: t("commandPalette.newBranch"),
         icon: <GitBranch />,
-        disabled: !activeBranch || isStreaming,
+        disabled: !activeBranch || activeBranchRunning,
         onSelect: () => {
           onViewChange("thread");
           onOpenBranch();
@@ -192,12 +192,12 @@ export const WorkspaceCommandPalette = memo(function WorkspaceCommandPalette({
     ],
     [
       activeBranch,
+      activeBranchRunning,
       controller.activeChatId,
       controller.chats,
       controller.loading,
       controller.workspaceId,
       controller.workspaces,
-      isStreaming,
       onArchiveFocusedChat,
       onCreateChat,
       onCycleThinking,

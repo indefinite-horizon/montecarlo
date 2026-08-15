@@ -45,6 +45,17 @@ adds blue/gold only when another hue improves path recognition.
 
 - Keep titles and headings in sentence case by default. Do not uppercase them
   unless the user or product specification explicitly calls for uppercase.
+- Use the 14px `text-sm` application scale for toolbar titles, navigation rows,
+  object names, and text-labeled actions. Peer labels in the left sidebar,
+  transcript header, and branch map should look equal in size and weight.
+- Reserve the 12px `text-xs` scale for section labels, metadata, shortcut hints,
+  compact state values, and supporting information. Do not use arbitrary sizes
+  such as 11px for primary navigation or object names.
+- Use `font-semibold` for the active page or panel title, `font-medium` for
+  actions and section labels, and normal weight for ordinary object names.
+- Use `text-foreground` for primary content and selected or unread emphasis.
+  Use `text-muted-foreground` for secondary actions, inactive navigation,
+  metadata, and icons that accompany those elements.
 
 ## Interaction Hierarchy
 
@@ -141,6 +152,36 @@ adds blue/gold only when another hue improves path recognition.
 - Secondary and outline buttons are for supporting actions.
 - Destructive actions should use the destructive variant and should require confirmation if the action is hard to undo.
 - Prefer an icon plus text for important commands when the icon clarifies the action.
+- Use the shared `Button` primitive instead of recreating padding, typography,
+  color, hover, focus, disabled, or icon sizing at call sites.
+- Use `default` for the primary action, `destructive` for destructive actions,
+  `outline` for bounded supporting actions, `secondary` for selected or
+  emphasized alternatives, and `ghost` for neutral chrome and icon controls.
+- Use `quiet` for low-emphasis text actions embedded in toolbars, composers, or
+  sidebars. Quiet actions use `text-muted-foreground` at rest and the standard
+  accent hover treatment. Create, Search, Thinking Level, and New Branch are
+  canonical examples.
+- Compose a quiet action with the shared primitive directly:
+
+  ```tsx
+  <Button className="justify-start px-3" variant="quiet">
+    <Plus />
+    <span>New branch</span>
+  </Button>
+  ```
+
+  The `quiet` variant owns the standard 14px font size, medium weight, semantic
+  color, shadow, and hover treatment. Call sites may set layout concerns such as
+  width, alignment, gap, responsive visibility, and horizontal padding. Labels
+  inherit the variant typography; do not repeat or override font size, weight,
+  color, shadow, or hover classes on the button or its primary label. Metadata
+  and shortcut hints inside the action may use `text-xs text-muted-foreground`.
+- Keep this as a documented `Button` composition rather than adding an
+  `ActionButton`. Introduce another component only when actions share behavior
+  or structure that a variant plus ordinary composition cannot express.
+- Do not add dashed borders or one-off button colors when an existing variant
+  expresses the action hierarchy. If a new recurring hierarchy is needed, add
+  it to the shared primitive first and document it here.
 
 ## Dialogs
 

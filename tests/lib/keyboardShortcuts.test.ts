@@ -34,6 +34,8 @@ describe("application keyboard shortcuts", () => {
     expect(appShortcutLabel("toggleLeftSidebar", "macos")).toBe("⌘B");
     expect(appShortcutLabel("toggleRightSidebar", "macos")).toBe("⌘⌥B");
     expect(appShortcutLabel("toggleRightSidebar", "linux")).toBe("Ctrl+Alt+B");
+    expect(appShortcutLabel("stopGeneration", "macos")).toBe("⌘⇧⌫");
+    expect(appShortcutLabel("stopGeneration", "windows")).toBe("Ctrl+Shift+Backspace");
   });
 
   it("distinguishes left and right sidebar shortcuts", () => {
@@ -110,6 +112,27 @@ describe("application keyboard shortcuts", () => {
         keyboardEvent("KeyA", { ctrlKey: true, shiftKey: true, altKey: true }),
         "archiveChat",
         "windows",
+      ),
+    ).toBe(false);
+    expect(
+      matchesAppShortcut(
+        keyboardEvent("Backspace", { metaKey: true, shiftKey: true }),
+        "stopGeneration",
+        "macos",
+      ),
+    ).toBe(true);
+    expect(
+      matchesAppShortcut(
+        keyboardEvent("Backspace", { ctrlKey: true, shiftKey: true }),
+        "stopGeneration",
+        "linux",
+      ),
+    ).toBe(true);
+    expect(
+      matchesAppShortcut(
+        keyboardEvent("Backspace", { ctrlKey: true, metaKey: true, shiftKey: true }),
+        "stopGeneration",
+        "linux",
       ),
     ).toBe(false);
   });

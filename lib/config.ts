@@ -6,6 +6,9 @@
  */
 
 export const sharedConfig = {
+  runs: {
+    heartbeatIntervalMs: 10_000,
+  },
   chatNaming: {
     maxGeneratedWords: 7,
     maxRecoveryAttempts: 3,
@@ -21,6 +24,9 @@ export const sharedConfig = {
     limits: {
       contentPreviewLength: 1_000,
     },
+  },
+  presentationMemory: {
+    maxEntries: 500,
   },
   workspaceBootstrap: {
     maxAttempts: 3,

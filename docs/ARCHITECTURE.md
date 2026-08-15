@@ -136,8 +136,8 @@ sequenceDiagram
 
     User->>UI: Send prompt with provider and model
     UI->>UI: Materialize bounded context from the chat DAG
-    UI->>Data: Persist user message and create run
-    Data-->>UI: Run ID
+    UI->>Data: Atomically persist user message and claim this branch's run lease
+    Data-->>UI: Run ID, lease deadline, and private ownership capability
     UI->>Runtime: POST /v1/chat with context, provider, and model
     Runtime->>Runtime: Validate bearer, origin, request, and endpoint policy
 
@@ -156,12 +156,24 @@ sequenceDiagram
     loop Until finish, error, or cancellation
         Runtime-->>UI: Normalized SSE events (text, reasoning, usage, status)
         UI-->>User: Render incremental assistant output
+        UI->>Data: Renew this branch's run lease
     end
-    UI->>Data: Persist assistant message and complete run
+    UI->>Data: Persist assistant message and complete the owning run
     Note over UI,Data: The app-owned DAG remains authoritative; provider session IDs are optional and discardable
 ```
 
 Streaming text stays transient in the initiating renderer and is persisted once, as the final message body. Convex live queries remain the source of truth for durable metadata, but are not an intermediate token journal: that would duplicate the direct SSE path and place plaintext message bodies outside the object-storage boundary.
+
+Each branch admits at most one active run. The user-message insert and branch
+lease claim share one Convex transaction, so concurrent starts on the same
+branch conflict while sibling branches can stream independently. The initiating
+renderer renews an expiring lease with a private capability; a crashed renderer
+therefore cannot leave the branch permanently locked, and a different run
+cannot append output or clear its ownership. On reload, the old document marks
+its tab-scoped session record as orphaned; session storage retains only stable
+public IDs so the replacement document can release the abandoned run without
+persisting credential material. Cancellation still re-authorizes workspace
+membership, the requesting user, and the branch's current run identity.
 
 ## Chat graph
 
