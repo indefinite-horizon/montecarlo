@@ -28,16 +28,6 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
   non-secret tuning knobs with runtime defaults remain documented through their config modules
   rather than duplicated as active `.env.example` assignments. Never place real values, token
   fragments, hashes, credential lengths, or screenshots in either file.
-- Every public tenant Convex function must authorize active workspace membership. Do not accept a user/owner ID from clients.
-- Every tenant-owned document carries `workspaceId`; tenant compound indexes begin with it and reads use those indexes.
-- Keep stable public IDs and versioned envelopes at persistence boundaries. Never export Convex `_id` values or absolute local paths as portable identity.
-- Keep branch persistence provider-neutral. Native Codex/Claude forks may optimize a run but do not define the graph.
-- Implement only the local workspace mode for now: local self-hosted Convex,
-  local filesystem objects, and model execution on the user's device. Do not
-  expose a cloud workspace selector or implement a hybrid local/cloud mode.
-  Keep cloud mode as documented future work that ships only when hosted Convex,
-  private R2 storage, subscription enforcement, and isolated cloud Codex/Claude
-  execution are complete together.
 - Use TanStack Router for in-app navigation. Push fully specified paths, including every state-bearing
   query parameter, so browser back and forward restore the complete workspace, chat, branch, and view.
 - Keep in-app Back and Forward controls on an application-owned route stack. Never delegate those
@@ -56,6 +46,39 @@ The application-owned chat DAG is always authoritative. Provider session IDs are
 - Before changing UI typography, colors, component choice, or component styling,
   consult `docs/DESIGN.md`. Follow its shared typography scale and button
   hierarchy, and extend shared primitives before introducing repeated one-off styles.
+
+## Planning for Cloud
+
+These are hard constraints even while only local mode is implemented. See
+[`MIGRATION.md`](MIGRATION.md) for the workspace-transfer contract, gaps,
+implementation phases, and release gates.
+
+- Every public tenant Convex function authorizes active workspace membership;
+  never accept a user or owner ID from a client as authority.
+- Every tenant-owned document carries `workspaceId`; workspace-bounded compound
+  indexes and reads begin with it. Limit global discovery indexes to documented
+  authorization entry points such as membership lookup, and authorize before
+  reading tenant data.
+- Keep stable public IDs and versioned envelopes at persistence boundaries.
+  Never export Convex `_id` values or absolute local paths as portable identity.
+- Keep the application-owned chat DAG provider-neutral and reconstructable
+  without provider sessions. Native Codex or Claude forks may optimize a run
+  but never define the graph.
+- Implement only local workspace mode for now: local self-hosted Convex, local
+  filesystem objects, and model execution on the user's device. Do not expose a
+  cloud selector or hybrid local/cloud workspace.
+- Ship cloud mode only as one complete hosted boundary: hosted multi-tenant
+  Convex, private R2, Better Auth authorization, subscription enforcement,
+  isolated model execution, provider enrollment, metering, cancellation, and
+  deletion.
+- Treat local-to-cloud and cloud-to-local changes as explicit, staged, verified,
+  idempotent transfers—not a `storageMode` toggle or raw database copy.
+- Transfer only application-owned portable state. Re-establish cloud identity,
+  membership, provider authorization, and secrets inside their target trust
+  boundaries; never upload local credential caches.
+- Keep portable versions independent of Convex `_id` values, the embedded
+  SQLite/data-format version, and the current table layout. Preserve import
+  fixtures and deterministic migrators for every supported portable version.
 
 ## Development
 
@@ -98,6 +121,7 @@ Add focused coverage for branch graphs, context windows, authorization, portable
 ## Doc Map
 
 - `README.md`: setup, feature status, and provider support.
+- `MIGRATION.md`: future local/cloud workspace-transfer contract and implementation plan.
 - `SECRETS.md`: canonical secret-bearing environment and deployment ownership inventory.
 - `docs/ARCHITECTURE.md`: runtime and persistence invariants.
 - `docs/ONTOLOGY.md`: canonical product terminology.
