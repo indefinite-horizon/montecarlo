@@ -29,11 +29,14 @@ function runChecker(arguments_) {
 after(() => rmSync(temporaryRoot, { recursive: true, force: true }));
 
 describe("desktop release compatibility", () => {
-  it("releases only successful main-branch source pushes or main dispatches", () => {
-    assert.match(releaseWorkflow, /github\.ref == 'refs\/heads\/main'/);
-    assert.match(releaseWorkflow, /workflow_run\.event == 'push'/);
-    assert.match(releaseWorkflow, /workflow_run\.head_branch == 'main'/);
-    assert.match(releaseWorkflow, /workflow_run\.head_repository\.full_name == github\.repository/);
+  it("releases only explicit main-branch dispatches", () => {
+    assert.match(releaseWorkflow, /\non:\n {2}workflow_dispatch:\n/);
+    assert.match(
+      releaseWorkflow,
+      /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/,
+    );
+    assert.match(releaseWorkflow, /SOURCE_SHA: \$\{\{ github\.sha \}\}/);
+    assert.doesNotMatch(releaseWorkflow, /\bworkflow_run:/);
   });
 
   it("pins the updater identity and public update feed", () => {

@@ -4,6 +4,12 @@ Monte Carlo has four trust boundaries: the renderer, Convex control plane,
 loopback model runtime, and workspace object store. A chat may cross all four;
 provider credentials must cross none of them except the runtime that uses them.
 
+## Reporting a Vulnerability
+
+Report suspected vulnerabilities privately through
+[GitHub private vulnerability reporting](https://github.com/indefinite-horizon/montecarlo/security/advisories/new).
+Please do not disclose security issues in public GitHub issues or discussions.
+
 ## Baseline
 
 - Better Auth cookies use secure cookies outside local development.

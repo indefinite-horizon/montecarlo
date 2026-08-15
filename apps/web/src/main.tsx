@@ -1,6 +1,9 @@
 /** Bootstraps the web app, Convex auth provider, TanStack Router, and global toasts. */
 
-import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
+import {
+  type AuthClient as ConvexAuthClient,
+  ConvexBetterAuthProvider,
+} from "@convex-dev/better-auth/react";
 import { getAppName } from "@montecarlo/app-constants";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { ConvexReactClient } from "convex/react";
@@ -52,6 +55,11 @@ const convexClient = new ConvexReactClient(convexUrl, {
   expectAuth: import.meta.env.VITE_AUTH_REQUIRED === "true",
 });
 
+// TODO: Remove when https://github.com/get-convex/better-auth/issues/420 is fixed.
+// Better Auth 1.6.22+ exposes a named client type that the provider's otherwise compatible
+// AuthClient definition rejects. Keep the workaround at this single integration boundary.
+const convexProviderAuthClient = authClient as unknown as ConvexAuthClient;
+
 function RouteErrorComponent({ error }: { error: unknown }) {
   const { captureAppError } = useAnalytics();
   // lint-allow: no-direct-use-effect — route error boundaries report once on mount.
@@ -78,13 +86,20 @@ declare module "@tanstack/react-router" {
 }
 
 function InnerApp() {
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending } = authClient.useSession();
 
   // lint-allow: no-direct-use-effect — auth changes must rerun route guards.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: session is consumed by RouterProvider below, but its changes must also rerun route guards.
   React.useEffect(() => {
-    if (session === undefined) return;
+    if (isPending) return;
     void router.invalidate();
-  }, [session]);
+  }, [isPending, session]);
+
+  // Do not mount auth-gated routes until Better Auth has completed its initial
+  // session lookup. In cross-domain flows this also gives the provider time to
+  // exchange the one-time token before a route guard can redirect to /login and
+  // remove it from the URL.
+  if (isPending) return null;
 
   return <RouterProvider router={router} context={{ session, convexClient }} />;
 }
@@ -96,7 +111,7 @@ function App() {
   return (
     <ThemeContext.Provider value={themeCtx}>
       <AnalyticsProvider>
-        <ConvexBetterAuthProvider client={convexClient} authClient={authClient}>
+        <ConvexBetterAuthProvider client={convexClient} authClient={convexProviderAuthClient}>
           <InnerApp />
         </ConvexBetterAuthProvider>
         <DesktopUpdateToast />

@@ -141,3 +141,7 @@ Account-free mode is guarded twice: `ALLOW_LOCAL_ANONYMOUS_WORKSPACES=true` must
 ## Repository workflow
 
 Conductor uses [.conductor/settings.toml](.conductor/settings.toml) for setup and run commands. New local worktrees receive isolated frontend/Convex/runtime ports. Agent rules under `.agents/rules/` enforce tenant authorization, indexed Convex reads, schema naming, uniqueness, secret isolation, i18n, and CI behavior.
+
+## License
+
+Monte Carlo is available under the [MIT License](LICENSE).

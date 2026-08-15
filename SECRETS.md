@@ -91,7 +91,7 @@ backend variables.
 
 ## Desktop release secrets
 
-These values exist only as GitHub Actions secrets in the private source
+These values exist only as encrypted GitHub Actions secrets in the source
 repository. They are intentionally absent from `.env.example`, local Convex,
 application resources, and the public update repository.
 
