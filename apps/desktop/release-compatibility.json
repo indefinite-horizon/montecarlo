@@ -13,6 +13,6 @@
     "channel": "latest",
     "provider": "github",
     "owner": "indefinite-horizon",
-    "repo": "montecarlo-releases"
+    "repo": "montecarlo"
   }
 }

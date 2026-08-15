@@ -61,7 +61,7 @@ win:
 publish:
   provider: github
   owner: indefinite-horizon
-  repo: montecarlo-releases
+  repo: montecarlo
   # Draft releases keep a partially uploaded feed invisible. CI publishes the
   # release only after signature, notarization, metadata, and compatibility gates pass.
   releaseType: draft

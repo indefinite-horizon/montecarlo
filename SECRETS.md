@@ -93,11 +93,10 @@ backend variables.
 
 These values exist only as encrypted GitHub Actions secrets in the source
 repository. They are intentionally absent from `.env.example`, local Convex,
-application resources, and the public update repository.
+application resources, and release assets.
 
 | Variable | Purpose |
 | --- | --- |
-| `DESKTOP_RELEASE_TOKEN` | Publishes draft and verified releases to the public desktop update repository |
 | `DESKTOP_CSC_LINK` | Developer ID Application signing certificate consumed by electron-builder |
 | `DESKTOP_CSC_KEY_PASSWORD` | Unlocks the desktop signing certificate in CI |
 | `DESKTOP_APPLE_API_KEY_ID` | Selects the App Store Connect notarization key |
@@ -105,8 +104,9 @@ application resources, and the public update repository.
 | `DESKTOP_APPLE_API_KEY_P8_BASE64` | Carries the notarization private key into the ephemeral macOS runner |
 
 The public update feed location and release compatibility policy are non-secret
-committed configuration. Do not embed `DESKTOP_RELEASE_TOKEN` in an installed
-application; update reads must remain anonymous against the public repository.
+committed configuration. The workflow publishes to this repository with its
+short-lived `GITHUB_TOKEN`; installed applications read the public feed
+anonymously and contain no GitHub credential.
 
 ## Convex non-secret configuration
 

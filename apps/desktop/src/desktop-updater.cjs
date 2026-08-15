@@ -2,15 +2,21 @@
 
 const updateCheckDelayMs = 5_000;
 const updateCheckIntervalMs = 4 * 60 * 60 * 1_000;
-const changelogReleaseBaseUrl =
-  "https://github.com/indefinite-horizon/montecarlo-releases/releases/tag";
+const changelogReleaseBaseUrl = "https://github.com/indefinite-horizon/montecarlo/releases/tag";
 const versionPattern = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$/u;
+
+function normalizeReleaseName(value) {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().replace(/\s+/gu, " ");
+  return normalized && normalized.length <= 160 ? normalized : undefined;
+}
 
 function normalizeDownloadedUpdate(updateInfo) {
   const version = typeof updateInfo?.version === "string" ? updateInfo.version.trim() : "";
   if (!versionPattern.test(version)) return undefined;
   return Object.freeze({
     version,
+    releaseName: normalizeReleaseName(updateInfo.releaseName),
     releaseDate:
       typeof updateInfo.releaseDate === "string" && updateInfo.releaseDate.length <= 128
         ? updateInfo.releaseDate
@@ -31,6 +37,7 @@ function createDesktopUpdater({
   reportDiagnostic,
 }) {
   let downloadedUpdate;
+  let updateAnnouncementClaimed = false;
   let installStarted = false;
   let checkTimer;
   let intervalTimer;
@@ -67,7 +74,9 @@ function createDesktopUpdater({
     intervalTimer.unref();
   }
 
-  function getDownloadedUpdate() {
+  function claimDownloadedUpdate() {
+    if (!downloadedUpdate || updateAnnouncementClaimed) return undefined;
+    updateAnnouncementClaimed = true;
     return downloadedUpdate;
   }
 
@@ -94,11 +103,12 @@ function createDesktopUpdater({
     if (intervalTimer) clearInterval(intervalTimer);
   }
 
-  return Object.freeze({ dispose, getDownloadedUpdate, install, openChangelog, start });
+  return Object.freeze({ claimDownloadedUpdate, dispose, install, openChangelog, start });
 }
 
 module.exports = {
   changelogUrl,
   createDesktopUpdater,
   normalizeDownloadedUpdate,
+  normalizeReleaseName,
 };

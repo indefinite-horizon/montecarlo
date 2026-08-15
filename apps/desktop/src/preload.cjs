@@ -37,7 +37,7 @@ contextBridge.exposeInMainWorld("monteCarloDesktop", {
   convexSiteUrl: readLoopbackArgument("montecarlo-convex-site-url"),
   getRuntimeConfig: () => ipcRenderer.invoke("runtime-config"),
   getDesktopInfo: () => ipcRenderer.invoke("desktop-info"),
-  getDownloadedUpdate: () => ipcRenderer.invoke("desktop-update:get-downloaded"),
+  claimDownloadedUpdate: () => ipcRenderer.invoke("desktop-update:claim-downloaded"),
   openUpdateChangelog: () => ipcRenderer.invoke("desktop-update:open-changelog"),
   installDownloadedUpdate: () => ipcRenderer.invoke("desktop-update:install"),
   saveProviderSecret: (provider, secret) => {

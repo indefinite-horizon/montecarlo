@@ -87,16 +87,19 @@ requires.
 
 The desktop update identity is the stable tuple of application ID, executable
 name, Apple signing team, public update repository, channel, and data-layout
-contract. The manually dispatched release gate builds a universal macOS DMG
-and ZIP from `main`, signs and notarizes the app and every bundled executable,
-uploads an invisible draft, verifies signatures, notarization, architectures,
-feed hashes, and compatibility metadata, and only then publishes the release.
+contract. The source repository is also the public update repository. An
+explicit release PR owns the version and changelog; the manually dispatched
+release gate retargets its draft to an exact `main` SHA, builds a universal
+macOS DMG and ZIP once, signs and notarizes the app and every bundled
+executable, verifies signatures, notarization, architectures, feed hashes, and
+compatibility metadata, uploads the complete asset set, and publishes last.
 
 Electron downloads an applicable update in the background. Only the
-`update-downloaded` event reaches the renderer; once per app session it shows a
-persistent dismissible toast with **See changelog** and **Update**. Update first
-stops the model runtime and Convex cleanly, then calls the updater's atomic
-install-and-relaunch operation.
+`update-downloaded` event reaches the renderer, and the main process grants one
+announcement claim for its lifetime. That shows a persistent dismissible toast
+with **See changes** and **Restart** once per app session, even if the macOS
+window is closed and reopened. Restart first stops the model runtime and Convex
+cleanly, then calls the updater's atomic install-and-relaunch operation.
 
 The compatibility gate tests direct jumps from the previous published
 contract, keeps the feed and application identity immutable, requires versions

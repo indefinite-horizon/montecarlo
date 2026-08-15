@@ -3,15 +3,15 @@
 import { memo, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { claimDesktopUpdateToast } from "@/lib/desktopUpdatePrompt";
 
 type DownloadedDesktopUpdate = {
   version: string;
+  releaseName?: string;
   releaseDate?: string;
 };
 
 type DesktopUpdateBridge = {
-  getDownloadedUpdate?: () => Promise<DownloadedDesktopUpdate | undefined>;
+  claimDownloadedUpdate?: () => Promise<DownloadedDesktopUpdate | undefined>;
   onUpdateDownloaded?: (callback: (update: DownloadedDesktopUpdate) => void) => void;
   offUpdateDownloaded?: (callback: (update: DownloadedDesktopUpdate) => void) => void;
   openUpdateChangelog?: () => Promise<void>;
@@ -22,14 +22,6 @@ function updateBridge(): DesktopUpdateBridge | undefined {
   return window.monteCarloDesktop as DesktopUpdateBridge | undefined;
 }
 
-function rendererSessionStorage(): Storage | undefined {
-  try {
-    return window.sessionStorage;
-  } catch {
-    return undefined;
-  }
-}
-
 export const DesktopUpdateToast = memo(function DesktopUpdateToast() {
   const { ready, t } = useTranslation();
 
@@ -38,7 +30,7 @@ export const DesktopUpdateToast = memo(function DesktopUpdateToast() {
     if (!ready) return;
     const bridge = updateBridge();
     if (
-      !bridge?.getDownloadedUpdate ||
+      !bridge?.claimDownloadedUpdate ||
       !bridge.onUpdateDownloaded ||
       !bridge.offUpdateDownloaded ||
       !bridge.openUpdateChangelog ||
@@ -50,13 +42,18 @@ export const DesktopUpdateToast = memo(function DesktopUpdateToast() {
     const installDownloadedUpdate = bridge.installDownloadedUpdate;
 
     let active = true;
-    const showDownloadedUpdate = (update: DownloadedDesktopUpdate) => {
+    const showDownloadedUpdate = async () => {
+      if (!active) return;
+      const update = await bridge.claimDownloadedUpdate?.();
+      if (!update) return;
       const version = update.version.trim();
-      if (!active || !version || !claimDesktopUpdateToast(rendererSessionStorage())) return;
+      if (!version) return;
+      const releaseName = update.releaseName?.trim();
 
-      toast(t("updates.ready", { version }), {
+      toast(t("updates.available"), {
         id: "desktop-update-ready",
         testId: "desktop-update-ready",
+        description: releaseName || t("updates.ready", { version }),
         duration: Number.POSITIVE_INFINITY,
         dismissible: true,
         closeButton: true,
@@ -71,11 +68,11 @@ export const DesktopUpdateToast = memo(function DesktopUpdateToast() {
               });
             }}
           >
-            {t("updates.seeChangelog")}
+            {t("updates.seeChanges")}
           </button>
         ),
         action: {
-          label: t("updates.install"),
+          label: t("updates.restart"),
           onClick: (event) => {
             event.preventDefault();
             void installDownloadedUpdate()
@@ -88,17 +85,16 @@ export const DesktopUpdateToast = memo(function DesktopUpdateToast() {
       });
     };
 
-    bridge.onUpdateDownloaded(showDownloadedUpdate);
-    void bridge
-      .getDownloadedUpdate()
-      .then((update) => {
-        if (update) showDownloadedUpdate(update);
-      })
-      .catch(() => undefined);
+    const handleUpdateDownloaded = () => {
+      void showDownloadedUpdate().catch(() => undefined);
+    };
+
+    bridge.onUpdateDownloaded(handleUpdateDownloaded);
+    void showDownloadedUpdate().catch(() => undefined);
 
     return () => {
       active = false;
-      bridge.offUpdateDownloaded?.(showDownloadedUpdate);
+      bridge.offUpdateDownloaded?.(handleUpdateDownloaded);
     };
   }, [ready, t]);
 

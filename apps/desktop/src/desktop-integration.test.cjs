@@ -95,7 +95,7 @@ describe("desktop integration contracts", () => {
     assert.match(builderConfig, /generateUpdatesFilesForAllChannels: true/);
     assert.match(builderConfig, /- dmg/);
     assert.match(builderConfig, /- zip/);
-    assert.match(mainSource, /desktop-update:get-downloaded/);
+    assert.match(mainSource, /desktop-update:claim-downloaded/);
     assert.match(mainSource, /prepareForUpdateInstall/);
     assert.match(preloadSource, /desktop-update:downloaded/);
     assert.doesNotMatch(preloadSource, /update-available/);
@@ -112,6 +112,8 @@ describe("desktop integration contracts", () => {
     assert.match(desktopPackage.scripts["build:dir"], /ensure:production-deps/);
     assert.match(desktopPackage.scripts["build:smoke:mac"], /ensure:production-deps/);
     assert.match(desktopPackage.scripts["build:release:mac"], /ensure:production-deps/);
+    assert.match(desktopPackage.scripts["build:release:mac"], /--publish never/);
+    assert.doesNotMatch(desktopPackage.scripts["build:release:mac"], /--publish always/);
   });
 
   it("runs a persisted packaged-model turn before merge and release", () => {
