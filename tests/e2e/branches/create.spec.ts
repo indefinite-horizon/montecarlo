@@ -255,7 +255,7 @@ ${phrase}
   await expect(dialog.locator("blockquote")).toHaveText(`“${phrase}”`);
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(page.getByText(`“${phrase}”`, { exact: true })).toBeVisible();
-  expect(conversationRequests(runtime)).toHaveLength(1);
+  await expect.poll(() => conversationRequests(runtime).length).toBe(2);
 });
 
 test("selection action hides when cleared and tracks an immediate replacement", async ({
@@ -290,7 +290,7 @@ test("selection action hides when cleared and tracks an immediate replacement", 
   await dialog.getByRole("button", { name: "Create branch" }).click();
   await expect(page.getByText("Following a branch from", { exact: true })).toBeVisible();
   await expect(page.getByText(`“${secondSelection}”`, { exact: true })).toBeVisible();
-  expect(conversationRequests(runtime)).toHaveLength(1);
+  await expect.poll(() => conversationRequests(runtime).length).toBe(2);
 });
 
 test("selection branch with a prompt sends selection provenance in normalized context", async ({
