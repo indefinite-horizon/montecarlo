@@ -9,6 +9,7 @@ jobs:
       github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: blacksmith-2vcpu-ubuntu-2404-arm
     permissions:
+      actions: read
       contents: read
       pull-requests: write
       issues: write
