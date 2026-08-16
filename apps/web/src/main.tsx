@@ -22,6 +22,10 @@ import type { RouterContext } from "./lib/router-context";
 import { routeTree } from "./routeTree.gen";
 import "./styles/app.css";
 
+if (import.meta.env.DEV) {
+  void import("react-grab");
+}
+
 const reactScanEnabled =
   import.meta.env.DEV && import.meta.env.VITE_REACT_SCAN !== "false" && !navigator.webdriver;
 
