@@ -91,9 +91,12 @@ backend variables.
 
 ## Desktop release secrets
 
-These values exist only as encrypted GitHub Actions secrets in the source
-repository. They are intentionally absent from `.env.example`, local Convex,
-application resources, and release assets.
+These values exist only as encrypted secrets in the protected
+`desktop-release` GitHub Actions environment in the source repository. The
+environment accepts deployments only from `main` and requires explicit
+approval before GitHub makes its secrets available to the release job. They are
+intentionally absent from repository-level secrets, `.env.example`, local
+Convex, application resources, and release assets.
 
 | Variable | Purpose |
 | --- | --- |

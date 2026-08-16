@@ -17,6 +17,13 @@ const sameRepositoryPullRequestGuard =
   "github.event.pull_request.head.repo.full_name == github.repository";
 const sameRepositoryCiCondition = `github.event_name != 'pull_request' || ${sameRepositoryPullRequestGuard}`;
 const trustedReviewCondition = `${sameRepositoryPullRequestGuard} && github.event.pull_request.user.login != 'dependabot[bot]'`;
+const desktopReleaseSecretNames = [
+  "DESKTOP_APPLE_API_ISSUER",
+  "DESKTOP_APPLE_API_KEY_ID",
+  "DESKTOP_APPLE_API_KEY_P8_BASE64",
+  "DESKTOP_CSC_KEY_PASSWORD",
+  "DESKTOP_CSC_LINK",
+];
 
 function normalizeExpression(source: string) {
   return source.replace(/\s+/g, " ").trim();
@@ -149,5 +156,28 @@ describe("GitHub workflow security", () => {
     `);
 
     expect(actualCondition).toBe(expectedCondition);
+  });
+
+  it("confines Apple credentials to the protected desktop release environment", () => {
+    const desktopRelease = workflows.find(({ fileName }) => fileName === "desktop-release.yml");
+    expect(desktopRelease).toBeDefined();
+
+    const releaseJob = workflowJobs(desktopRelease?.source ?? "").get("release-macos");
+    expect(releaseJob).toBeDefined();
+    expect(releaseJob).toMatch(/^ {4}environment: desktop-release$/m);
+
+    const secretReferences = workflows.flatMap(({ fileName, source }) =>
+      [...source.matchAll(/secrets\.(DESKTOP_[A-Z0-9_]+)/g)].map((match) => ({
+        fileName,
+        secretName: match[1],
+      })),
+    );
+
+    expect([...new Set(secretReferences.map(({ secretName }) => secretName))].sort()).toEqual(
+      desktopReleaseSecretNames,
+    );
+    expect([...new Set(secretReferences.map(({ fileName }) => fileName))]).toEqual([
+      "desktop-release.yml",
+    ]);
   });
 });

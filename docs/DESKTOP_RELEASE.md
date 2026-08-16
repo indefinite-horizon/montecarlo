@@ -43,7 +43,9 @@ Keep `indefinite-horizon/montecarlo` public. GitHub Releases in this repository
 are both the DMG download page and the anonymous OTA feed, so installed
 applications never need an embedded GitHub credential.
 
-Configure these Actions secrets in the source repository:
+Create a protected GitHub Actions environment named `desktop-release`, allow
+deployments only from `main`, require explicit approval, and configure these
+environment secrets there (not as repository-level secrets):
 
 | Secret | Purpose |
 | --- | --- |
@@ -54,8 +56,10 @@ Configure these Actions secrets in the source repository:
 | `DESKTOP_APPLE_API_KEY_P8_BASE64` | Base64-encoded notarization API private key |
 
 Never put these in `.env.local`, Convex, the renderer, release assets, or the
-application bundle. The same-repository workflow writes releases with its
-short-lived `GITHUB_TOKEN` and a job-scoped `contents: write` permission.
+application bundle. Keep the release job attached to the protected environment
+so GitHub withholds the credentials until approval. The same-repository
+workflow writes releases with its short-lived `GITHUB_TOKEN` and a job-scoped
+`contents: write` permission.
 
 ## Prepare a release
 

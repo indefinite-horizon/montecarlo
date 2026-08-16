@@ -19,6 +19,7 @@ jobs:
   release-macos:
     if: >-
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    environment: desktop-release
     permissions:
       contents: write
     # Keep the established Intel host for this universal build; validate on an
