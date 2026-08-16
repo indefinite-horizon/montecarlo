@@ -4,6 +4,7 @@ export type DesktopProviderSecretId = "openrouter";
 
 export interface DesktopDownloadedUpdate {
   version: string;
+  releaseName?: string;
   releaseDate?: string;
 }
 
@@ -18,7 +19,7 @@ export interface MonteCarloDesktopBridge {
   offSwitchWorkspace(callback: (index: number) => void): void;
   onNewChat(callback: () => void): void;
   offNewChat(callback: () => void): void;
-  getDownloadedUpdate(): Promise<DesktopDownloadedUpdate | undefined>;
+  claimDownloadedUpdate(): Promise<DesktopDownloadedUpdate | undefined>;
   onUpdateDownloaded(callback: (update: DesktopDownloadedUpdate) => void): void;
   offUpdateDownloaded(callback: (update: DesktopDownloadedUpdate) => void): void;
   openUpdateChangelog(): Promise<void>;

@@ -39,15 +39,14 @@ that is already listening at `ELECTRON_START_URL`.
 
 ## One-time release setup
 
-Create `indefinite-horizon/montecarlo-releases` as a **public** GitHub
-repository. Keep update metadata publicly readable so installed applications
-never need an embedded GitHub credential.
+Keep `indefinite-horizon/montecarlo` public. GitHub Releases in this repository
+are both the DMG download page and the anonymous OTA feed, so installed
+applications never need an embedded GitHub credential.
 
 Configure these Actions secrets in the source repository:
 
 | Secret | Purpose |
 | --- | --- |
-| `DESKTOP_RELEASE_TOKEN` | Writes releases to the public update repository |
 | `DESKTOP_CSC_LINK` | Developer ID Application certificate consumed by electron-builder |
 | `DESKTOP_CSC_KEY_PASSWORD` | Password for the signing certificate |
 | `DESKTOP_APPLE_API_KEY_ID` | App Store Connect API key identifier |
@@ -55,27 +54,43 @@ Configure these Actions secrets in the source repository:
 | `DESKTOP_APPLE_API_KEY_P8_BASE64` | Base64-encoded notarization API private key |
 
 Never put these in `.env.local`, Convex, the renderer, release assets, or the
-application bundle.
+application bundle. The same-repository workflow writes releases with its
+short-lived `GITHUB_TOKEN` and a job-scoped `contents: write` permission.
 
-## Manual release gate
+## Prepare a release
 
-`.github/workflows/desktop-release.yml` can currently be dispatched manually
-from `main`. Automatic post-CI publishing is disabled until the explicit,
-source-controlled release-version workflow is in place. The workflow:
+Run `/create-release <major|minor|patch>` from a clean branch based on the code
+being released. The skill reviews the complete diff and associated PRs since
+the latest published stable release, synchronizes every workspace package
+version across the app and pinned desktop bundle, writes
+`docs/releases/v<version>.md`, opens an explicit release PR, and creates a
+matching GitHub draft. The draft is intentionally asset-free and invisible to
+updater clients while the release PR is reviewed.
 
-1. requires all signing/publishing secrets and a public update repository;
-2. chooses a semantic version greater than the latest published release;
+After the release PR is merged, copy its exact commit SHA from `main` and pass
+it as `source_sha` when dispatching `.github/workflows/desktop-release.yml`
+from `main`. This stays safe if other PRs land before the workflow starts: the
+workflow checks out the requested commit and requires it to be the isolated
+version/changelog commit on `main`'s first-parent history. The workflow:
+
+1. requires all signing secrets and this public repository;
+2. verifies the exact source commit introduced only the synchronized version,
+   lockfile, and changelog, requires their matching draft, and retargets it to
+   that SHA on `main`;
 3. compares the committed compatibility policy with the last release;
-4. builds a universal signed and notarized DMG and ZIP;
-5. leaves electron-builder's upload as a draft while it validates the app ID,
-   arm64/x64 slices, Developer ID signatures, stapled notarization ticket,
-   updater metadata, SHA-512 digests, signing team, and data layout;
+4. builds a universal signed and notarized DMG and ZIP exactly once without
+   publishing during the build;
+5. validates the app ID, arm64/x64 slices, Developer ID signatures, stapled
+   notarization ticket, updater metadata, recomputed ZIP SHA-512 and byte size,
+   signing team, and data layout;
 6. launches the signed package with Node, Bun, and Convex removed from the
    application's `PATH` (the Playwright process still uses Actions' Node), sends
    a UI message through the real bundled runtime and a deterministic Codex
    protocol fixture, then reloads and verifies both turns persisted;
-7. uploads the compatibility manifest and publishes the release only after all
-   gates pass.
+7. uploads the DMG, ZIP, both differential-download blockmaps,
+   `latest-mac.yml`, and the compatibility manifest to the invisible draft,
+   verifies the exact asset names, upload states, and byte sizes, rechecks the
+   draft immediately before publication, and publishes last.
 
 The protocol fixture replaces only the external Codex executable and provider
 network. The renderer, preload IPC, model runtime, SSE normalization, bundled
@@ -83,15 +98,19 @@ Convex service, filesystem object store, and persistence/reload path are the
 actual packaged implementations. CI must never use or upload a developer's
 Codex credential cache.
 
-The ZIP and `latest-mac.yml` are required for Electron's macOS updater even
-though users install the DMG initially. Do not delete or rename those assets.
+Publishing that one verified GitHub draft is the atomic visibility boundary:
+the DMG download and OTA metadata become public together. Draft releases are
+not visible to updater clients. The ZIP and `latest-mac.yml` are required for
+Electron's macOS updater even though users install the DMG initially. The ZIP
+and DMG blockmaps enable differential downloads and are verified against the
+same build. Do not delete or rename any of those assets.
 
 ## Update experience
 
 The installed app checks the stable public feed and downloads a newer version
 in the background. It does not prompt on `update-available`. After download, it
-shows one persistent, dismissible toast per app session with **See changelog**
-and **Update**. Update cleanly stops the local model and Convex processes, swaps
+shows one persistent, dismissible **New update available** toast per app session
+with **See changes** and **Restart**. Restart cleanly stops the local model and Convex processes, swaps
 the signed application, and relaunches it.
 
 The first signed version containing this updater is the bootstrap boundary and
@@ -106,7 +125,7 @@ Treat these values as permanent once the first release is public:
 - `chat.montecarlo.desktop` application ID;
 - `montecarlo` executable name and operating-system application-data location;
 - Apple Developer ID TeamIdentifier;
-- `indefinite-horizon/montecarlo-releases`, provider, and `latest` channel;
+- `indefinite-horizon/montecarlo`, provider, and `latest` channel;
 - updater protocol and minimum compatible metadata version.
 - checksum-pinned Convex backend release until an export/import migration path
   is implemented and tested.
@@ -130,8 +149,20 @@ rollback/refusal on failure, and draft metadata that is published last.
 
 ## Release checks
 
-Before relying on OTA for users, exercise the release on a clean Intel and Apple
-Silicon Mac with no global Node, Bun, Convex, Codex, or Claude installation:
+The desktop Playwright suite injects a normalized `update-downloaded` event
+through the real Electron main-process IPC channel. It verifies the persistent
+toast, close button, actions, suppression after dismissal, renderer reload,
+and a macOS-style window close/reopen inside the same process, plus reappearance
+after a fresh app session. Unit coverage verifies the electron-updater event,
+main-process session claim, and install handoff, while the artifact gate
+recomputes the DMG and update ZIP feed digests and validates their blockmaps.
+
+Those checks do not pretend an unsigned development build can replace a signed
+macOS application. Before relying on OTA for users, exercise the real updater
+with two signed versions on a clean Mac:
+
+On both Intel and Apple Silicon, use a machine with no global Node, Bun, Convex,
+Codex, or Claude installation:
 
 1. install the oldest supported signed DMG;
 2. create representative chats, branches, and filesystem-backed bodies;

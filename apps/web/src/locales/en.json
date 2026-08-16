@@ -277,9 +277,10 @@
     "offline": "The local model runtime is offline. Start the desktop app or `bun run dev:runtime`, then try again."
   },
   "updates": {
+    "available": "New update available",
     "ready": "Monte Carlo {{version}} is ready",
-    "seeChangelog": "See changelog",
-    "install": "Update",
+    "seeChanges": "See changes",
+    "restart": "Restart",
     "changelogError": "The changelog could not be opened.",
     "installError": "The update could not be installed. Try again."
   },

@@ -115,6 +115,12 @@ adapters. Provider-network tests are external tests and must be opt-in.
 Desktop verification should include `node --check`, an unsigned directory
 build on the target platform, custom-protocol navigation, encrypted key save,
 runtime restart, and a renderer check confirming no key readback API exists.
+The Electron E2E suite injects `update-downloaded` through the real
+main/preload/renderer IPC path and checks that the persistent update toast is
+shown once per app session, remains dismissed across renderer reloads and a
+same-process macOS-style window close/reopen, and is eligible again after a
+fresh app process. This verifies update UX and session semantics, not macOS
+application replacement.
 Release verification additionally requires a clean macOS machine with no Bun,
 Node, or Convex installation available to the application. The release workflow
 uses its own Node test runner to launch the signed package,

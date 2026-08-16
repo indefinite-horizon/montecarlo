@@ -35,7 +35,25 @@ describe("desktop release compatibility", () => {
       releaseWorkflow,
       /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/,
     );
-    assert.match(releaseWorkflow, /SOURCE_SHA: \$\{\{ github\.sha \}\}/);
+    assert.match(releaseWorkflow, /source_sha:/);
+    assert.match(releaseWorkflow, /SOURCE_SHA: \$\{\{ inputs\.source_sha \}\}/);
+    assert.match(releaseWorkflow, /merge-base --is-ancestor/);
+    assert.match(releaseWorkflow, /rev-list --first-parent origin\/main/);
+    assert.match(releaseWorkflow, /expected-source-files\.txt/);
+    assert.match(releaseWorkflow, /UPDATE_REPOSITORY: \$\{\{ github\.repository \}\}/);
+    assert.match(releaseWorkflow, /permissions:\n {6}contents: write/);
+    assert.match(releaseWorkflow, /bun scripts\/release_version\.mjs current/);
+    assert.match(releaseWorkflow, /release_version\.mjs assert-newer/);
+    assert.match(releaseWorkflow, /bun scripts\/release_notes\.mjs validate/);
+    assert.match(releaseWorkflow, /select\(\.draft == true and \.tag_name/);
+    assert.match(releaseWorkflow, /git\/refs\/tags\/\$\{tag\}/);
+    assert.match(releaseWorkflow, /commits\/\$\{RELEASE_TAG\}/);
+    assert.match(releaseWorkflow, /make_latest: "true"/);
+    assert.match(releaseWorkflow, /universal\.dmg\.blockmap/);
+    assert.match(releaseWorkflow, /universal\.zip\.blockmap/);
+    assert.match(releaseWorkflow, /expected-assets\.tsv/);
+    assert.match(releaseWorkflow, /pre-publish-assets\.tsv/);
+    assert.doesNotMatch(releaseWorkflow, /DESKTOP_RELEASE_TOKEN|GITHUB_RUN_NUMBER/);
     assert.doesNotMatch(releaseWorkflow, /\bworkflow_run:/);
   });
 
@@ -55,7 +73,7 @@ describe("desktop release compatibility", () => {
       channel: "latest",
       provider: "github",
       owner: "indefinite-horizon",
-      repo: "montecarlo-releases",
+      repo: "montecarlo",
     });
     assert.match(
       builderConfig,

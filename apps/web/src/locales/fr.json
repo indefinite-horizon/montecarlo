@@ -277,9 +277,10 @@
     "offline": "Le moteur de modèles local est hors ligne. Démarrez l'application ou `bun run dev:runtime`, puis réessayez."
   },
   "updates": {
+    "available": "Nouvelle mise à jour disponible",
     "ready": "Monte Carlo {{version}} est prêt",
-    "seeChangelog": "Voir les nouveautés",
-    "install": "Mettre à jour",
+    "seeChanges": "Voir les changements",
+    "restart": "Redémarrer",
     "changelogError": "Impossible d'ouvrir les nouveautés.",
     "installError": "Impossible d'installer la mise à jour. Réessayez."
   },

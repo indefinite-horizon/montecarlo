@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Release"
+  short_description: "Prepare a versioned desktop release"
+  default_prompt: "Use $create-release with minor to prepare a source-controlled release PR and verified GitHub draft."

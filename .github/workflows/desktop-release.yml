@@ -2,6 +2,11 @@ name: Desktop Release
 
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit created by the merged release PR
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -14,16 +19,28 @@ jobs:
   release-macos:
     if: >-
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    runs-on: macos-14
+    permissions:
+      contents: write
+    # Keep the established Intel host for this universal build; validate on an
+    # arm64 host and macos-26-intel before migrating the release job.
+    runs-on: macos-15-intel
     timeout-minutes: 60
     env:
-      UPDATE_REPOSITORY: indefinite-horizon/montecarlo-releases
-      SOURCE_SHA: ${{ github.sha }}
+      UPDATE_REPOSITORY: ${{ github.repository }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
     steps:
+      - name: Require an exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::source_sha must be the full lowercase SHA of the merged release PR"
+            exit 1
+          fi
+
       - name: Check release credentials
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
           CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
           APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
@@ -32,7 +49,6 @@ jobs:
         run: |
           set -euo pipefail
           for variable in \
-            GH_TOKEN \
             CSC_LINK \
             CSC_KEY_PASSWORD \
             APPLE_API_KEY_ID \
@@ -45,21 +61,37 @@ jobs:
             fi
           done
 
-      - name: Require a public update repository
+      - name: Require this public repository
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           visibility="$(gh repo view "$UPDATE_REPOSITORY" --json visibility --jq .visibility)"
           if [[ "$visibility" != "PUBLIC" ]]; then
-            echo "::error::OTA updates require $UPDATE_REPOSITORY to be public; it is $visibility"
+            echo "::error::Anonymous OTA updates require $UPDATE_REPOSITORY to be public; it is $visibility"
             exit 1
           fi
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require the source commit on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$SOURCE_SHA" origin/main; then
+            echo "::error::source_sha is not reachable from main"
+            exit 1
+          fi
+          if ! git rev-list --first-parent origin/main | grep -Fx "$SOURCE_SHA" >/dev/null; then
+            echo "::error::source_sha must be a merge or squash commit on main's first-parent history"
+            exit 1
+          fi
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -72,35 +104,151 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Select a monotonic release version
-        id: version
+      - name: Validate and retarget the release draft
+        id: release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          latest_tag="$(gh release view --repo "$UPDATE_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)"
-          version_arguments=(--run-number "$GITHUB_RUN_NUMBER")
-          if [[ -n "$latest_tag" ]]; then
-            version_arguments+=(--latest-tag "$latest_tag")
+          version="$(bun scripts/release_version.mjs current)"
+          tag="v${version}"
+          bun scripts/release_notes.mjs validate --version "$version"
+          release_title="$(bun scripts/release_notes.mjs title --version "$version")"
+          mkdir -p .context/desktop-release
+          bun scripts/release_notes.mjs body \
+            --version "$version" \
+            --output .context/desktop-release/release-notes.md
+
+          parent_sha="$(git rev-parse "${SOURCE_SHA}^")"
+          parent_version="$(git show "${parent_sha}:package.json" \
+            | node -e 'const fs = require("node:fs"); process.stdout.write(JSON.parse(fs.readFileSync(0, "utf8")).version)')"
+          bun scripts/release_version.mjs assert-newer "$version" "$parent_version"
+          {
+            bun scripts/release_version.mjs paths
+            printf '%s\n' bun.lock "docs/releases/${tag}.md"
+          } | sort > .context/desktop-release/expected-source-files.txt
+          git diff --name-only "$parent_sha" "$SOURCE_SHA" \
+            | sort > .context/desktop-release/actual-source-files.txt
+          if ! cmp -s \
+            .context/desktop-release/expected-source-files.txt \
+            .context/desktop-release/actual-source-files.txt
+          then
+            echo "::error::source_sha must be the isolated merged release commit"
+            diff -u \
+              .context/desktop-release/expected-source-files.txt \
+              .context/desktop-release/actual-source-files.txt || true
+            exit 1
           fi
-          version="$(bun scripts/desktop_release_version.mjs "${version_arguments[@]}")"
+
+          gh api \
+            --paginate \
+            "repos/${UPDATE_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+            > .context/desktop-release/published-tags.txt
+          previous_tag="$(bun scripts/release_version.mjs highest-tag \
+            < .context/desktop-release/published-tags.txt)"
+          if [[ -n "$previous_tag" ]]; then
+            bun scripts/release_version.mjs assert-newer "$version" "${previous_tag#v}"
+          fi
+
+          gh api \
+            --paginate \
+            "repos/${UPDATE_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft == true and .tag_name == \"${tag}\") | .id" \
+            > .context/desktop-release/draft-ids.txt
+          draft_count="$(awk 'NF { count += 1 } END { print count + 0 }' \
+            .context/desktop-release/draft-ids.txt)"
+          if [[ "$draft_count" -ne 1 ]]; then
+            echo "::error::Expected exactly one ${tag} draft; found ${draft_count}. Run /create-release first."
+            exit 1
+          fi
+          release_id="$(sed -n '1p' .context/desktop-release/draft-ids.txt)"
+          release_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${release_id}")"
+          if [[ "$(jq -r .draft <<< "$release_json")" != "true" ]]; then
+            echo "::error::${tag} already exists as a published release"
+            exit 1
+          fi
+          if [[ "$(jq -r .prerelease <<< "$release_json")" != "false" ]]; then
+            echo "::error::${tag} must be a stable release draft"
+            exit 1
+          fi
+          if [[ "$(jq -r .tag_name <<< "$release_json")" != "$tag" ]]; then
+            echo "::error::Release lookup returned the wrong tag"
+            exit 1
+          fi
+          original_target="$(jq -r .target_commitish <<< "$release_json")"
+          if [[ ! "$original_target" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::${tag} draft must target the exact release-branch SHA"
+            exit 1
+          fi
+          jq -n \
+            --arg target "$SOURCE_SHA" \
+            --arg name "$release_title" \
+            --rawfile body .context/desktop-release/release-notes.md \
+            '{target_commitish: $target, name: $name, body: $body, draft: true, prerelease: false}' \
+            | gh api \
+                --method PATCH \
+                "repos/${UPDATE_REPOSITORY}/releases/${release_id}" \
+                --input - \
+                > .context/desktop-release/draft.json
+          if [[ "$(jq -r .target_commitish .context/desktop-release/draft.json)" != "$SOURCE_SHA" ]]; then
+            echo "::error::The release draft was not retargeted to the exact main SHA"
+            exit 1
+          fi
+
+          tag_ref_json="$(gh api "repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/${tag}")"
+          tag_ref_count="$(jq --arg ref "refs/tags/${tag}" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$tag_ref_json")"
+          if [[ "$tag_ref_count" -gt 1 ]]; then
+            echo "::error::Multiple exact refs unexpectedly matched ${tag}"
+            exit 1
+          fi
+          if [[ "$tag_ref_count" -eq 1 ]]; then
+            existing_tag_sha="$(gh api "repos/${UPDATE_REPOSITORY}/commits/${tag}" --jq .sha)"
+            if [[ "$existing_tag_sha" != "$original_target" && "$existing_tag_sha" != "$SOURCE_SHA" ]]; then
+              echo "::error::Existing ${tag} does not point to the draft target or source SHA"
+              exit 1
+            fi
+            jq -n --arg sha "$SOURCE_SHA" '{sha: $sha, force: true}' \
+              | gh api \
+                  --method PATCH \
+                  "repos/${UPDATE_REPOSITORY}/git/refs/tags/${tag}" \
+                  --input - \
+                  > .context/desktop-release/tag-ref.json
+          else
+            jq -n \
+              --arg ref "refs/tags/${tag}" \
+              --arg sha "$SOURCE_SHA" \
+              '{ref: $ref, sha: $sha}' \
+              | gh api \
+                  --method POST \
+                  "repos/${UPDATE_REPOSITORY}/git/refs" \
+                  --input - \
+                  > .context/desktop-release/tag-ref.json
+          fi
+          tag_commit_sha="$(gh api "repos/${UPDATE_REPOSITORY}/commits/${tag}" --jq .sha)"
+          if [[ "$tag_commit_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::${tag} does not resolve to the exact source SHA"
+            exit 1
+          fi
+
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
 
       - name: Enforce direct-update compatibility
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS_RELEASE_TAG: ${{ steps.release.outputs.previous_tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          mkdir -p .context/desktop-release
-          latest_tag="$(gh release view --repo "$UPDATE_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || true)"
           previous_arguments=()
-          if [[ -n "$latest_tag" ]]; then
-            gh release download "$latest_tag" \
+          if [[ -n "$PREVIOUS_RELEASE_TAG" ]]; then
+            gh release download "$PREVIOUS_RELEASE_TAG" \
               --repo "$UPDATE_REPOSITORY" \
               --pattern desktop-release-compatibility.json \
               --dir .context/desktop-release/previous
@@ -123,17 +271,14 @@ jobs:
           chmod 600 "$key_path"
           echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
 
-      - name: Build, sign, notarize, and upload a draft
+      - name: Build, sign, and notarize once
         env:
-          GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
           CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
           APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: >-
           bun run --filter './apps/desktop' build:release:mac --
-          --config.extraMetadata.version="$RELEASE_VERSION"
           --config.forceCodeSigning=true
 
       - name: Remove notarization private key
@@ -141,10 +286,10 @@ jobs:
         shell: bash
         run: rm -f "${APPLE_API_KEY:-$RUNNER_TEMP/missing-notarization-key}"
 
-      - name: Verify signed and notarized artifacts
+      - name: Verify signed, notarized, and hashed artifacts
         shell: bash
         env:
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
           app_path="$(find dist/desktop -type d -iname 'montecarlo.app' -print -quit)"
@@ -193,46 +338,214 @@ jobs:
           app_path="$(find dist/desktop -type d -iname 'montecarlo.app' -print -quit)"
           bash scripts/smoke_packaged_desktop.sh "$app_path"
 
-      - name: Publish verified OTA release
+      - name: Upload the verified DMG and OTA feed
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.release.outputs.release_id }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          is_draft="$(gh release view "$RELEASE_TAG" \
-            --repo "$UPDATE_REPOSITORY" \
-            --json isDraft \
-            --jq .isDraft)"
-          if [[ "$is_draft" != "true" ]]; then
-            echo "::error::Expected electron-builder to upload an invisible draft release"
+          release_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}")"
+          if [[ "$(jq -r .draft <<< "$release_json")" != "true" ]]; then
+            echo "::error::The release stopped being a draft before asset upload"
             exit 1
           fi
-          uploaded_assets="$(gh release view "$RELEASE_TAG" \
-            --repo "$UPDATE_REPOSITORY" \
-            --json assets \
-            --jq '.assets[].name')"
-          for required_asset in \
-            "Monte-Carlo-${RELEASE_VERSION}-universal.dmg" \
-            "Monte-Carlo-${RELEASE_VERSION}-universal.zip" \
-            latest-mac.yml
-          do
-            if ! grep -Fxq "$required_asset" <<< "$uploaded_assets"; then
-              echo "::error::Draft release is missing $required_asset"
-              exit 1
-            fi
-          done
+          if [[ "$(jq -r .target_commitish <<< "$release_json")" != "$SOURCE_SHA" ]]; then
+            echo "::error::The release draft no longer targets the source SHA"
+            exit 1
+          fi
+          if [[ "$(jq -r .prerelease <<< "$release_json")" != "false" ]]; then
+            echo "::error::The release draft became a prerelease"
+            exit 1
+          fi
+          tag_ref_json="$(gh api "repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}")"
+          tag_ref_count="$(jq --arg ref "refs/tags/${RELEASE_TAG}" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$tag_ref_json")"
+          if [[ "$tag_ref_count" -ne 1 ]]; then
+            echo "::error::The exact ${RELEASE_TAG} ref is missing before asset upload"
+            exit 1
+          fi
+          tag_commit_sha="$(gh api \
+            "repos/${UPDATE_REPOSITORY}/commits/${RELEASE_TAG}" \
+            --jq .sha)"
+          if [[ "$tag_commit_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::${RELEASE_TAG} moved away from the source SHA before asset upload"
+            exit 1
+          fi
+          expected_title="$(bun scripts/release_notes.mjs title --version "$RELEASE_VERSION")"
+          if [[ "$(jq -r .name <<< "$release_json")" != "$expected_title" ]]; then
+            echo "::error::The release title no longer matches the committed notes"
+            exit 1
+          fi
+          jq -j .body <<< "$release_json" > .context/desktop-release/remote-notes.md
+          if ! cmp -s \
+            .context/desktop-release/release-notes.md \
+            .context/desktop-release/remote-notes.md
+          then
+            echo "::error::The release body no longer matches the committed notes"
+            exit 1
+          fi
+
+          release_asset_paths=(
+            "dist/desktop/Monte-Carlo-${RELEASE_VERSION}-universal.dmg"
+            "dist/desktop/Monte-Carlo-${RELEASE_VERSION}-universal.dmg.blockmap"
+            "dist/desktop/Monte-Carlo-${RELEASE_VERSION}-universal.zip"
+            "dist/desktop/Monte-Carlo-${RELEASE_VERSION}-universal.zip.blockmap"
+            dist/desktop/latest-mac.yml
+            .context/desktop-release/desktop-release-compatibility.json
+          )
           gh release upload "$RELEASE_TAG" \
-            .context/desktop-release/desktop-release-compatibility.json \
+            "${release_asset_paths[@]}" \
             --repo "$UPDATE_REPOSITORY" \
             --clobber
-          printf 'Monte Carlo %s\n\nSource revision: `%s`\n' \
-            "$RELEASE_VERSION" "$SOURCE_SHA" \
-            > .context/desktop-release/release-notes.md
-          gh release edit "$RELEASE_TAG" \
-            --repo "$UPDATE_REPOSITORY" \
-            --title "Monte Carlo ${RELEASE_VERSION}" \
-            --notes-file .context/desktop-release/release-notes.md \
-            --draft=false \
-            --latest
+
+          for asset_path in "${release_asset_paths[@]}"; do
+            asset_name="$(basename "$asset_path")"
+            asset_size="$(wc -c < "$asset_path" | tr -d '[:space:]')"
+            printf '%s\t%s\tuploaded\n' "$asset_name" "$asset_size"
+          done | sort > .context/desktop-release/expected-assets.tsv
+          asset_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}")"
+          jq -r '.assets[] | [.name, (.size | tostring), .state] | @tsv' \
+            <<< "$asset_json" \
+            | sort > .context/desktop-release/uploaded-assets.tsv
+          if ! cmp -s \
+            .context/desktop-release/expected-assets.tsv \
+            .context/desktop-release/uploaded-assets.tsv
+          then
+            echo "::error::Draft release assets have unexpected names, states, or byte sizes"
+            diff -u \
+              .context/desktop-release/expected-assets.tsv \
+              .context/desktop-release/uploaded-assets.tsv || true
+            exit 1
+          fi
+
+      - name: Publish the DMG and OTA update atomically
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.release.outputs.release_id }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}")"
+          if [[ "$(jq -r .draft <<< "$release_json")" != "true" ]]; then
+            echo "::error::The release stopped being a draft before publication"
+            exit 1
+          fi
+          if [[ "$(jq -r .target_commitish <<< "$release_json")" != "$SOURCE_SHA" ]]; then
+            echo "::error::The release draft no longer targets the source SHA"
+            exit 1
+          fi
+          if [[ "$(jq -r .tag_name <<< "$release_json")" != "$RELEASE_TAG" ]]; then
+            echo "::error::The release draft tag changed before publication"
+            exit 1
+          fi
+          if [[ "$(jq -r .prerelease <<< "$release_json")" != "false" ]]; then
+            echo "::error::The release draft became a prerelease before publication"
+            exit 1
+          fi
+          expected_title="$(bun scripts/release_notes.mjs title --version "$RELEASE_VERSION")"
+          if [[ "$(jq -r .name <<< "$release_json")" != "$expected_title" ]]; then
+            echo "::error::The release title changed before publication"
+            exit 1
+          fi
+          jq -j .body <<< "$release_json" > .context/desktop-release/pre-publish-notes.md
+          if ! cmp -s \
+            .context/desktop-release/release-notes.md \
+            .context/desktop-release/pre-publish-notes.md
+          then
+            echo "::error::The release notes changed before publication"
+            exit 1
+          fi
+          jq -r '.assets[] | [.name, (.size | tostring), .state] | @tsv' \
+            <<< "$release_json" \
+            | sort > .context/desktop-release/pre-publish-assets.tsv
+          if ! cmp -s \
+            .context/desktop-release/expected-assets.tsv \
+            .context/desktop-release/pre-publish-assets.tsv
+          then
+            echo "::error::The release assets changed before publication"
+            exit 1
+          fi
+          tag_ref_json="$(gh api "repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}")"
+          tag_ref_count="$(jq --arg ref "refs/tags/${RELEASE_TAG}" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$tag_ref_json")"
+          if [[ "$tag_ref_count" -ne 1 ]]; then
+            echo "::error::The exact ${RELEASE_TAG} ref is missing before publication"
+            exit 1
+          fi
+          tag_commit_sha="$(gh api \
+            "repos/${UPDATE_REPOSITORY}/commits/${RELEASE_TAG}" \
+            --jq .sha)"
+          if [[ "$tag_commit_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::${RELEASE_TAG} moved away from the source SHA before publication"
+            exit 1
+          fi
+
+          jq -n '{draft: false, prerelease: false, make_latest: "true"}' \
+            | gh api \
+                --method PATCH \
+                "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}" \
+                --input - \
+                > .context/desktop-release/published.json
+          release_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}")"
+          if [[ "$(jq -r .draft <<< "$release_json")" != "false" ]]; then
+            echo "::error::The verified release was not published"
+            exit 1
+          fi
+          if [[ "$(jq -r .target_commitish <<< "$release_json")" != "$SOURCE_SHA" ]]; then
+            echo "::error::The published release does not target the source SHA"
+            exit 1
+          fi
+          if [[ "$(jq -r .prerelease <<< "$release_json")" != "false" ]]; then
+            echo "::error::The published release unexpectedly became a prerelease"
+            exit 1
+          fi
+          expected_title="$(bun scripts/release_notes.mjs title --version "$RELEASE_VERSION")"
+          if [[ "$(jq -r .name <<< "$release_json")" != "$expected_title" ]]; then
+            echo "::error::The published release title changed"
+            exit 1
+          fi
+          jq -j .body <<< "$release_json" > .context/desktop-release/published-notes.md
+          if ! cmp -s \
+            .context/desktop-release/release-notes.md \
+            .context/desktop-release/published-notes.md
+          then
+            echo "::error::The published release notes changed"
+            exit 1
+          fi
+          jq -r '.assets[] | [.name, (.size | tostring), .state] | @tsv' \
+            <<< "$release_json" \
+            | sort > .context/desktop-release/published-assets.tsv
+          if ! cmp -s \
+            .context/desktop-release/expected-assets.tsv \
+            .context/desktop-release/published-assets.tsv
+          then
+            echo "::error::The published release asset set changed"
+            exit 1
+          fi
+          tag_ref_json="$(gh api "repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}")"
+          tag_ref_count="$(jq --arg ref "refs/tags/${RELEASE_TAG}" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$tag_ref_json")"
+          if [[ "$tag_ref_count" -ne 1 ]]; then
+            echo "::error::The published release tag ref is missing"
+            exit 1
+          fi
+          tag_commit_sha="$(gh api \
+            "repos/${UPDATE_REPOSITORY}/commits/${RELEASE_TAG}" \
+            --jq .sha)"
+          if [[ "$tag_commit_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::The published release tag does not point to the source SHA"
+            exit 1
+          fi
+          release_url="$(jq -r .html_url <<< "$release_json")"
+          {
+            echo "### Desktop release published"
+            echo
+            echo "- Release: [$RELEASE_TAG]($release_url)"
+            echo "- Source: \`$SOURCE_SHA\`"
+            echo "- Assets: DMG, ZIP, blockmaps, latest-mac.yml, compatibility manifest"
+          } >> "$GITHUB_STEP_SUMMARY"

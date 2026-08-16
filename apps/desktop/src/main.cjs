@@ -271,9 +271,9 @@ function registerIpcHandlers() {
         writeDiagnostic("provider_secret_save_failed", "The provider credential was not saved.");
       });
   });
-  ipcMain.handle("desktop-update:get-downloaded", (event) => {
+  ipcMain.handle("desktop-update:claim-downloaded", (event) => {
     assertTrustedIpcSender(event);
-    return desktopUpdater?.getDownloadedUpdate();
+    return desktopUpdater?.claimDownloadedUpdate();
   });
   ipcMain.handle("desktop-update:open-changelog", async (event) => {
     assertTrustedIpcSender(event);
