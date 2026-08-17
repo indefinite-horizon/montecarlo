@@ -40,6 +40,10 @@ describe("desktop release compatibility", () => {
     assert.match(releaseWorkflow, /merge-base --is-ancestor/);
     assert.match(releaseWorkflow, /rev-list --first-parent origin\/main/);
     assert.match(releaseWorkflow, /expected-source-files\.txt/);
+    assert.match(
+      releaseWorkflow,
+      /if ! git diff --quiet "\$parent_sha" "\$SOURCE_SHA" -- bun\.lock/,
+    );
     assert.match(releaseWorkflow, /UPDATE_REPOSITORY: \$\{\{ github\.repository \}\}/);
     assert.match(releaseWorkflow, /permissions:\n {6}contents: write/);
     assert.match(releaseWorkflow, /bun scripts\/release_version\.mjs current/);

@@ -127,7 +127,10 @@ jobs:
           bun scripts/release_version.mjs assert-newer "$version" "$parent_version"
           {
             bun scripts/release_version.mjs paths
-            printf '%s\n' bun.lock "docs/releases/${tag}.md"
+            printf '%s\n' "docs/releases/${tag}.md"
+            if ! git diff --quiet "$parent_sha" "$SOURCE_SHA" -- bun.lock; then
+              printf '%s\n' bun.lock
+            fi
           } | sort > .context/desktop-release/expected-source-files.txt
           git diff --name-only "$parent_sha" "$SOURCE_SHA" \
             | sort > .context/desktop-release/actual-source-files.txt
