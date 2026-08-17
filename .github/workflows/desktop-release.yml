@@ -105,7 +105,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Validate and retarget the release draft
+      - name: Validate the source and prepare the release draft
         id: release
         shell: bash
         env:
@@ -156,6 +156,36 @@ jobs:
             bun scripts/release_version.mjs assert-newer "$version" "${previous_tag#v}"
           fi
 
+          tag_ref_json="$(gh api "repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/${tag}")"
+          tag_ref_count="$(jq --arg ref "refs/tags/${tag}" \
+            '[.[] | select(.ref == $ref)] | length' <<< "$tag_ref_json")"
+          if [[ "$tag_ref_count" -gt 1 ]]; then
+            echo "::error::Multiple exact refs unexpectedly matched ${tag}"
+            exit 1
+          fi
+          if [[ "$tag_ref_count" -eq 1 ]]; then
+            existing_tag_sha="$(gh api "repos/${UPDATE_REPOSITORY}/commits/${tag}" --jq .sha)"
+            if [[ "$existing_tag_sha" != "$SOURCE_SHA" ]]; then
+              echo "::error::Existing ${tag} does not point to the exact source SHA"
+              exit 1
+            fi
+          else
+            jq -n \
+              --arg ref "refs/tags/${tag}" \
+              --arg sha "$SOURCE_SHA" \
+              '{ref: $ref, sha: $sha}' \
+              | gh api \
+                  --method POST \
+                  "repos/${UPDATE_REPOSITORY}/git/refs" \
+                  --input - \
+                  > .context/desktop-release/tag-ref.json
+          fi
+          tag_commit_sha="$(gh api "repos/${UPDATE_REPOSITORY}/commits/${tag}" --jq .sha)"
+          if [[ "$tag_commit_sha" != "$SOURCE_SHA" ]]; then
+            echo "::error::${tag} does not resolve to the exact source SHA"
+            exit 1
+          fi
+
           gh api \
             --paginate \
             "repos/${UPDATE_REPOSITORY}/releases?per_page=100" \
@@ -170,10 +200,9 @@ jobs:
           if [[ "$draft_count" -eq 0 ]]; then
             jq -n \
               --arg tag "$tag" \
-              --arg target "$SOURCE_SHA" \
               --arg name "$release_title" \
               --rawfile body .context/desktop-release/release-notes.md \
-              '{tag_name: $tag, target_commitish: $target, name: $name, body: $body, draft: true, prerelease: false}' \
+              '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false}' \
               | gh api \
                   --method POST \
                   "repos/${UPDATE_REPOSITORY}/releases" \
@@ -196,61 +225,15 @@ jobs:
             echo "::error::Release lookup returned the wrong tag"
             exit 1
           fi
-          original_target="$(jq -r .target_commitish <<< "$release_json")"
-          if [[ ! "$original_target" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::${tag} draft must target the exact release-branch SHA"
-            exit 1
-          fi
           jq -n \
-            --arg target "$SOURCE_SHA" \
             --arg name "$release_title" \
             --rawfile body .context/desktop-release/release-notes.md \
-            '{target_commitish: $target, name: $name, body: $body, draft: true, prerelease: false}' \
+            '{name: $name, body: $body, draft: true, prerelease: false}' \
             | gh api \
                 --method PATCH \
                 "repos/${UPDATE_REPOSITORY}/releases/${release_id}" \
                 --input - \
                 > .context/desktop-release/draft.json
-          if [[ "$(jq -r .target_commitish .context/desktop-release/draft.json)" != "$SOURCE_SHA" ]]; then
-            echo "::error::The release draft was not retargeted to the exact main SHA"
-            exit 1
-          fi
-
-          tag_ref_json="$(gh api "repos/${UPDATE_REPOSITORY}/git/matching-refs/tags/${tag}")"
-          tag_ref_count="$(jq --arg ref "refs/tags/${tag}" \
-            '[.[] | select(.ref == $ref)] | length' <<< "$tag_ref_json")"
-          if [[ "$tag_ref_count" -gt 1 ]]; then
-            echo "::error::Multiple exact refs unexpectedly matched ${tag}"
-            exit 1
-          fi
-          if [[ "$tag_ref_count" -eq 1 ]]; then
-            existing_tag_sha="$(gh api "repos/${UPDATE_REPOSITORY}/commits/${tag}" --jq .sha)"
-            if [[ "$existing_tag_sha" != "$original_target" && "$existing_tag_sha" != "$SOURCE_SHA" ]]; then
-              echo "::error::Existing ${tag} does not point to the draft target or source SHA"
-              exit 1
-            fi
-            jq -n --arg sha "$SOURCE_SHA" '{sha: $sha, force: true}' \
-              | gh api \
-                  --method PATCH \
-                  "repos/${UPDATE_REPOSITORY}/git/refs/tags/${tag}" \
-                  --input - \
-                  > .context/desktop-release/tag-ref.json
-          else
-            jq -n \
-              --arg ref "refs/tags/${tag}" \
-              --arg sha "$SOURCE_SHA" \
-              '{ref: $ref, sha: $sha}' \
-              | gh api \
-                  --method POST \
-                  "repos/${UPDATE_REPOSITORY}/git/refs" \
-                  --input - \
-                  > .context/desktop-release/tag-ref.json
-          fi
-          tag_commit_sha="$(gh api "repos/${UPDATE_REPOSITORY}/commits/${tag}" --jq .sha)"
-          if [[ "$tag_commit_sha" != "$SOURCE_SHA" ]]; then
-            echo "::error::${tag} does not resolve to the exact source SHA"
-            exit 1
-          fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -371,10 +354,6 @@ jobs:
             echo "::error::The release stopped being a draft before asset upload"
             exit 1
           fi
-          if [[ "$(jq -r .target_commitish <<< "$release_json")" != "$SOURCE_SHA" ]]; then
-            echo "::error::The release draft no longer targets the source SHA"
-            exit 1
-          fi
           if [[ "$(jq -r .prerelease <<< "$release_json")" != "false" ]]; then
             echo "::error::The release draft became a prerelease"
             exit 1
@@ -454,10 +433,6 @@ jobs:
             echo "::error::The release stopped being a draft before publication"
             exit 1
           fi
-          if [[ "$(jq -r .target_commitish <<< "$release_json")" != "$SOURCE_SHA" ]]; then
-            echo "::error::The release draft no longer targets the source SHA"
-            exit 1
-          fi
           if [[ "$(jq -r .tag_name <<< "$release_json")" != "$RELEASE_TAG" ]]; then
             echo "::error::The release draft tag changed before publication"
             exit 1
@@ -513,10 +488,6 @@ jobs:
           release_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}")"
           if [[ "$(jq -r .draft <<< "$release_json")" != "false" ]]; then
             echo "::error::The verified release was not published"
-            exit 1
-          fi
-          if [[ "$(jq -r .target_commitish <<< "$release_json")" != "$SOURCE_SHA" ]]; then
-            echo "::error::The published release does not target the source SHA"
             exit 1
           fi
           if [[ "$(jq -r .prerelease <<< "$release_json")" != "false" ]]; then

@@ -40,6 +40,16 @@ describe("desktop release compatibility", () => {
     assert.doesNotMatch(releaseWorkflow, /inputs\.release_id/);
     assert.match(releaseWorkflow, /created-draft\.json/);
     assert.match(releaseWorkflow, /tag_name: \$tag/);
+    assert.doesNotMatch(releaseWorkflow, /target_commitish/);
+    const tagCreationIndex = releaseWorkflow.search(/"repos\/\$\{UPDATE_REPOSITORY\}\/git\/refs"/);
+    const draftCreationIndex = releaseWorkflow.search(/"repos\/\$\{UPDATE_REPOSITORY\}\/releases"/);
+    assert.notEqual(tagCreationIndex, -1);
+    assert.notEqual(draftCreationIndex, -1);
+    assert.ok(
+      tagCreationIndex < draftCreationIndex,
+      "the exact tag must exist before GitHub creates the release draft",
+    );
+    assert.doesNotMatch(releaseWorkflow, /git\/refs\/tags\/\$\{tag\}[\s\S]*force: true/);
     assert.match(releaseWorkflow, /merge-base --is-ancestor/);
     assert.match(releaseWorkflow, /rev-list --first-parent origin\/main/);
     assert.match(releaseWorkflow, /expected-source-files\.txt/);
@@ -53,7 +63,7 @@ describe("desktop release compatibility", () => {
     assert.match(releaseWorkflow, /release_version\.mjs assert-newer/);
     assert.match(releaseWorkflow, /bun scripts\/release_notes\.mjs validate/);
     assert.match(releaseWorkflow, /select\(\.draft == true and \.tag_name/);
-    assert.match(releaseWorkflow, /git\/refs\/tags\/\$\{tag\}/);
+    assert.match(releaseWorkflow, /git\/matching-refs\/tags\/\$\{tag\}/);
     assert.match(releaseWorkflow, /commits\/\$\{RELEASE_TAG\}/);
     assert.match(releaseWorkflow, /make_latest: "true"/);
     assert.match(releaseWorkflow, /universal\.dmg\.blockmap/);
