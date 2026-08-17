@@ -7,6 +7,10 @@ on:
         description: Exact main commit created by the merged release PR
         required: true
         type: string
+      release_id:
+        description: Exact GitHub draft release ID created for this version
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -29,6 +33,7 @@ jobs:
     env:
       UPDATE_REPOSITORY: ${{ github.repository }}
       SOURCE_SHA: ${{ inputs.source_sha }}
+      RELEASE_ID: ${{ inputs.release_id }}
     steps:
       - name: Require an exact source SHA
         shell: bash
@@ -36,6 +41,11 @@ jobs:
           set -euo pipefail
           if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::source_sha must be the full lowercase SHA of the merged release PR"
+            exit 1
+          fi
+
+          if [[ ! "$RELEASE_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::release_id must be the numeric ID of the matching GitHub draft"
             exit 1
           fi
 
@@ -156,19 +166,7 @@ jobs:
             bun scripts/release_version.mjs assert-newer "$version" "${previous_tag#v}"
           fi
 
-          gh api \
-            --paginate \
-            "repos/${UPDATE_REPOSITORY}/releases?per_page=100" \
-            --jq ".[] | select(.draft == true and .tag_name == \"${tag}\") | .id" \
-            > .context/desktop-release/draft-ids.txt
-          draft_count="$(awk 'NF { count += 1 } END { print count + 0 }' \
-            .context/desktop-release/draft-ids.txt)"
-          if [[ "$draft_count" -ne 1 ]]; then
-            echo "::error::Expected exactly one ${tag} draft; found ${draft_count}. Run /create-release first."
-            exit 1
-          fi
-          release_id="$(sed -n '1p' .context/desktop-release/draft-ids.txt)"
-          release_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${release_id}")"
+          release_json="$(gh api "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}")"
           if [[ "$(jq -r .draft <<< "$release_json")" != "true" ]]; then
             echo "::error::${tag} already exists as a published release"
             exit 1
@@ -193,7 +191,7 @@ jobs:
             '{target_commitish: $target, name: $name, body: $body, draft: true, prerelease: false}' \
             | gh api \
                 --method PATCH \
-                "repos/${UPDATE_REPOSITORY}/releases/${release_id}" \
+                "repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}" \
                 --input - \
                 > .context/desktop-release/draft.json
           if [[ "$(jq -r .target_commitish .context/desktop-release/draft.json)" != "$SOURCE_SHA" ]]; then
@@ -239,7 +237,7 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
           echo "previous_tag=$previous_tag" >> "$GITHUB_OUTPUT"
 
       - name: Enforce direct-update compatibility
