@@ -67,22 +67,20 @@ Run `/create-release <major|minor|patch>` from a clean branch based on the code
 being released. The skill reviews the complete diff and associated PRs since
 the latest published stable release, synchronizes every workspace package
 version across the app and pinned desktop bundle, writes
-`docs/releases/v<version>.md`, opens an explicit release PR, and creates a
-matching GitHub draft. The draft is intentionally asset-free and invisible to
-updater clients while the release PR is reviewed.
+`docs/releases/v<version>.md`, and opens an explicit release PR. The committed
+release notes and version bump are the review boundary.
 
 After the release PR is merged, copy its exact commit SHA from `main` and pass
-it as `source_sha` when dispatching `.github/workflows/desktop-release.yml`.
-Also pass the numeric ID of the matching GitHub draft as `release_id`; draft
-releases are addressed directly because GitHub's release-list endpoint may omit
-them even for an authenticated caller. Dispatch the workflow from `main`.
+it as `source_sha` when dispatching `.github/workflows/desktop-release.yml` from
+`main`. The protected workflow creates and owns the matching asset-free draft;
+GitHub Actions tokens cannot access drafts created by a human account.
 This stays safe if other PRs land before the workflow starts: the
 workflow checks out the requested commit and requires it to be the isolated
 version/changelog commit on `main`'s first-parent history. The workflow:
 
 1. requires all signing secrets and this public repository;
 2. verifies the exact source commit introduced only the synchronized version,
-   lockfile, and changelog, requires their matching draft, and retargets it to
+   lockfile, and changelog, then creates or resumes its matching draft at
    that SHA on `main`;
 3. compares the committed compatibility policy with the last release;
 4. builds a universal signed and notarized DMG and ZIP exactly once without

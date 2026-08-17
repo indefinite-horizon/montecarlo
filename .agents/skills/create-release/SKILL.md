@@ -77,21 +77,16 @@ git diff --check
 
 Also run any additional checks required by `docs/TESTING.md` for the included changes.
 
-## 5. Open the release PR and draft
+## 5. Open the release PR
 
 1. Commit only the synchronized version files, lockfiles, and `docs/releases/v<version>.md`.
 2. Push the release branch.
 3. Open a PR titled `Release v<version>` against the recorded base branch. Summarize the version bump, baseline, material user changes, and validation. If the base branch has an open PR, preserve the stack by using that branch as the PR base.
-4. Extract the title and body with `scripts/release_notes.mjs`.
-5. Create `v<version>` as a GitHub **draft** release targeting the pushed release-branch SHA. This target is temporary: the trusted release workflow retargets the draft to the exact `main` SHA after the release PR is merged.
-6. Read the draft back by selecting its exact `tag_name` from the authenticated paginated releases list, requiring exactly one match, and fetching that release by numeric ID. Do not rely on a CLI exit code and do not use the published-only REST `releases/tags/{tag}` endpoint. Verify all of these before reporting success:
-   - `draft` is `true` and `prerelease` is `false`;
-   - tag, title, and body exactly match the source-controlled release plan;
-   - `target_commitish` is the pushed release-branch SHA;
-   - there are no assets yet.
+4. Extract and verify the title and body with `scripts/release_notes.mjs`.
+5. Do not create a GitHub draft manually. The protected desktop release workflow creates an Actions-owned, asset-free draft after the PR is merged; Actions tokens cannot access human-owned drafts.
 
-Do not dispatch `.github/workflows/desktop-release.yml` before the release PR is on `main`. Do not publish the draft manually. After merge, dispatch that workflow from `main` with the release PR's exact merge or squash SHA as `source_sha` and the numeric ID of the matching GitHub draft as `release_id`; it verifies the isolated release commit and exact draft, retargets the draft to that trusted SHA, builds and verifies the DMG plus OTA assets once, uploads them together, and publishes only after every gate passes.
+Do not dispatch `.github/workflows/desktop-release.yml` before the release PR is on `main`. Do not create or publish the draft manually. After merge, dispatch that workflow from `main` with the release PR's exact merge or squash SHA as `source_sha`; it verifies the isolated release commit, creates and owns the matching asset-free draft, builds and verifies the DMG plus OTA assets once, uploads them together, and publishes only after every gate passes.
 
 ## 6. Report
 
-Return the old and new versions, baseline tag or root commit, number of PRs/commits reviewed, release PR URL, draft release URL, checks run, and the explicit next action: merge the release PR, then dispatch the desktop release workflow from `main` with that merged commit's full SHA.
+Return the old and new versions, baseline tag or root commit, number of PRs/commits reviewed, release PR URL, checks run, and the explicit next action: merge the release PR, then dispatch the desktop release workflow from `main` with that merged commit's full SHA.
