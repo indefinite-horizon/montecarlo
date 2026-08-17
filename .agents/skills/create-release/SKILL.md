@@ -90,7 +90,7 @@ Also run any additional checks required by `docs/TESTING.md` for the included ch
    - `target_commitish` is the pushed release-branch SHA;
    - there are no assets yet.
 
-Do not dispatch `.github/workflows/desktop-release.yml` before the release PR is on `main`. Do not publish the draft manually. After merge, dispatch that workflow from `main` with the release PR's exact merge or squash SHA as `source_sha`; it verifies the isolated release commit, retargets the draft to that trusted SHA, builds and verifies the DMG plus OTA assets once, uploads them together, and publishes only after every gate passes.
+Do not dispatch `.github/workflows/desktop-release.yml` before the release PR is on `main`. Do not publish the draft manually. After merge, dispatch that workflow from `main` with the release PR's exact merge or squash SHA as `source_sha` and the numeric ID of the matching GitHub draft as `release_id`; it verifies the isolated release commit and exact draft, retargets the draft to that trusted SHA, builds and verifies the DMG plus OTA assets once, uploads them together, and publishes only after every gate passes.
 
 ## 6. Report
 

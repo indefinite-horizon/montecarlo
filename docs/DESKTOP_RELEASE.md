@@ -72,8 +72,11 @@ matching GitHub draft. The draft is intentionally asset-free and invisible to
 updater clients while the release PR is reviewed.
 
 After the release PR is merged, copy its exact commit SHA from `main` and pass
-it as `source_sha` when dispatching `.github/workflows/desktop-release.yml`
-from `main`. This stays safe if other PRs land before the workflow starts: the
+it as `source_sha` when dispatching `.github/workflows/desktop-release.yml`.
+Also pass the numeric ID of the matching GitHub draft as `release_id`; draft
+releases are addressed directly because GitHub's release-list endpoint may omit
+them even for an authenticated caller. Dispatch the workflow from `main`.
+This stays safe if other PRs land before the workflow starts: the
 workflow checks out the requested commit and requires it to be the isolated
 version/changelog commit on `main`'s first-parent history. The workflow:
 

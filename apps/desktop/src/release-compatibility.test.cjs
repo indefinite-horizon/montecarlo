@@ -37,6 +37,10 @@ describe("desktop release compatibility", () => {
     );
     assert.match(releaseWorkflow, /source_sha:/);
     assert.match(releaseWorkflow, /SOURCE_SHA: \$\{\{ inputs\.source_sha \}\}/);
+    assert.match(releaseWorkflow, /release_id:/);
+    assert.match(releaseWorkflow, /RELEASE_ID: \$\{\{ inputs\.release_id \}\}/);
+    assert.match(releaseWorkflow, /repos\/\$\{UPDATE_REPOSITORY\}\/releases\/\$\{RELEASE_ID\}/);
+    assert.doesNotMatch(releaseWorkflow, /draft-ids\.txt/);
     assert.match(releaseWorkflow, /merge-base --is-ancestor/);
     assert.match(releaseWorkflow, /rev-list --first-parent origin\/main/);
     assert.match(releaseWorkflow, /expected-source-files\.txt/);
@@ -49,7 +53,7 @@ describe("desktop release compatibility", () => {
     assert.match(releaseWorkflow, /bun scripts\/release_version\.mjs current/);
     assert.match(releaseWorkflow, /release_version\.mjs assert-newer/);
     assert.match(releaseWorkflow, /bun scripts\/release_notes\.mjs validate/);
-    assert.match(releaseWorkflow, /select\(\.draft == true and \.tag_name/);
+    assert.match(releaseWorkflow, /jq -r \.draft/);
     assert.match(releaseWorkflow, /git\/refs\/tags\/\$\{tag\}/);
     assert.match(releaseWorkflow, /commits\/\$\{RELEASE_TAG\}/);
     assert.match(releaseWorkflow, /make_latest: "true"/);
