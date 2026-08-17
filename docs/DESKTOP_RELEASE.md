@@ -72,16 +72,18 @@ release notes and version bump are the review boundary.
 
 After the release PR is merged, copy its exact commit SHA from `main` and pass
 it as `source_sha` when dispatching `.github/workflows/desktop-release.yml` from
-`main`. The protected workflow creates and owns the matching asset-free draft;
-GitHub Actions tokens cannot access drafts created by a human account.
+`main`. The protected workflow creates the exact source tag first, then creates
+and owns the matching asset-free draft; GitHub Actions tokens cannot access
+drafts created by a human account.
 This stays safe if other PRs land before the workflow starts: the
 workflow checks out the requested commit and requires it to be the isolated
 version/changelog commit on `main`'s first-parent history. The workflow:
 
 1. requires all signing secrets and this public repository;
 2. verifies the exact source commit introduced only the synchronized version,
-   lockfile, and changelog, then creates or resumes its matching draft at
-   that SHA on `main`;
+   lockfile, and changelog, creates or verifies an immutable tag at that SHA,
+   then creates or resumes its matching draft without asking the Releases API
+   to create a tag from an older workflow revision;
 3. compares the committed compatibility policy with the last release;
 4. builds a universal signed and notarized DMG and ZIP exactly once without
    publishing during the build;
