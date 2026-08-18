@@ -77,11 +77,21 @@ describe("desktop release compatibility", () => {
     const verifyArtifactsIndex = releaseWorkflow.search(
       /bun scripts\/verify_desktop_release_artifacts\.mjs/,
     );
+    const loadSmokeHarnessIndex = releaseWorkflow.search(
+      /git show "\$\{WORKFLOW_SHA\}:tests\/e2e\/desktop\/shell\.spec\.ts"/,
+    );
+    const smokePackageIndex = releaseWorkflow.search(
+      /bash scripts\/smoke_packaged_desktop\.sh "\$app_path"/,
+    );
     assert.notEqual(stapleIndex, -1);
     assert.notEqual(refreshMetadataIndex, -1);
     assert.notEqual(verifyArtifactsIndex, -1);
+    assert.notEqual(loadSmokeHarnessIndex, -1);
+    assert.notEqual(smokePackageIndex, -1);
     assert.ok(stapleIndex < refreshMetadataIndex);
     assert.ok(refreshMetadataIndex < verifyArtifactsIndex);
+    assert.ok(verifyArtifactsIndex < loadSmokeHarnessIndex);
+    assert.ok(loadSmokeHarnessIndex < smokePackageIndex);
     assert.match(releaseWorkflow, /WORKFLOW_SHA: \$\{\{ github\.sha \}\}/);
     assert.match(releaseWorkflow, /expected-assets\.tsv/);
     assert.match(releaseWorkflow, /pre-publish-assets\.tsv/);
