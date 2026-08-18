@@ -130,21 +130,11 @@ async function reloadRenderer(page: Page) {
   let dialogHandling: Promise<void> | undefined;
   let dialogError: Error | undefined;
   const handleDialog = (dialog: Dialog) => {
-    const isBeforeUnload = dialog.type() === "beforeunload";
-    if (!isBeforeUnload) {
-      dialogError = new Error(`Unexpected ${dialog.type()} dialog during renderer reload.`);
-    }
-    const handling = isBeforeUnload ? dialog.accept() : dialog.dismiss();
-    dialogHandling = handling.catch((error: unknown) => {
-      // Electron's will-prevent-unload handler permits the reload and closes
-      // Convex's beforeunload prompt before Playwright can accept it.
-      if (
-        isBeforeUnload &&
-        error instanceof Error &&
-        error.message.includes("No dialog is showing")
-      ) {
-        return;
-      }
+    // Electron's will-prevent-unload handler permits the reload and closes
+    // Convex's beforeunload prompt. Playwright must not handle it again.
+    if (dialog.type() === "beforeunload") return;
+    dialogError = new Error(`Unexpected ${dialog.type()} dialog during renderer reload.`);
+    dialogHandling = dialog.dismiss().catch((error: unknown) => {
       dialogError = error instanceof Error ? error : new Error(String(error));
     });
   };
