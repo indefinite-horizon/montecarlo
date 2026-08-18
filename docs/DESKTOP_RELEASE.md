@@ -86,11 +86,12 @@ version/changelog commit on `main`'s first-parent history. The workflow:
    then creates or resumes its matching draft without asking the Releases API
    to create a tag from an older workflow revision;
 3. compares the committed compatibility policy with the last release;
-4. builds a universal signed and notarized DMG and ZIP exactly once without
-   publishing during the build;
+4. builds the universal app, DMG, and ZIP exactly once without publishing,
+   notarizes the app during packaging, then separately notarizes and staples
+   the signed DMG;
 5. validates the app ID, arm64/x64 slices, Developer ID signatures, stapled
-   notarization ticket, updater metadata, recomputed ZIP SHA-512 and byte size,
-   signing team, and data layout;
+   app and DMG notarization tickets, updater metadata, recomputed ZIP SHA-512
+   and byte size, signing team, and data layout;
 6. launches the signed package with Node, Bun, and Convex removed from the
    application's `PATH` (the Playwright process still uses Actions' Node), sends
    a UI message through the real bundled runtime and a deterministic Codex
