@@ -105,7 +105,8 @@ version/changelog commit on `main`'s first-parent history. The workflow:
    a UI message through the real bundled runtime and a deterministic Codex
    protocol fixture, then reloads and verifies both turns persisted;
 7. uploads the DMG, ZIP, both differential-download blockmaps,
-   `latest-mac.yml`, and the compatibility manifest to the invisible draft,
+   `latest-mac.yml`, and the compatibility manifest to the invisible draft by
+   its exact release ID (drafts are intentionally not tag-addressable),
    verifies the exact asset names, upload states, and byte sizes, rechecks the
    draft immediately before publication, and publishes last.
 
