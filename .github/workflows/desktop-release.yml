@@ -22,9 +22,9 @@ jobs:
     environment: desktop-release
     permissions:
       contents: write
-    # Keep the established Intel host for this universal build; validate on an
-    # arm64 host and macos-26-intel before migrating the release job.
-    runs-on: macos-15-intel
+    # Pin the release and smoke builds to the same Blacksmith macOS image. The
+    # M4 host still produces and verifies both slices of the universal app.
+    runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 60
     env:
       UPDATE_REPOSITORY: ${{ github.repository }}
