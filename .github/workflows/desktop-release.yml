@@ -231,14 +231,19 @@ jobs:
             exit 1
           fi
           jq -n \
+            --arg tag "$tag" \
             --arg name "$release_title" \
             --rawfile body .context/desktop-release/release-notes.md \
-            '{name: $name, body: $body, draft: true, prerelease: false}' \
+            '{tag_name: $tag, name: $name, body: $body, draft: true, prerelease: false}' \
             | gh api \
                 --method PATCH \
                 "repos/${UPDATE_REPOSITORY}/releases/${release_id}" \
                 --input - \
                 > .context/desktop-release/draft.json
+          if [[ "$(jq -r .tag_name .context/desktop-release/draft.json)" != "$tag" ]]; then
+            echo "::error::Refreshing the release draft changed its tag association"
+            exit 1
+          fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
