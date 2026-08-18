@@ -29,6 +29,7 @@ jobs:
     env:
       UPDATE_REPOSITORY: ${{ github.repository }}
       SOURCE_SHA: ${{ inputs.source_sha }}
+      WORKFLOW_SHA: ${{ github.sha }}
     steps:
       - name: Require an exact source SHA
         shell: bash
@@ -338,7 +339,11 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          bun scripts/refresh_desktop_release_dmg_metadata.mjs \
+          set -euo pipefail
+          refresh_script="$RUNNER_TEMP/refresh_desktop_release_dmg_metadata.mjs"
+          git show "${WORKFLOW_SHA}:scripts/refresh_desktop_release_dmg_metadata.mjs" \
+            > "$refresh_script"
+          bun "$refresh_script" \
             --version "$RELEASE_VERSION" \
             --directory dist/desktop
 

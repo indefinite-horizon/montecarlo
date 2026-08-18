@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url);
 
@@ -61,7 +61,7 @@ export function replaceArtifactMetadata(metadata, artifactName, updateInfo) {
 }
 
 function resolveBlockMapBuilder() {
-  const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const repositoryRoot = process.cwd();
   const electronBuilderPackage = require.resolve("electron-builder/package.json", {
     paths: [path.join(repositoryRoot, "apps/desktop")],
   });

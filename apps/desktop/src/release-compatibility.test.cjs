@@ -72,7 +72,7 @@ describe("desktop release compatibility", () => {
     assert.match(releaseWorkflow, /universal\.zip\.blockmap/);
     const stapleIndex = releaseWorkflow.search(/xcrun stapler staple "\$dmg_path"/);
     const refreshMetadataIndex = releaseWorkflow.search(
-      /bun scripts\/refresh_desktop_release_dmg_metadata\.mjs/,
+      /git show "\$\{WORKFLOW_SHA\}:scripts\/refresh_desktop_release_dmg_metadata\.mjs"/,
     );
     const verifyArtifactsIndex = releaseWorkflow.search(
       /bun scripts\/verify_desktop_release_artifacts\.mjs/,
@@ -82,6 +82,7 @@ describe("desktop release compatibility", () => {
     assert.notEqual(verifyArtifactsIndex, -1);
     assert.ok(stapleIndex < refreshMetadataIndex);
     assert.ok(refreshMetadataIndex < verifyArtifactsIndex);
+    assert.match(releaseWorkflow, /WORKFLOW_SHA: \$\{\{ github\.sha \}\}/);
     assert.match(releaseWorkflow, /expected-assets\.tsv/);
     assert.match(releaseWorkflow, /pre-publish-assets\.tsv/);
     assert.doesNotMatch(releaseWorkflow, /DESKTOP_RELEASE_TOKEN|GITHUB_RUN_NUMBER/);
