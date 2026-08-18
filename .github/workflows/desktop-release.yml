@@ -333,6 +333,15 @@ jobs:
             --wait
           xcrun stapler staple "$dmg_path"
 
+      - name: Refresh updater metadata for the stapled DMG
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          bun scripts/refresh_desktop_release_dmg_metadata.mjs \
+            --version "$RELEASE_VERSION" \
+            --directory dist/desktop
+
       - name: Remove signing secrets
         if: always()
         shell: bash
