@@ -476,10 +476,25 @@ jobs:
             dist/desktop/latest-mac.yml
             .context/desktop-release/desktop-release-compatibility.json
           )
-          gh release upload "$RELEASE_TAG" \
-            "${release_asset_paths[@]}" \
-            --repo "$UPDATE_REPOSITORY" \
-            --clobber
+          for asset_path in "${release_asset_paths[@]}"; do
+            asset_name="$(basename "$asset_path")"
+            while IFS= read -r existing_asset_id; do
+              if [[ -n "$existing_asset_id" ]]; then
+                gh api --method DELETE \
+                  "repos/${UPDATE_REPOSITORY}/releases/assets/${existing_asset_id}"
+              fi
+            done < <(
+              jq -r --arg name "$asset_name" \
+                '.assets[] | select(.name == $name) | .id' \
+                <<< "$release_json"
+            )
+            gh api \
+              --method POST \
+              -H 'Content-Type: application/octet-stream' \
+              --input "$asset_path" \
+              "https://uploads.github.com/repos/${UPDATE_REPOSITORY}/releases/${RELEASE_ID}/assets?name=${asset_name}" \
+              >/dev/null
+          done
 
           for asset_path in "${release_asset_paths[@]}"; do
             asset_name="$(basename "$asset_path")"

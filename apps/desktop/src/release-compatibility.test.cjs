@@ -95,6 +95,11 @@ describe("desktop release compatibility", () => {
     assert.match(releaseWorkflow, /WORKFLOW_SHA: \$\{\{ github\.sha \}\}/);
     assert.match(releaseWorkflow, /expected-assets\.tsv/);
     assert.match(releaseWorkflow, /pre-publish-assets\.tsv/);
+    assert.match(
+      releaseWorkflow,
+      /uploads\.github\.com\/repos\/\$\{UPDATE_REPOSITORY\}\/releases\/\$\{RELEASE_ID\}\/assets/,
+    );
+    assert.doesNotMatch(releaseWorkflow, /gh release upload/);
     assert.doesNotMatch(releaseWorkflow, /DESKTOP_RELEASE_TOKEN|GITHUB_RUN_NUMBER/);
     assert.doesNotMatch(releaseWorkflow, /\bworkflow_run:/);
   });
