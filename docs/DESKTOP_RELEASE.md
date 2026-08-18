@@ -93,7 +93,8 @@ version/changelog commit on `main`'s first-parent history. The workflow:
 3. compares the committed compatibility policy with the last release;
 4. builds the universal app, DMG, and ZIP exactly once without publishing,
    notarizes the app during packaging, then separately notarizes and staples
-   the signed DMG;
+   the signed DMG, and regenerates the DMG blockmap and feed digest from the
+   final stapled bytes;
 5. validates the app ID, arm64/x64 slices, Developer ID signatures, stapled
    app and DMG notarization tickets, updater metadata, recomputed ZIP SHA-512
    and byte size, signing team, and data layout;

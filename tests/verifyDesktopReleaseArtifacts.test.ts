@@ -1,11 +1,19 @@
 /** Verifies release metadata hashes the exact ZIP that will be served to the updater. */
 
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
+import { refreshDesktopReleaseDmgMetadata } from "../scripts/refresh_desktop_release_dmg_metadata.mjs";
 import { verifyDesktopReleaseArtifacts } from "../scripts/verify_desktop_release_artifacts.mjs";
 
 const temporaryDirectories: string[] = [];
@@ -60,5 +68,27 @@ describe("desktop release artifacts", () => {
     await expect(
       verifyDesktopReleaseArtifacts({ version, artifactsDirectory: directory }),
     ).rejects.toThrow(/digest does not match/u);
+  });
+
+  it("regenerates the DMG blockmap and feed entry after stapling changes the bytes", async () => {
+    const { directory, version } = releaseFixture();
+    const dmg = `Monte-Carlo-${version}-universal.dmg`;
+    const dmgPath = path.join(directory, dmg);
+    appendFileSync(dmgPath, "stapled notarization ticket");
+    await expect(
+      verifyDesktopReleaseArtifacts({ version, artifactsDirectory: directory }),
+    ).rejects.toThrow(/records .* bytes/u);
+
+    await refreshDesktopReleaseDmgMetadata({ version, artifactsDirectory: directory });
+
+    await expect(
+      verifyDesktopReleaseArtifacts({ version, artifactsDirectory: directory }),
+    ).resolves.toBeDefined();
+    const metadata = readFileSync(path.join(directory, "latest-mac.yml"), "utf8");
+    expect(metadata).toContain(`size: ${statSync(dmgPath).size}`);
+    const blockMap = JSON.parse(gunzipSync(readFileSync(`${dmgPath}.blockmap`)).toString("utf8"));
+    expect(blockMap.files[0].sizes.reduce((sum: number, size: number) => sum + size, 0)).toBe(
+      statSync(dmgPath).size,
+    );
   });
 });
