@@ -248,18 +248,21 @@ jobs:
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
-          previous_arguments=()
+          compatibility_arguments=(--version "$RELEASE_VERSION")
           if [[ -n "$PREVIOUS_RELEASE_TAG" ]]; then
             gh release download "$PREVIOUS_RELEASE_TAG" \
               --repo "$UPDATE_REPOSITORY" \
               --pattern desktop-release-compatibility.json \
               --dir .context/desktop-release/previous
-            previous_arguments=(--previous .context/desktop-release/previous/desktop-release-compatibility.json)
+            compatibility_arguments+=(
+              --previous .context/desktop-release/previous/desktop-release-compatibility.json
+            )
           fi
-          bun scripts/check_desktop_release_compatibility.mjs \
-            --version "$RELEASE_VERSION" \
-            "${previous_arguments[@]}" \
+          compatibility_arguments+=(
             --output .context/desktop-release/desktop-release-compatibility.json
+          )
+          bun scripts/check_desktop_release_compatibility.mjs \
+            "${compatibility_arguments[@]}"
 
       - name: Configure Apple notarization
         shell: bash
@@ -320,15 +323,20 @@ jobs:
             echo "::error::The release is not signed by an Apple Developer ID team"
             exit 1
           fi
-          previous_arguments=()
+          compatibility_arguments=(
+            --version "$RELEASE_VERSION"
+            --signing-team-id "$signing_team_id"
+          )
           if [[ -f .context/desktop-release/previous/desktop-release-compatibility.json ]]; then
-            previous_arguments=(--previous .context/desktop-release/previous/desktop-release-compatibility.json)
+            compatibility_arguments+=(
+              --previous .context/desktop-release/previous/desktop-release-compatibility.json
+            )
           fi
-          bun scripts/check_desktop_release_compatibility.mjs \
-            --version "$RELEASE_VERSION" \
-            "${previous_arguments[@]}" \
-            --signing-team-id "$signing_team_id" \
+          compatibility_arguments+=(
             --output .context/desktop-release/desktop-release-compatibility.json
+          )
+          bun scripts/check_desktop_release_compatibility.mjs \
+            "${compatibility_arguments[@]}"
           bun scripts/verify_desktop_release_artifacts.mjs \
             --version "$RELEASE_VERSION" \
             --directory dist/desktop

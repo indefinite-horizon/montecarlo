@@ -62,6 +62,8 @@ describe("desktop release compatibility", () => {
     assert.match(releaseWorkflow, /bun scripts\/release_version\.mjs current/);
     assert.match(releaseWorkflow, /release_version\.mjs assert-newer/);
     assert.match(releaseWorkflow, /bun scripts\/release_notes\.mjs validate/);
+    assert.doesNotMatch(releaseWorkflow, /previous_arguments=\(\)/);
+    assert.match(releaseWorkflow, /compatibility_arguments=\(--version "\$RELEASE_VERSION"\)/);
     assert.match(releaseWorkflow, /select\(\.draft == true and \.tag_name/);
     assert.match(releaseWorkflow, /git\/matching-refs\/tags\/\$\{tag\}/);
     assert.match(releaseWorkflow, /commits\/\$\{RELEASE_TAG\}/);
