@@ -3,6 +3,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import {
+  type Dialog,
   type ElectronApplication,
   _electron as electron,
   expect,
@@ -126,13 +127,41 @@ async function reopenDesktopWindow() {
 
 async function reloadRenderer(page: Page) {
   if (!app) throw new Error("Electron did not launch.");
-  const loadEvent = page.waitForEvent("load", { timeout: 120_000 }).catch(() => undefined);
-  await app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0];
-    if (!window || window.isDestroyed()) throw new Error("No Electron window is open.");
-    window.webContents.reload();
-  });
-  await loadEvent;
+  let dialogHandling: Promise<void> | undefined;
+  let dialogError: Error | undefined;
+  const handleDialog = (dialog: Dialog) => {
+    const isBeforeUnload = dialog.type() === "beforeunload";
+    if (!isBeforeUnload) {
+      dialogError = new Error(`Unexpected ${dialog.type()} dialog during renderer reload.`);
+    }
+    const handling = isBeforeUnload ? dialog.accept() : dialog.dismiss();
+    dialogHandling = handling.catch((error: unknown) => {
+      // Electron's will-prevent-unload handler permits the reload and closes
+      // Convex's beforeunload prompt before Playwright can accept it.
+      if (
+        isBeforeUnload &&
+        error instanceof Error &&
+        error.message.includes("No dialog is showing")
+      ) {
+        return;
+      }
+      dialogError = error instanceof Error ? error : new Error(String(error));
+    });
+  };
+  page.on("dialog", handleDialog);
+  try {
+    const loadEvent = page.waitForEvent("load", { timeout: 120_000 });
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      if (!window || window.isDestroyed()) throw new Error("No Electron window is open.");
+      window.webContents.reload();
+    });
+    await loadEvent;
+    await dialogHandling;
+    if (dialogError) throw dialogError;
+  } finally {
+    page.off("dialog", handleDialog);
+  }
   const reloaded = page.isClosed() ? await firstWindow({ timeout: 180_000 }) : page;
   await expect(reloaded.getByTestId("workspace-app")).toBeVisible({ timeout: 120_000 });
   return reloaded;
