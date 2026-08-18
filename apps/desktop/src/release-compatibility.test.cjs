@@ -40,6 +40,7 @@ describe("desktop release compatibility", () => {
     assert.doesNotMatch(releaseWorkflow, /inputs\.release_id/);
     assert.match(releaseWorkflow, /created-draft\.json/);
     assert.match(releaseWorkflow, /tag_name: \$tag/);
+    assert.match(releaseWorkflow, /Refreshing the release draft changed its tag association/);
     assert.doesNotMatch(releaseWorkflow, /target_commitish/);
     const tagCreationIndex = releaseWorkflow.search(/"repos\/\$\{UPDATE_REPOSITORY\}\/git\/refs"/);
     const draftCreationIndex = releaseWorkflow.search(/"repos\/\$\{UPDATE_REPOSITORY\}\/releases"/);
