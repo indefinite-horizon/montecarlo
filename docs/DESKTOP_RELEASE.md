@@ -80,7 +80,8 @@ workflow checks out the requested commit and requires it to be the isolated
 version/changelog commit on `main`'s first-parent history. The workflow:
 
 1. requires all signing secrets and this public repository;
-2. verifies the exact source commit introduced only the synchronized version,
+2. validates the App Store Connect credentials with Apple before starting the
+   long universal build, then verifies the exact source commit introduced only the synchronized version,
    lockfile, and changelog, creates or verifies an immutable tag at that SHA,
    then creates or resumes its matching draft without asking the Releases API
    to create a tag from an older workflow revision;
