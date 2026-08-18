@@ -61,6 +61,11 @@ so GitHub withholds the credentials until approval. The same-repository
 workflow writes releases with its short-lived `GITHUB_TOKEN` and a job-scoped
 `contents: write` permission.
 
+Install the Blacksmith GitHub App for this repository. The macOS packaging
+smoke job and protected release job both use the pinned
+`blacksmith-6vcpu-macos-15` M4 image and verify that the resulting application
+contains both arm64 and x64 slices.
+
 ## Prepare a release
 
 Run `/create-release <major|minor|patch>` from a clean branch based on the code

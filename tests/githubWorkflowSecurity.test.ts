@@ -165,6 +165,11 @@ describe("GitHub workflow security", () => {
     const releaseJob = workflowJobs(desktopRelease?.source ?? "").get("release-macos");
     expect(releaseJob).toBeDefined();
     expect(releaseJob).toMatch(/^ {4}environment: desktop-release$/m);
+    expect(releaseJob).toMatch(/^ {4}runs-on: blacksmith-6vcpu-macos-15$/m);
+
+    const ci = workflows.find(({ fileName }) => fileName === "ci.yml");
+    const desktopSmokeJob = workflowJobs(ci?.source ?? "").get("desktop-smoke-macos");
+    expect(desktopSmokeJob).toMatch(/^ {4}runs-on: blacksmith-6vcpu-macos-15$/m);
 
     const secretReferences = workflows.flatMap(({ fileName, source }) =>
       [...source.matchAll(/secrets\.(DESKTOP_[A-Z0-9_]+)/g)].map((match) => ({
