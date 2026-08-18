@@ -184,6 +184,10 @@ describe("GitHub workflow security", () => {
     );
     expect(releaseJob).toContain("DESKTOP_APPLE_API_ISSUER must be a UUID");
     expect(releaseJob).toContain("xcrun notarytool history");
+    expect(releaseJob).toContain(
+      `/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist"`,
+    );
+    expect(releaseJob).not.toContain('defaults read "$app_path/Contents/Info"');
     expect(releaseJob).toContain('echo "CSC_LINK=$certificate_path" >> "$GITHUB_ENV"');
     expect(releaseJob).toContain('"$' + '{CSC_LINK:-$RUNNER_TEMP/missing-signing-certificate}"');
   });

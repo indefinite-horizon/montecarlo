@@ -337,7 +337,7 @@ jobs:
             echo "::error::The universal app or DMG is missing"
             exit 1
           fi
-          bundle_identifier="$(defaults read "$app_path/Contents/Info" CFBundleIdentifier)"
+          bundle_identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist")"
           if [[ "$bundle_identifier" != "chat.montecarlo.desktop" ]]; then
             echo "::error::Unexpected bundle identifier: $bundle_identifier"
             exit 1
