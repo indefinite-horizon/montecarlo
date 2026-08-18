@@ -42,7 +42,7 @@ jobs:
       - name: Check release credentials
         shell: bash
         env:
-          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
+          CSC_LINK_P12_BASE64: ${{ secrets.DESKTOP_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
           APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           for variable in \
-            CSC_LINK \
+            CSC_LINK_P12_BASE64 \
             CSC_KEY_PASSWORD \
             APPLE_API_KEY_ID \
             APPLE_API_ISSUER \
@@ -276,9 +276,23 @@ jobs:
           chmod 600 "$key_path"
           echo "APPLE_API_KEY=$key_path" >> "$GITHUB_ENV"
 
+      - name: Configure Apple signing certificate
+        shell: bash
+        env:
+          CSC_LINK_P12_BASE64: ${{ secrets.DESKTOP_CSC_LINK }}
+        run: |
+          set -euo pipefail
+          certificate_path="$RUNNER_TEMP/desktop-signing.p12"
+          printf '%s' "$CSC_LINK_P12_BASE64" | base64 -D > "$certificate_path"
+          if [[ ! -s "$certificate_path" ]]; then
+            echo "::error::DESKTOP_CSC_LINK did not decode to a signing certificate"
+            exit 1
+          fi
+          chmod 600 "$certificate_path"
+          echo "CSC_LINK=$certificate_path" >> "$GITHUB_ENV"
+
       - name: Build, sign, and notarize once
         env:
-          CSC_LINK: ${{ secrets.DESKTOP_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.DESKTOP_CSC_KEY_PASSWORD }}
           APPLE_API_KEY_ID: ${{ secrets.DESKTOP_APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.DESKTOP_APPLE_API_ISSUER }}
@@ -286,10 +300,13 @@ jobs:
           bun run --filter './apps/desktop' build:release:mac --
           --config.forceCodeSigning=true
 
-      - name: Remove notarization private key
+      - name: Remove signing secrets
         if: always()
         shell: bash
-        run: rm -f "${APPLE_API_KEY:-$RUNNER_TEMP/missing-notarization-key}"
+        run: |
+          rm -f \
+            "${APPLE_API_KEY:-$RUNNER_TEMP/missing-notarization-key}" \
+            "${CSC_LINK:-$RUNNER_TEMP/missing-signing-certificate}"
 
       - name: Verify signed, notarized, and hashed artifacts
         shell: bash
