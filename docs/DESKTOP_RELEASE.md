@@ -97,7 +97,9 @@ version/changelog commit on `main`'s first-parent history. The workflow:
    final stapled bytes;
 5. validates the app ID, arm64/x64 slices, Developer ID signatures, stapled
    app and DMG notarization tickets, updater metadata, recomputed ZIP SHA-512
-   and byte size, signing team, and data layout;
+   and byte size, signing team, and data layout; release-only repair helpers
+   and the smoke harness come from the immutable workflow revision, while all
+   packaged application bytes remain pinned to the requested release source;
 6. launches the signed package with Node, Bun, and Convex removed from the
    application's `PATH` (the Playwright process still uses Actions' Node), sends
    a UI message through the real bundled runtime and a deterministic Codex

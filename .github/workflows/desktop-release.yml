@@ -406,6 +406,15 @@ jobs:
             --version "$RELEASE_VERSION" \
             --directory dist/desktop
 
+      - name: Load the release smoke harness from the workflow revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show "${WORKFLOW_SHA}:scripts/smoke_packaged_desktop.sh" \
+            > scripts/smoke_packaged_desktop.sh
+          git show "${WORKFLOW_SHA}:tests/e2e/desktop/shell.spec.ts" \
+            > tests/e2e/desktop/shell.spec.ts
+
       - name: Smoke test the self-contained packaged app
         shell: bash
         run: |
