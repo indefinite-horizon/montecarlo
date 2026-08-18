@@ -184,6 +184,9 @@ describe("GitHub workflow security", () => {
     );
     expect(releaseJob).toContain("DESKTOP_APPLE_API_ISSUER must be a UUID");
     expect(releaseJob).toContain("xcrun notarytool history");
+    expect(releaseJob).toContain('xcrun notarytool submit "$dmg_path"');
+    expect(releaseJob).toContain('xcrun stapler staple "$dmg_path"');
+    expect(releaseJob).toContain('xcrun stapler validate "$dmg_path"');
     expect(releaseJob).toContain(
       `/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app_path/Contents/Info.plist"`,
     );
