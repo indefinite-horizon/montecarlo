@@ -100,8 +100,8 @@ Convex, application resources, and release assets.
 
 | Variable | Purpose |
 | --- | --- |
-| `DESKTOP_CSC_LINK` | Developer ID Application signing certificate consumed by electron-builder |
-| `DESKTOP_CSC_KEY_PASSWORD` | Unlocks the desktop signing certificate in CI |
+| `DESKTOP_CSC_LINK` | Carries the base64-encoded Developer ID Application PKCS#12 certificate into the ephemeral macOS runner |
+| `DESKTOP_CSC_KEY_PASSWORD` | Unlocks the PKCS#12 signing certificate in CI |
 | `DESKTOP_APPLE_API_KEY_ID` | Selects the App Store Connect notarization key |
 | `DESKTOP_APPLE_API_ISSUER` | Selects the App Store Connect notarization issuer |
 | `DESKTOP_APPLE_API_KEY_P8_BASE64` | Carries the notarization private key into the ephemeral macOS runner |

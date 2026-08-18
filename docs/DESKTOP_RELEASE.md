@@ -49,8 +49,8 @@ environment secrets there (not as repository-level secrets):
 
 | Secret | Purpose |
 | --- | --- |
-| `DESKTOP_CSC_LINK` | Developer ID Application certificate consumed by electron-builder |
-| `DESKTOP_CSC_KEY_PASSWORD` | Password for the signing certificate |
+| `DESKTOP_CSC_LINK` | Base64-encoded Developer ID Application PKCS#12 certificate |
+| `DESKTOP_CSC_KEY_PASSWORD` | Password for the PKCS#12 signing certificate |
 | `DESKTOP_APPLE_API_KEY_ID` | App Store Connect API key identifier |
 | `DESKTOP_APPLE_API_ISSUER` | App Store Connect API issuer identifier |
 | `DESKTOP_APPLE_API_KEY_P8_BASE64` | Base64-encoded notarization API private key |
