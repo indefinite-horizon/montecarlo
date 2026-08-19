@@ -22,6 +22,10 @@ const smokeScript = readFileSync(
   path.resolve(desktopRoot, "../../scripts/smoke_packaged_desktop.sh"),
   "utf8",
 );
+const desktopShellTest = readFileSync(
+  path.resolve(desktopRoot, "../../tests/e2e/desktop/shell.spec.ts"),
+  "utf8",
+);
 const runtimeConfigSource = readFileSync(
   path.resolve(desktopRoot, "../runtime/src/config.ts"),
   "utf8",
@@ -132,6 +136,11 @@ describe("desktop integration contracts", () => {
     assert.match(smokeScript, /playwright-core\/lib\/server\/electron\/loader\.js/);
     assert.doesNotMatch(mainSource, /__playwright_run/);
     assert.match(smokeScript, /packaged app completes and persists a model turn/);
+    assert.match(desktopShellTest, /page\.on\("dialog", handleDialog\)/);
+    assert.match(desktopShellTest, /page\.off\("dialog", handleDialog\)/);
+    assert.match(desktopShellTest, /if \(dialog\.type\(\) === "beforeunload"\) return/);
+    assert.match(desktopShellTest, /if \(page\.isClosed\(\)\) return undefined/);
+    assert.match(desktopShellTest, /throw error/);
     assert.doesNotMatch(ciWorkflow, /CODEX_HOME|auth\.json/);
     assert.doesNotMatch(releaseWorkflow, /CODEX_HOME|auth\.json/);
   });
