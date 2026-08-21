@@ -10,6 +10,10 @@ const desktopRoot = path.resolve(__dirname, "..");
 const mainSource = readFileSync(path.join(__dirname, "main.cjs"), "utf8");
 const preloadSource = readFileSync(path.join(__dirname, "preload.cjs"), "utf8");
 const builderConfig = readFileSync(path.join(desktopRoot, "electron-builder.yml"), "utf8");
+const developmentBuilderConfig = readFileSync(
+  path.join(desktopRoot, "electron-builder.dev.yml"),
+  "utf8",
+);
 const ciWorkflow = readFileSync(
   path.resolve(desktopRoot, "../../.github/workflows/ci.yml"),
   "utf8",
@@ -68,6 +72,16 @@ describe("desktop integration contracts", () => {
     assert.match(builderConfig, /"\*\*\/\*"/);
   });
 
+  it("hydrates and packages the desktop login-shell environment before runtime startup", () => {
+    assert.match(builderConfig, /src\/shell-environment\.cjs/);
+    assert.match(mainSource, /hydrateDesktopEnvironment/);
+    assert.match(
+      mainSource,
+      /desktopEnvironment = await hydrateDesktopEnvironment[\s\S]*await startRuntime\(\)/,
+    );
+    assert.doesNotMatch(mainSource, /function runtimeExecutablePath/);
+  });
+
   it("packages and supervises the offline Convex bundle", () => {
     assert.match(builderConfig, /from: \.\.\/\.\.\/\.desktop-resources\/convex/);
     assert.match(builderConfig, /to: convex/);
@@ -116,6 +130,29 @@ describe("desktop integration contracts", () => {
     assert.doesNotMatch(desktopPackage.scripts["build:release:mac"], /--publish always/);
   });
 
+  it("gives development builds a distinct desktop identity", () => {
+    const desktopPackage = JSON.parse(readFileSync(path.join(desktopRoot, "package.json"), "utf8"));
+    assert.match(developmentBuilderConfig, /extends: \.\/electron-builder\.yml/);
+    assert.match(developmentBuilderConfig, /appId: chat\.montecarlo\.desktop\.dev/);
+    assert.match(developmentBuilderConfig, /productName: Monte Carlo \(Dev\)/);
+    assert.match(developmentBuilderConfig, /executableName: montecarlo-dev/);
+    assert.match(developmentBuilderConfig, /identity: null/);
+    assert.match(developmentBuilderConfig, /icon: \.\.\/web\/public\/favicon-dev\.svg/);
+    assert.match(developmentBuilderConfig, /notarize: false/);
+    assert.match(developmentBuilderConfig, /dmg:[\s\S]*sign: false/);
+    assert.match(builderConfig, /icon: \.\.\/web\/public\/favicon\.svg/);
+    assert.match(desktopPackage.scripts.build, /electron-builder\.dev\.yml/);
+    assert.match(desktopPackage.scripts["build:dir"], /electron-builder\.dev\.yml/);
+    assert.match(desktopPackage.scripts["build:smoke:mac"], /electron-builder\.dev\.yml/);
+    assert.match(desktopPackage.scripts["build:release:mac"], /electron-builder\.yml/);
+    assert.doesNotMatch(desktopPackage.scripts["build:release:mac"], /electron-builder\.dev\.yml/);
+    assert.match(mainSource, /isDevelopmentBuild/);
+    assert.match(
+      mainSource,
+      /if \(isDevelopmentBuild \|\| process\.platform !== "darwin"\) return/,
+    );
+  });
+
   it("runs a persisted packaged-model turn before merge and release", () => {
     assert.match(ciWorkflow, /desktop-smoke-macos:/);
     assert.match(ciWorkflow, /if: github\.event_name == 'push'/);
@@ -127,8 +164,11 @@ describe("desktop integration contracts", () => {
       releaseWorkflow,
       /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4/,
     );
-    assert.match(smokeScript, /CODEX_PATH="\$fake_codex"/);
+    assert.match(smokeScript, /SHELL=\/bin\/zsh/);
+    assert.match(smokeScript, /ZDOTDIR="\$shell_profile_root"/);
+    assert.doesNotMatch(smokeScript, /CODEX_PATH="\$fake_codex"/);
     assert.match(smokeScript, /PACKAGED_DESKTOP_EXECUTABLE="\$executable"/);
+    assert.match(smokeScript, /montecarlo-dev/);
     assert.match(smokeScript, /playwright-core\/lib\/server\/electron\/loader\.js/);
     assert.doesNotMatch(mainSource, /__playwright_run/);
     assert.match(smokeScript, /packaged app completes and persists a model turn/);

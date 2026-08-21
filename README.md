@@ -78,10 +78,10 @@ bun run build:runtime
 
 | Provider | Supported credential | Execution location | Notes |
 | --- | --- | --- | --- |
-| Codex | Existing `codex login` / ChatGPT-plan session | Local only | Requires the official Codex CLI on `PATH` (or `CODEX_PATH`). `codex login --device-auth` is available through the companion. The app never reads `~/.codex/auth.json`. |
+| Codex | Existing `codex login` / ChatGPT-plan session | Local only | Requires the official Codex CLI on `PATH` (or `CODEX_PATH`). Packaged macOS launches recover the login-shell `PATH` before resolving the executable. `codex login --device-auth` is available through the companion. The app never reads `~/.codex/auth.json`. |
 | Ollama | No credential by default | Local only | Defaults to `http://127.0.0.1:11434/v1`; arbitrary insecure remote endpoints are rejected. |
 | OpenRouter | User API key or administrator-provisioned runtime key | Local companion | User keys stay in the local credential boundary; settings or `OPENROUTER_BASE_URL` selects an HTTPS-compatible endpoint, and managed keys are never forwarded to request-selected endpoints. |
-| Claude | Existing Claude Code Pro/Max session | Local only | Requires the official Claude CLI on `PATH` (or `CLAUDE_PATH`). Monte Carlo invokes the CLI but never reads its credential store. |
+| Claude | Existing Claude Code Pro/Max session | Local only | Requires the official Claude CLI on `PATH` (or `CLAUDE_PATH`). Packaged macOS launches recover the login-shell `PATH` before resolving the executable. Monte Carlo invokes the CLI but never reads its credential store. |
 
 Local development uses one `.env.local`. The runtime loads the complete file,
 while `scripts/filter_convex_env.sh` ensures only explicitly allowlisted values

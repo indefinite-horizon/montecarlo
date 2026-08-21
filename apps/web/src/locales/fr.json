@@ -274,7 +274,7 @@
     "switchWorkspace": "Changer d’espace : {{name}}"
   },
   "runtime": {
-    "offline": "Le moteur de modèles local est hors ligne. Démarrez l'application ou `bun run dev:runtime`, puis réessayez."
+    "requestFailed": "Le modèle sélectionné n’a pas pu terminer la requête. Vérifiez sa connexion, puis réessayez."
   },
   "updates": {
     "available": "Nouvelle mise à jour disponible",
