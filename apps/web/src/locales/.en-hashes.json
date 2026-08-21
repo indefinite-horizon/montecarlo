@@ -117,7 +117,7 @@
   "composer.stop": "c712aa283fb9609ca1233a5e6d8e1c08",
   "composer.send": "747c6a3564774149c989884e0c581d53",
   "composer.persistence": "cd8a1b998434143bb05987a6f26a4439",
-  "runtime.offline": "76b0ac0d888f3864efeb4199464cb5f4",
+  "runtime.requestFailed": "6f62bcd9b5fbfb2996e008fd7ca6a87f",
   "updates.available": "ca971bc1bb2ea28a3db62b618d09bac4",
   "updates.ready": "04bb150532c590f5252f0eef48f1df42",
   "updates.seeChanges": "56b6c9198c74b233dc243cde975f2c9e",

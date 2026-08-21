@@ -1,0 +1,11 @@
+extends: ./electron-builder.yml
+appId: chat.montecarlo.desktop.dev
+productName: Monte Carlo (Dev)
+executableName: montecarlo-dev
+mac:
+  identity: null
+  icon: ../web/public/favicon-dev.svg
+  notarize: false
+  artifactName: Monte-Carlo-Dev-${version}-${arch}.${ext}
+dmg:
+  sign: false

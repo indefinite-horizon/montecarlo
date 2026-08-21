@@ -16,6 +16,7 @@ files:
   - src/local-convex.cjs
   - src/local-convex-credentials.cjs
   - src/provider-secrets.cjs
+  - src/shell-environment.cjs
   - package.json
 extraResources:
   - from: ../web/dist
@@ -33,6 +34,7 @@ extraResources:
 mac:
   category: public.app-category.productivity
   hardenedRuntime: true
+  icon: ../web/public/favicon.svg
   notarize: true
   # Both per-architecture packages intentionally contain the complete offline
   # Convex bundle. These paths therefore hold the same single-architecture

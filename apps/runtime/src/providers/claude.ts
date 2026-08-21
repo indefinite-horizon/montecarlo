@@ -21,6 +21,7 @@ import type {
   RunnerEvent,
   TokenUsage,
 } from "../types.js";
+import { localToolChildEnvironment } from "./localProcessEnvironment.js";
 
 type LoginProcessEvent =
   | { type: "output"; delta: string; stream: "stdout" | "stderr" }
@@ -81,6 +82,7 @@ export function normalizeClaudeModelCatalog(value: unknown): ProviderModel[] {
 
 async function readClaudeModelCatalog(
   executable: string,
+  environment: NodeJS.ProcessEnv,
   signal?: AbortSignal,
 ): Promise<ProviderModel[]> {
   signal?.throwIfAborted();
@@ -102,6 +104,7 @@ async function readClaudeModelCatalog(
     prompt: input(),
     options: {
       abortController: controller,
+      env: environment,
       pathToClaudeCodeExecutable: executable,
       settingSources: [],
       tools: [],
@@ -247,6 +250,10 @@ export function claudeRunArguments(input: ChatRequest): string[] {
   ];
 }
 
+export function claudeChildEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return localToolChildEnvironment(env, ["CLAUDE_CONFIG_DIR"]);
+}
+
 export class ClaudeRunner implements LocalAuthRunner {
   readonly descriptor = {
     id: "anthropic",
@@ -257,11 +264,13 @@ export class ClaudeRunner implements LocalAuthRunner {
   } as const;
 
   private readonly executable: string;
+  private readonly childEnvironment: NodeJS.ProcessEnv;
   private readonly modelDiscoveryExecutable: string;
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
     this.executable = env.CLAUDE_PATH?.trim() || "claude";
-    this.modelDiscoveryExecutable = executablePath(this.executable, env);
+    this.childEnvironment = claudeChildEnvironment(env);
+    this.modelDiscoveryExecutable = executablePath(this.executable, this.childEnvironment);
   }
 
   health(signal?: AbortSignal): Promise<ProviderHealth> {
@@ -271,6 +280,7 @@ export class ClaudeRunner implements LocalAuthRunner {
   async authStatus(signal?: AbortSignal): Promise<ProviderHealth> {
     try {
       const child = spawn(this.executable, ["auth", "status"], {
+        env: this.childEnvironment,
         shell: false,
         stdio: ["ignore", "ignore", "ignore"],
         windowsHide: true,
@@ -296,6 +306,7 @@ export class ClaudeRunner implements LocalAuthRunner {
   async *deviceLogin(signal: AbortSignal): AsyncIterable<AuthEvent> {
     yield { type: "status", status: "starting", message: "Starting the official Claude CLI." };
     const child = spawn(this.executable, ["auth", "login"], {
+      env: this.childEnvironment,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -343,7 +354,11 @@ export class ClaudeRunner implements LocalAuthRunner {
   ): Promise<ProviderModelCatalog> {
     return {
       provider: "anthropic",
-      models: await readClaudeModelCatalog(this.modelDiscoveryExecutable, signal),
+      models: await readClaudeModelCatalog(
+        this.modelDiscoveryExecutable,
+        this.childEnvironment,
+        signal,
+      ),
       source: "cli",
       fetchedAt: Date.now(),
     };
@@ -352,6 +367,7 @@ export class ClaudeRunner implements LocalAuthRunner {
   async *run(input: ChatRequest, signal: AbortSignal): AsyncIterable<RunnerEvent> {
     signal.throwIfAborted();
     const child = spawn(this.executable, claudeRunArguments(input), {
+      env: this.childEnvironment,
       shell: false,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,

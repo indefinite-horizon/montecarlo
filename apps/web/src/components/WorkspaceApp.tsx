@@ -43,7 +43,7 @@ export const WorkspaceApp = memo(function WorkspaceApp() {
   const [initialChatTitle] = useState(randomFoodChatName);
   const workspaceSelectionRequestRef = useRef(0);
   const controller = useConversationController(
-    t("runtime.offline"),
+    t("runtime.requestFailed"),
     t("workspace.persistenceError"),
     view === "canvas",
     initialChatTitle,

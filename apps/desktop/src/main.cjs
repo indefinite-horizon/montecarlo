@@ -28,6 +28,7 @@ const {
 const { createDesktopUpdater } = require("./desktop-updater.cjs");
 const { createLocalConvexSupervisor } = require("./local-convex.cjs");
 const { createProviderSecretStore, parseProviderSecretUpdate } = require("./provider-secrets.cjs");
+const { hydrateDesktopEnvironment } = require("./shell-environment.cjs");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -43,7 +44,9 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const isDevelopment = !app.isPackaged;
-const appName = isDevelopment ? "Monte Carlo (Dev)" : "Monte Carlo";
+const developmentAppName = "Monte Carlo (Dev)";
+const isDevelopmentBuild = isDevelopment || app.getName() === developmentAppName;
+const appName = isDevelopmentBuild ? developmentAppName : "Monte Carlo";
 const developmentRendererUrl = resolveDevelopmentRendererUrl(process.env.ELECTRON_START_URL);
 const rendererOrigin = isDevelopment ? new URL(developmentRendererUrl).origin : desktopOrigin;
 // Port zero lets the child bind an OS-assigned socket that another process
@@ -56,6 +59,7 @@ let isQuitting = false;
 let cleanupComplete = false;
 let cleanupStarted = false;
 let desktopUpdater;
+let desktopEnvironment = process.env;
 let localConvexConfiguration;
 let localConvexSupervisor;
 let providerSecretStore;
@@ -79,22 +83,9 @@ function workspaceRoot() {
   return path.join(app.getPath("userData"), "workspaces");
 }
 
-function runtimeExecutablePath() {
-  const userHome = app.getPath("home");
-  const candidates = [
-    path.join(userHome, ".bun", "bin"),
-    path.join(userHome, ".local", "bin"),
-    path.join(userHome, ".npm", "bin"),
-    "/opt/homebrew/bin",
-    "/usr/local/bin",
-    ...(process.env.PATH || "").split(path.delimiter),
-  ];
-  return [...new Set(candidates.filter(Boolean))].join(path.delimiter);
-}
-
 function startRuntime() {
   if (runtimeProcess !== undefined && runtimeReadyPromise !== undefined) return runtimeReadyPromise;
-  const executable = isDevelopment ? process.env.BUN_EXECUTABLE || "bun" : process.execPath;
+  const executable = isDevelopment ? desktopEnvironment.BUN_EXECUTABLE || "bun" : process.execPath;
   const entrypoint = runtimeEntrypoint();
   const args = isDevelopment ? ["run", entrypoint] : [entrypoint];
   const workspacesDirectory = workspaceRoot();
@@ -114,10 +105,9 @@ function startRuntime() {
   const child = spawn(executable, args, {
     cwd: isDevelopment ? path.resolve(__dirname, "../../..") : app.getPath("userData"),
     env: {
-      ...process.env,
+      ...desktopEnvironment,
       ...(localConvexConfiguration?.runtimeEnvironment ?? {}),
       ...providerEnvironment,
-      PATH: runtimeExecutablePath(),
       ...(isDevelopment ? {} : { ELECTRON_RUN_AS_NODE: "1" }),
       MONTECARLO_RUNTIME_ALLOWED_ORIGINS: rendererOrigin,
       MONTECARLO_RUNTIME_DEV: isDevelopment ? "1" : "0",
@@ -125,7 +115,7 @@ function startRuntime() {
       MONTECARLO_RUNTIME_PORT: String(runtimePort),
       MONTECARLO_RUNTIME_TOKEN: runtimeToken,
       MONTECARLO_WORKSPACES_DIR: workspacesDirectory,
-      NODE_ENV: isDevelopment ? process.env.NODE_ENV || "development" : "production",
+      NODE_ENV: isDevelopment ? desktopEnvironment.NODE_ENV || "development" : "production",
     },
     stdio: ["ignore", "pipe", isDevelopment ? "inherit" : "ignore"],
   });
@@ -387,7 +377,7 @@ function broadcastToWindows(channel, value) {
 }
 
 function configureDesktopUpdater() {
-  if (isDevelopment || process.platform !== "darwin") return;
+  if (isDevelopmentBuild || process.platform !== "darwin") return;
   desktopUpdater = createDesktopUpdater({
     autoUpdater,
     broadcast: broadcastToWindows,
@@ -412,6 +402,13 @@ if (!hasSingleInstanceLock) {
   app
     .whenReady()
     .then(async () => {
+      desktopEnvironment = await hydrateDesktopEnvironment({
+        environment: process.env,
+        platform: process.platform,
+        userHome: app.getPath("home"),
+        reportDiagnostic: (code) =>
+          writeDiagnostic(code, "The desktop app could not read the login-shell environment."),
+      });
       providerSecretStore = createProviderSecretStore({
         safeStorage,
         userDataPath: app.getPath("userData"),

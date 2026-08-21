@@ -212,7 +212,9 @@ test("provider error preserves the user turn and allows a later successful send"
 }) => {
   const failedPrompt = "[e2e:error] Keep this user message";
   await sendMessage(page, failedPrompt);
-  const errorToast = page.getByText("local model runtime is offline", { exact: false });
+  const errorToast = page.getByText("selected model couldn't complete the request", {
+    exact: false,
+  });
   await expect(errorToast).toBeVisible();
   const failedUserTurn = userMessage(page, failedPrompt);
   await expect(failedUserTurn).toBeVisible();
