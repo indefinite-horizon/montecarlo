@@ -16,6 +16,8 @@ const { randomBytes } = require("node:crypto");
 const { mkdirSync } = require("node:fs");
 const { readFile } = require("node:fs/promises");
 const path = require("node:path");
+const desktopPackage = require("../package.json");
+const { resolveDesktopBuildIdentity } = require("./desktop-build-identity.cjs");
 const {
   desktopOrigin,
   isAllowedExternalUrl,
@@ -44,9 +46,10 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const isDevelopment = !app.isPackaged;
-const developmentAppName = "Monte Carlo (Dev)";
-const isDevelopmentBuild = isDevelopment || app.getName() === developmentAppName;
-const appName = isDevelopmentBuild ? developmentAppName : "Monte Carlo";
+const { appName, isDevelopmentBuild } = resolveDesktopBuildIdentity({
+  isPackaged: app.isPackaged,
+  channel: desktopPackage.desktopChannel,
+});
 const developmentRendererUrl = resolveDevelopmentRendererUrl(process.env.ELECTRON_START_URL);
 const rendererOrigin = isDevelopment ? new URL(developmentRendererUrl).origin : desktopOrigin;
 // Port zero lets the child bind an OS-assigned socket that another process

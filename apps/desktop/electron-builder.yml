@@ -10,6 +10,7 @@ directories:
 files:
   - src/main.cjs
   - src/preload.cjs
+  - src/desktop-build-identity.cjs
   - src/desktop-security.cjs
   - src/desktop-updater.cjs
   - src/desktop-private-files.cjs

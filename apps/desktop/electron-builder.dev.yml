@@ -2,6 +2,8 @@ extends: ./electron-builder.yml
 appId: chat.montecarlo.desktop.dev
 productName: Monte Carlo (Dev)
 executableName: montecarlo-dev
+extraMetadata:
+  desktopChannel: development
 mac:
   identity: null
   icon: ../web/public/favicon-dev.svg

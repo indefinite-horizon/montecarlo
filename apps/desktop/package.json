@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "description": "A local-first, branchable multi-model conversation workspace.",
   "author": "Monte Carlo contributors",
+  "desktopChannel": "production",
   "desktopName": "Monte Carlo",
   "private": true,
   "main": "src/main.cjs",
@@ -19,7 +20,7 @@
     "build:smoke:mac": "bun run prepare:convex --platform mac --arch universal && bun run --cwd ../web build && bun run --cwd ../runtime build && bun run ensure:production-deps && electron-builder --config electron-builder.dev.yml --mac --universal --dir --config.mac.identity=null --config.mac.notarize=false --config.dmg.sign=false",
     "build:release:mac": "bun run prepare:convex --platform mac --arch universal && bun run --cwd ../web build && bun run --cwd ../runtime build && bun run ensure:production-deps && electron-builder --config electron-builder.yml --mac --universal --publish never",
     "test": "node --test src/*.test.cjs",
-    "typecheck": "node --check src/main.cjs && node --check src/preload.cjs && node --check src/desktop-private-files.cjs && node --check src/desktop-security.cjs && node --check src/desktop-updater.cjs && node --check src/local-convex-credentials.cjs && node --check src/local-convex.cjs && node --check src/provider-secrets.cjs && node --check src/shell-environment.cjs"
+    "typecheck": "node --check src/main.cjs && node --check src/preload.cjs && node --check src/desktop-build-identity.cjs && node --check src/desktop-private-files.cjs && node --check src/desktop-security.cjs && node --check src/desktop-updater.cjs && node --check src/local-convex-credentials.cjs && node --check src/local-convex.cjs && node --check src/provider-secrets.cjs && node --check src/shell-environment.cjs"
   },
   "devDependencies": {
     "electron": "^43.0.0",

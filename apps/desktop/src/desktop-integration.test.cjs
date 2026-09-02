@@ -74,6 +74,7 @@ describe("desktop integration contracts", () => {
 
   it("hydrates and packages the desktop login-shell environment before runtime startup", () => {
     assert.match(builderConfig, /src\/shell-environment\.cjs/);
+    assert.match(builderConfig, /src\/desktop-build-identity\.cjs/);
     assert.match(mainSource, /hydrateDesktopEnvironment/);
     assert.match(
       mainSource,
@@ -136,6 +137,7 @@ describe("desktop integration contracts", () => {
     assert.match(developmentBuilderConfig, /appId: chat\.montecarlo\.desktop\.dev/);
     assert.match(developmentBuilderConfig, /productName: Monte Carlo \(Dev\)/);
     assert.match(developmentBuilderConfig, /executableName: montecarlo-dev/);
+    assert.match(developmentBuilderConfig, /extraMetadata:[\s\S]*desktopChannel: development/);
     assert.match(developmentBuilderConfig, /identity: null/);
     assert.match(developmentBuilderConfig, /icon: \.\.\/web\/public\/favicon-dev\.svg/);
     assert.match(developmentBuilderConfig, /notarize: false/);
@@ -146,7 +148,10 @@ describe("desktop integration contracts", () => {
     assert.match(desktopPackage.scripts["build:smoke:mac"], /electron-builder\.dev\.yml/);
     assert.match(desktopPackage.scripts["build:release:mac"], /electron-builder\.yml/);
     assert.doesNotMatch(desktopPackage.scripts["build:release:mac"], /electron-builder\.dev\.yml/);
+    assert.equal(desktopPackage.desktopChannel, "production");
     assert.match(mainSource, /isDevelopmentBuild/);
+    assert.match(mainSource, /resolveDesktopBuildIdentity/);
+    assert.doesNotMatch(mainSource, /app\.getName\(\)/);
     assert.match(
       mainSource,
       /if \(isDevelopmentBuild \|\| process\.platform !== "darwin"\) return/,
