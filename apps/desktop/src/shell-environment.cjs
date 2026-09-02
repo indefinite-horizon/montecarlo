@@ -256,14 +256,20 @@ function resolveProviderExecutableEnvironment(
     ["CODEX_PATH", "codex"],
     ["CLAUDE_PATH", "claude"],
   ]) {
-    const configuredExecutable = environment[environmentName]?.trim() || defaultExecutable;
-    const resolved = resolveExecutablePath(
-      configuredExecutable,
-      environment,
-      platform,
-      executableFileCheck,
-    );
-    if (resolved !== undefined) resolvedEnvironment[environmentName] = resolved;
+    const configuredExecutable = environment[environmentName]?.trim();
+    const candidates = configuredExecutable
+      ? [...new Set([configuredExecutable, defaultExecutable])]
+      : [defaultExecutable];
+    const resolved = candidates
+      .map((candidate) =>
+        resolveExecutablePath(candidate, environment, platform, executableFileCheck),
+      )
+      .find((candidate) => candidate !== undefined);
+    if (resolved !== undefined) {
+      resolvedEnvironment[environmentName] = resolved;
+    } else {
+      delete resolvedEnvironment[environmentName];
+    }
   }
   return resolvedEnvironment;
 }
@@ -341,6 +347,8 @@ async function hydrateDesktopEnvironment({
   for (const environmentName of ["CODEX_PATH", "CLAUDE_PATH"]) {
     if (resolvedProviders[environmentName] !== undefined) {
       hydrated[environmentName] = resolvedProviders[environmentName];
+    } else {
+      delete hydrated[environmentName];
     }
   }
   return hydrated;

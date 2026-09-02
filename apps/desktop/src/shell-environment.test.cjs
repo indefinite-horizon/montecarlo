@@ -193,4 +193,42 @@ describe("desktop shell environment", () => {
       },
     );
   });
+
+  it("discards invalid provider overrides and falls back to provider commands", () => {
+    const executablePaths = new Set(["/known/bin/claude"]);
+    assert.deepEqual(
+      resolveProviderExecutableEnvironment(
+        {
+          PATH: "/known/bin",
+          CODEX_PATH: "codex is a shell function",
+          CLAUDE_PATH: "alias claude='/custom/claude'",
+        },
+        "darwin",
+        (candidate) => executablePaths.has(candidate),
+      ),
+      {
+        PATH: "/known/bin",
+        CLAUDE_PATH: "/known/bin/claude",
+      },
+    );
+  });
+
+  it("does not let an invalid shell result shadow known-directory discovery", async () => {
+    const environment = await hydrateDesktopEnvironment({
+      environment: { PATH: "/usr/bin", SHELL: "/bin/zsh" },
+      platform: "darwin",
+      userHome: "/Users/example",
+      userShell: "/bin/zsh",
+      readShellEnvironment: async () => ({
+        PATH: "/usr/bin",
+        CODEX_PATH: "codex is a shell function",
+        CLAUDE_PATH: "alias claude='/Users/example/.claude/local/claude'",
+      }),
+      readLaunchctlPath: async () => undefined,
+      executableFileCheck: (candidate) => candidate === "/Users/example/.claude/local/claude",
+    });
+
+    assert.equal(environment.CODEX_PATH, undefined);
+    assert.equal(environment.CLAUDE_PATH, "/Users/example/.claude/local/claude");
+  });
 });
