@@ -47,21 +47,40 @@ function decodeOutput(output: Uint8Array): string {
   return new TextDecoder().decode(output);
 }
 
+function stripAnsiSequences(value: string): string {
+  let result = "";
+  let escapeState: "none" | "started" | "csi" = "none";
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (escapeState === "none") {
+      if (code === 27) escapeState = "started";
+      else result += character;
+    } else if (escapeState === "started") {
+      escapeState = character === "[" ? "csi" : "none";
+    } else if (code >= 64 && code <= 126) {
+      escapeState = "none";
+    }
+  }
+  return result;
+}
+
+function isExpectedBunAuditBanner(errorOutput: string): boolean {
+  return /^bun audit v\S+(?: \([^)]+\))?$/.test(stripAnsiSequences(errorOutput).trim());
+}
+
 export function evaluateRootAudit(output: string, exitCode: number, errorOutput: string): string[] {
   const advisories = parseAuditJson(output);
   const blockedAdvisories: string[] = [];
-  let advisoryCount = 0;
 
   for (const [packageName, packageAdvisories] of Object.entries(advisories)) {
     for (const advisory of packageAdvisories) {
-      advisoryCount += 1;
       if (advisory.severity !== "high" && advisory.severity !== "critical") continue;
       const summary = `${packageName}: ${advisory.title ?? `${advisory.severity} advisory`} (${advisory.url ?? "no URL"})`;
       blockedAdvisories.push(summary);
     }
   }
 
-  if (exitCode !== 0 && advisoryCount === 0) {
+  if (exitCode !== 0 && blockedAdvisories.length === 0 && !isExpectedBunAuditBanner(errorOutput)) {
     throw new Error(`bun audit failed: ${errorOutput.trim() || "unknown error"}`);
   }
 
@@ -69,7 +88,7 @@ export function evaluateRootAudit(output: string, exitCode: number, errorOutput:
 }
 
 function auditRootDependencies(): string[] {
-  const audit = Bun.spawnSync(["bun", "audit", "--json"], {
+  const audit = Bun.spawnSync(["bun", "audit", "--audit-level=high", "--json"], {
     stdout: "pipe",
     stderr: "pipe",
   });
