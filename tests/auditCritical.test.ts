@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateRootAudit } from "../scripts/audit-critical";
 
 describe("critical dependency audit", () => {
-  it("allows a filtered report that contains only lower severities", () => {
+  it("allows a nonzero Bun exit when the complete report only contains lower severities", () => {
     expect(
       evaluateRootAudit(
         JSON.stringify({
@@ -16,6 +16,8 @@ describe("critical dependency audit", () => {
             },
           ],
         }),
+        1,
+        "bun audit v1.3.6",
       ),
     ).toEqual([]);
   });
@@ -37,6 +39,8 @@ describe("critical dependency audit", () => {
             },
           ],
         }),
+        1,
+        "",
       ),
     ).toEqual([
       "vulnerable: High example (https://example.test/high)",
@@ -44,12 +48,14 @@ describe("critical dependency audit", () => {
     ]);
   });
 
-  it("allows an empty high-severity report", () => {
-    expect(evaluateRootAudit("{}")).toEqual([]);
+  it("still rejects a failed audit with no advisory report", () => {
+    expect(() => evaluateRootAudit("{}", 1, "registry unavailable")).toThrow(
+      "bun audit failed: registry unavailable",
+    );
   });
 
   it("rejects unexpected registry JSON instead of treating it as a clean report", () => {
-    expect(() => evaluateRootAudit('{"error":"registry unavailable"}')).toThrow(
+    expect(() => evaluateRootAudit('{"error":"registry unavailable"}', 1, "")).toThrow(
       "bun audit emitted an unexpected JSON report",
     );
   });

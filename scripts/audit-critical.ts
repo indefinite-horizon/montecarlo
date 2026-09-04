@@ -47,28 +47,34 @@ function decodeOutput(output: Uint8Array): string {
   return new TextDecoder().decode(output);
 }
 
-export function evaluateRootAudit(output: string): string[] {
+export function evaluateRootAudit(output: string, exitCode: number, errorOutput: string): string[] {
   const advisories = parseAuditJson(output);
   const blockedAdvisories: string[] = [];
+  let advisoryCount = 0;
 
   for (const [packageName, packageAdvisories] of Object.entries(advisories)) {
     for (const advisory of packageAdvisories) {
+      advisoryCount += 1;
       if (advisory.severity !== "high" && advisory.severity !== "critical") continue;
       const summary = `${packageName}: ${advisory.title ?? `${advisory.severity} advisory`} (${advisory.url ?? "no URL"})`;
       blockedAdvisories.push(summary);
     }
   }
 
+  if (exitCode !== 0 && advisoryCount === 0) {
+    throw new Error(`bun audit failed: ${errorOutput.trim() || "unknown error"}`);
+  }
+
   return blockedAdvisories;
 }
 
 function auditRootDependencies(): string[] {
-  const audit = Bun.spawnSync(["bun", "audit", "--audit-level=high", "--json"], {
+  const audit = Bun.spawnSync(["bun", "audit", "--json"], {
     stdout: "pipe",
     stderr: "pipe",
   });
 
-  return evaluateRootAudit(decodeOutput(audit.stdout));
+  return evaluateRootAudit(decodeOutput(audit.stdout), audit.exitCode, decodeOutput(audit.stderr));
 }
 
 function auditDesktopConvexBundle(): string[] {
