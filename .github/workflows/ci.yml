@@ -19,7 +19,24 @@ jobs:
         with:
           bun-version: 1.3.6
       - run: bun install
-      - run: bun scripts/audit-critical.ts
+      - name: Scan Bun lockfile
+        id: osv-scan
+        # The scanner exits 1 for findings at any severity; the next step enforces our high threshold.
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+        with:
+          scan-args: |-
+            scan
+            source
+            --lockfile=bun.lock
+            --lockfile=apps/desktop/convex-bundle/package-lock.json
+            --format=json
+            --output-file=.osv-results-${{ github.run_id }}-${{ github.run_attempt }}.json
+      - name: Enforce high-severity dependency audit
+        run: >-
+          bun scripts/audit-critical.ts
+          --osv-report .osv-results-${{ github.run_id }}-${{ github.run_attempt }}.json
+          --osv-scan-outcome ${{ steps.osv-scan.outcome }}
 
   lint:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
