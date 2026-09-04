@@ -208,14 +208,15 @@ function main() {
   if (reportFlagIndex !== -1 && !osvReportPath) {
     throw new Error("--osv-report requires a report path");
   }
-  const outcomeFlagIndex = process.argv.indexOf("--osv-scan-outcome");
-  const osvScanOutcome = outcomeFlagIndex === -1 ? undefined : process.argv[outcomeFlagIndex + 1];
-  if (outcomeFlagIndex !== -1 && osvScanOutcome !== "success" && osvScanOutcome !== "failure") {
-    throw new Error("--osv-scan-outcome must be success or failure");
+  const exitCodeFlagIndex = process.argv.indexOf("--osv-scan-exit-code");
+  const osvScanExitCode =
+    exitCodeFlagIndex === -1 ? undefined : process.argv[exitCodeFlagIndex + 1];
+  if (exitCodeFlagIndex !== -1 && osvScanExitCode !== "0" && osvScanExitCode !== "1") {
+    throw new Error("--osv-scan-exit-code must be 0 or 1");
   }
 
   const blockedAdvisories = osvReportPath
-    ? auditRootDependencies(osvReportPath, osvScanOutcome === "failure")
+    ? auditRootDependencies(osvReportPath, osvScanExitCode === "1")
     : [...auditRootDependencies(), ...auditDesktopConvexBundle()];
 
   if (blockedAdvisories.length > 0) {
