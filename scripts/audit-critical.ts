@@ -23,35 +23,58 @@ function parseAuditJson(output: string): Record<string, Advisory[]> {
   if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) {
     throw new Error("bun audit did not emit parseable JSON output");
   }
-  return JSON.parse(output.slice(jsonStart, jsonEnd + 1));
+  const parsed: unknown = JSON.parse(output.slice(jsonStart, jsonEnd + 1));
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("bun audit emitted an unexpected JSON report");
+  }
+
+  const advisories: Record<string, Advisory[]> = {};
+  for (const [packageName, packageAdvisories] of Object.entries(parsed)) {
+    if (
+      !Array.isArray(packageAdvisories) ||
+      packageAdvisories.some(
+        (advisory) => advisory === null || typeof advisory !== "object" || Array.isArray(advisory),
+      )
+    ) {
+      throw new Error("bun audit emitted an unexpected JSON report");
+    }
+    advisories[packageName] = packageAdvisories as Advisory[];
+  }
+  return advisories;
 }
 
 function decodeOutput(output: Uint8Array): string {
   return new TextDecoder().decode(output);
 }
 
-function auditRootDependencies(): string[] {
-  const audit = Bun.spawnSync(["bun", "audit", "--audit-level=high", "--json"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const advisories = parseAuditJson(decodeOutput(audit.stdout));
+export function evaluateRootAudit(output: string, exitCode: number, errorOutput: string): string[] {
+  const advisories = parseAuditJson(output);
   const blockedAdvisories: string[] = [];
+  let advisoryCount = 0;
 
   for (const [packageName, packageAdvisories] of Object.entries(advisories)) {
     for (const advisory of packageAdvisories) {
+      advisoryCount += 1;
       if (advisory.severity !== "high" && advisory.severity !== "critical") continue;
       const summary = `${packageName}: ${advisory.title ?? `${advisory.severity} advisory`} (${advisory.url ?? "no URL"})`;
       blockedAdvisories.push(summary);
     }
   }
 
-  if (audit.exitCode !== 0 && blockedAdvisories.length === 0) {
-    throw new Error(`bun audit failed: ${decodeOutput(audit.stderr).trim() || "unknown error"}`);
+  if (exitCode !== 0 && advisoryCount === 0) {
+    throw new Error(`bun audit failed: ${errorOutput.trim() || "unknown error"}`);
   }
 
   return blockedAdvisories;
+}
+
+function auditRootDependencies(): string[] {
+  const audit = Bun.spawnSync(["bun", "audit", "--json"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  return evaluateRootAudit(decodeOutput(audit.stdout), audit.exitCode, decodeOutput(audit.stderr));
 }
 
 function auditDesktopConvexBundle(): string[] {
@@ -94,4 +117,4 @@ function main() {
   console.log("High-severity dependency audit passed.");
 }
 
-main();
+if (import.meta.main) main();
