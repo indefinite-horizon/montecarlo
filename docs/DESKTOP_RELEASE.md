@@ -37,6 +37,15 @@ under `apps/desktop/src` or `apps/runtime/src` restart Electron and its owned
 runtime. `bun run dev:desktop:shell` is only for attaching Electron to a stack
 that is already listening at `ELECTRON_START_URL`.
 
+Development and local packaged builds use the distinct `Monte Carlo (Dev)`
+name, application ID, executable, and data directory. They can run alongside
+the signed `Monte Carlo` release and never connect to its automatic-update
+channel. Local packages are unsigned and skip notarization. The protected
+Desktop Release workflow is the only build path that uses the production
+desktop identity, signing certificate, and notarization credentials. Both use
+the web favicon artwork for their macOS icon; the dev variant uses gold nodes
+so it remains recognizable beside the production app in the Dock.
+
 ## One-time release setup
 
 Keep `indefinite-horizon/montecarlo` public. GitHub Releases in this repository
@@ -100,10 +109,11 @@ version/changelog commit on `main`'s first-parent history. The workflow:
    and byte size, signing team, and data layout; release-only repair helpers
    and the smoke harness come from the immutable workflow revision, while all
    packaged application bytes remain pinned to the requested release source;
-6. launches the signed package with Node, Bun, and Convex removed from the
-   application's `PATH` (the Playwright process still uses Actions' Node), sends
-   a UI message through the real bundled runtime and a deterministic Codex
-   protocol fixture, then reloads and verifies both turns persisted;
+6. launches the signed package with Node, Bun, Convex, and the Codex fixture
+   removed from the inherited application `PATH` (the Playwright process still
+   uses Actions' Node), exposes the fixture only through an isolated zsh login
+   profile, sends a UI message through the real bundled runtime, then reloads
+   and verifies both turns persisted;
 7. uploads the DMG, ZIP, both differential-download blockmaps,
    `latest-mac.yml`, and the compatibility manifest to the invisible draft by
    its exact release ID (drafts are intentionally not tag-addressable),
@@ -111,7 +121,8 @@ version/changelog commit on `main`'s first-parent history. The workflow:
    draft immediately before publication, and publishes last.
 
 The protocol fixture replaces only the external Codex executable and provider
-network. The renderer, preload IPC, model runtime, SSE normalization, bundled
+network. Its login-profile-only location also verifies Finder-style provider
+discovery. The renderer, preload IPC, model runtime, SSE normalization, bundled
 Convex service, filesystem object store, and persistence/reload path are the
 actual packaged implementations. CI must never use or upload a developer's
 Codex credential cache.

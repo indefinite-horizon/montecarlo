@@ -5,6 +5,7 @@ import type { Readable } from "node:stream";
 import { AsyncQueue } from "../asyncQueue.js";
 import { runtimeDefaults } from "../config.js";
 import { sanitizeProcessOutput } from "../errors.js";
+import { localToolChildEnvironment } from "./localProcessEnvironment.js";
 
 type ProcessEvent =
   | { type: "output"; value: string; stream: "stdout" | "stderr" }
@@ -12,44 +13,6 @@ type ProcessEvent =
   | { type: "failure"; error: Error };
 
 export type CapturedChild = ChildProcessByStdio<null, Readable, Readable>;
-
-const CODEX_CHILD_ENVIRONMENT_KEYS = [
-  "HOME",
-  "PATH",
-  "USER",
-  "LOGNAME",
-  "SHELL",
-  "TMPDIR",
-  "TMP",
-  "TEMP",
-  "LANG",
-  "LC_ALL",
-  "LC_CTYPE",
-  "CODEX_HOME",
-  "XDG_CONFIG_HOME",
-  "XDG_RUNTIME_DIR",
-  "DBUS_SESSION_BUS_ADDRESS",
-  "HTTP_PROXY",
-  "HTTPS_PROXY",
-  "ALL_PROXY",
-  "NO_PROXY",
-  "http_proxy",
-  "https_proxy",
-  "all_proxy",
-  "no_proxy",
-  "SSL_CERT_FILE",
-  "SSL_CERT_DIR",
-  "USERPROFILE",
-  "HOMEDRIVE",
-  "HOMEPATH",
-  "APPDATA",
-  "LOCALAPPDATA",
-  "USERNAME",
-  "SystemRoot",
-  "WINDIR",
-  "ComSpec",
-  "PATHEXT",
-] as const;
 
 export function abortError(): Error {
   const error = new Error("The operation was cancelled.");
@@ -68,11 +31,7 @@ export function terminateProcess(child: ChildProcess): NodeJS.Timeout | undefine
 }
 
 export function codexChildEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const childEnvironment: NodeJS.ProcessEnv = {};
-  for (const key of CODEX_CHILD_ENVIRONMENT_KEYS) {
-    const value = env[key];
-    if (value !== undefined) childEnvironment[key] = value;
-  }
+  const childEnvironment = localToolChildEnvironment(env, ["CODEX_HOME"]);
   childEnvironment.CODEX_INTERNAL_ORIGINATOR_OVERRIDE = "monte_carlo";
   return childEnvironment;
 }

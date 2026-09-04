@@ -121,7 +121,7 @@ type RuntimeEvent =
   | { type: "error"; code: string; message: string };
 ```
 
-Codex runs through the official CLI app-server and its own credential cache. Its token-level app-server notifications are normalized into the same runtime event stream as every other provider. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction.
+Codex runs through the official CLI app-server and its own credential cache. Its token-level app-server notifications are normalized into the same runtime event stream as every other provider. Claude runs through the official local CLI and the user's approved Pro or Max subscription login. On macOS, Electron probes the user's login environment once before starting the companion, merges its `PATH` with inherited and standard fallback directories, imports only the documented desktop allowlist, and resolves provider executables to direct paths. Provider commands are not wrapped in a shell. OpenRouter and Ollama models use AI SDK 7. AI SDK's experimental Harness adapters are not the persistence abstraction.
 
 ## Chat execution
 

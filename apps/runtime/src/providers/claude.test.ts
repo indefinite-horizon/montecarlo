@@ -117,7 +117,7 @@ describe("ClaudeRunner", () => {
   });
 
   it("streams official CLI login output before finishing", async () => {
-    const runner = new ClaudeRunner({ CLAUDE_PATH: fakeClaudeCli() });
+    const runner = new ClaudeRunner({ ...process.env, CLAUDE_PATH: fakeClaudeCli() });
     const events = [];
     for await (const event of runner.deviceLogin(new AbortController().signal)) {
       events.push(event);
@@ -132,7 +132,7 @@ describe("ClaudeRunner", () => {
   });
 
   it("uses the official CLI sign-in and normalizes streamed JSON", async () => {
-    const runner = new ClaudeRunner({ CLAUDE_PATH: fakeClaudeCli() });
+    const runner = new ClaudeRunner({ ...process.env, CLAUDE_PATH: fakeClaudeCli() });
     await expect(runner.health()).resolves.toMatchObject({
       status: "ready",
       authenticated: true,
@@ -164,6 +164,7 @@ describe("ClaudeRunner", () => {
 
   it("fails when the completed message disagrees with streamed text", async () => {
     const runner = new ClaudeRunner({
+      ...process.env,
       CLAUDE_PATH: fakeClaudeCli({ completedText: "different" }),
     });
     const consume = async () => {

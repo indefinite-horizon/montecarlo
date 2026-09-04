@@ -141,6 +141,15 @@ not operator prompts in `.env.example`.
 | `OPENROUTER_BASE_URL` | Optional compatible OpenRouter endpoint override |
 | `OLLAMA_BASE_URL` | Optional Ollama-compatible endpoint override |
 
+Packaged macOS Electron also reconstructs a narrow local-tool environment once
+at startup. It may import `PATH`, `CODEX_PATH`, `CLAUDE_PATH`, `SSH_AUTH_SOCK`,
+`HOMEBREW_PREFIX`, `HOMEBREW_CELLAR`, `HOMEBREW_REPOSITORY`,
+`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `XDG_RUNTIME_DIR` from the user's login
+shell. These values remain inside the trusted desktop/runtime boundary; they
+are never sent to Convex or the renderer. Provider children receive a further
+allowlisted subset that excludes Monte Carlo bearer tokens, attestation keys,
+and unrelated provider credentials.
+
 `MONTECARLO_RUNTIME_HOST`, `MONTECARLO_RUNTIME_PORT`,
 `MONTECARLO_RUNTIME_ALLOWED_ORIGINS`, and `MONTECARLO_RUNTIME_DEV` are local
 runner or deployment controls with safe defaults in `apps/runtime/src/config.ts`.

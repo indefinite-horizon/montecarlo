@@ -7,19 +7,25 @@ cd "$(dirname "$0")/.."
 
 app_path="${1:-}"
 if [[ -z "$app_path" ]]; then
-  if [[ -d dist/desktop/mac-universal/montecarlo.app ]]; then
+  if [[ -d "dist/desktop/mac-universal/montecarlo-dev.app" ]]; then
+    app_path="dist/desktop/mac-universal/montecarlo-dev.app"
+  elif [[ -d "dist/desktop/mac-universal/montecarlo.app" ]]; then
     app_path="dist/desktop/mac-universal/montecarlo.app"
   else
-    app_path="$(find dist/desktop -type d -iname 'montecarlo.app' -print -quit)"
+    app_path="$(find dist/desktop -type d \( -iname 'montecarlo-dev.app' -o -iname 'montecarlo.app' \) -print -quit)"
   fi
 fi
 if [[ -z "$app_path" || ! -d "$app_path" ]]; then
-  echo "Error: the packaged Monte Carlo.app was not found." >&2
+  echo "Error: a packaged Monte Carlo desktop app was not found." >&2
   exit 1
 fi
 app_path="$(cd "$(dirname "$app_path")" && pwd)/$(basename "$app_path")"
 
-executable="$app_path/Contents/MacOS/montecarlo"
+if [[ -x "$app_path/Contents/MacOS/montecarlo-dev" ]]; then
+  executable="$app_path/Contents/MacOS/montecarlo-dev"
+else
+  executable="$app_path/Contents/MacOS/montecarlo"
+fi
 if [[ ! -x "$executable" ]]; then
   echo "Error: the packaged desktop executable is missing." >&2
   exit 1
@@ -32,7 +38,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-fake_codex="$smoke_root/fake-codex"
+fake_bin="$smoke_root/login-bin"
+fake_codex="$fake_bin/codex"
+shell_profile_root="$smoke_root/zsh"
 user_data="$smoke_root/user-data"
 node_executable="$(command -v node)"
 playwright_loader="$(find "$PWD/node_modules" -path '*/playwright-core/lib/server/electron/loader.js' -type f -print -quit)"
@@ -40,13 +48,16 @@ if [[ -z "$playwright_loader" || ! -f "$playwright_loader" ]]; then
   echo "Error: Playwright's Electron loader was not found." >&2
   exit 1
 fi
-mkdir -p "$user_data"
+mkdir -p "$fake_bin" "$shell_profile_root" "$user_data"
 bun build tests/e2e/fixtures/fake-codex.mjs --compile --outfile "$fake_codex"
 chmod 700 "$fake_codex"
+printf 'export PATH="%s:/usr/bin:/bin:/usr/sbin:/sbin"\n' "$fake_bin" \
+  > "$shell_profile_root/.zprofile"
 
 env -u APPLE_API_KEY -u MONTECARLO_PACKAGED_SMOKE \
-  CODEX_PATH="$fake_codex" \
   PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  SHELL=/bin/zsh \
+  ZDOTDIR="$shell_profile_root" \
   RUN_DESKTOP_E2E=true \
   PLAYWRIGHT_SKIP_WEBSERVER=true \
   PACKAGED_DESKTOP_EXECUTABLE="$executable" \

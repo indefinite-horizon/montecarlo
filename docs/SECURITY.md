@@ -62,6 +62,11 @@ flag on a shared or cloud deployment.
   temporary working directory. Shell, patch, web, app, plugin, browser, and
   computer tools are disabled. Configured MCP capabilities are disabled per
   thread and verified absent before a user prompt is sent.
+- Packaged macOS Electron reads a bounded allowlist from the login shell once
+  at startup. It uses the result only to merge tool paths, recover local tool
+  context such as `SSH_AUTH_SOCK`, and resolve provider executables. Provider
+  commands are spawned directly, and shell output and local paths are never
+  logged.
 - OpenRouter keys come from Electron's encrypted store or an explicitly trusted
   local runtime environment.
 - A managed OpenRouter key is used only with the configured managed endpoint;
@@ -69,6 +74,9 @@ flag on a shared or cloud deployment.
 - Ollama endpoints must resolve to loopback.
 - Claude Pro/Max authentication remains in the official Claude CLI credential
   store. Monte Carlo may invoke the CLI login flow, but does not read its cache.
+  Claude CLI and Agent SDK children receive the same narrow local-tool
+  environment as Codex; runtime bearer, attestation, and unrelated provider
+  secrets are excluded.
 
 ## Object Storage
 

@@ -274,7 +274,7 @@
     "switchWorkspace": "Switch workspace: {{name}}"
   },
   "runtime": {
-    "offline": "The local model runtime is offline. Start the desktop app or `bun run dev:runtime`, then try again."
+    "requestFailed": "The selected model couldn't complete the request. Check its connection and try again."
   },
   "updates": {
     "available": "New update available",
