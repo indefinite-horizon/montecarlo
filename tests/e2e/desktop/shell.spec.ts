@@ -140,7 +140,10 @@ async function reloadRenderer(page: Page) {
   };
   page.on("dialog", handleDialog);
   try {
-    const loadEvent = page.waitForEvent("load", { timeout: 120_000 });
+    const loadEvent = page.waitForEvent("load", { timeout: 120_000 }).catch((error: unknown) => {
+      if (page.isClosed()) return undefined;
+      throw error;
+    });
     await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       if (!window || window.isDestroyed()) throw new Error("No Electron window is open.");
